@@ -247,6 +247,44 @@ const Dropdown: React.FC<{
   );
 };
 
+// Function to analyze historical data by shot position
+const analyzeHistoricalDataByShotPosition = (holeHistory: HoleHistory) => {
+  const shotPositionData: { [key: string]: { [key: string]: number } } = {};
+  
+  // Process each round's hole score
+  holeHistory.recentRounds.forEach(holeScore => {
+    const shots = holeScore.shots || [];
+    
+    // Group shots by type and position
+    const ironShots = shots.filter(shot => shot.type === 'iron').sort((a, b) => a.timestamp - b.timestamp);
+    const putts = shots.filter(shot => shot.type === 'putt').sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Process iron shots by position
+    ironShots.forEach((shot, index) => {
+      const positionKey = `iron-${index + 1}`;
+      if (!shotPositionData[positionKey]) {
+        shotPositionData[positionKey] = {};
+      }
+      if (shot.direction) {
+        shotPositionData[positionKey][shot.direction] = (shotPositionData[positionKey][shot.direction] || 0) + 1;
+      }
+    });
+    
+    // Process putts by position
+    putts.forEach((putt, index) => {
+      const positionKey = `putt-${index + 1}`;
+      if (!shotPositionData[positionKey]) {
+        shotPositionData[positionKey] = {};
+      }
+      if (putt.direction) {
+        shotPositionData[positionKey][putt.direction] = (shotPositionData[positionKey][putt.direction] || 0) + 1;
+      }
+    });
+  });
+  
+  return shotPositionData;
+};
+
 // Hole History Modal Component
 const HoleHistoryModal: React.FC<{
   visible: boolean;
@@ -285,6 +323,10 @@ const HoleHistoryModal: React.FC<{
       width: '90%',
       maxWidth: 500,
       maxHeight: '90%',
+      flex: 1,
+    },
+    scrollContent: {
+      flex: 1,
     },
     modalTitle: {
       fontSize: 24,
@@ -328,7 +370,7 @@ const HoleHistoryModal: React.FC<{
       marginTop: 16,
     },
     recentRoundsList: {
-      maxHeight: 200,
+      marginBottom: 16,
     },
     roundItem: {
       flexDirection: 'row',
@@ -355,26 +397,70 @@ const HoleHistoryModal: React.FC<{
     shotAnalysis: {
       marginTop: 16,
     },
-    shotTypeTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    shotList: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    shotTag: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+    todaysDistanceCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginBottom: 0,
       borderRadius: 12,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    shotTagText: {
-      color: colors.background,
-      fontSize: 12,
+    actionButtonsCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginTop: 8,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+    },
+    navigationButtons: {
+      flexDirection: 'row',
+      padding: 20,
+      paddingBottom: 40, // Move up from bottom
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      minHeight: 80,
+      justifyContent: 'space-between',
+    },
+    shotCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+      justifyContent: 'center',
+    },
+    addShotCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sectionHeader: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    expectedText: {
+      fontSize: 14,
+      color: colors.textSecondary,
       fontWeight: '500',
     },
     emptyState: {
@@ -430,73 +516,78 @@ const HoleHistoryModal: React.FC<{
           <Text style={styles.modalTitle}>Hole {holeHistory.holeNumber} History</Text>
           <Text style={styles.courseName}>{courseName}</Text>
 
-          {/* Statistics */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{holeHistory.totalRounds}</Text>
-              <Text style={styles.statLabel}>Rounds</Text>
+          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Statistics */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{holeHistory.totalRounds}</Text>
+                <Text style={styles.statLabel}>Rounds</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{holeHistory.averageScore}</Text>
+                <Text style={styles.statLabel}>Avg Score</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: getScoreColor(holeHistory.bestScore, 4) }]}>
+                  {holeHistory.bestScore}
+                </Text>
+                <Text style={styles.statLabel}>Best</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: getScoreColor(holeHistory.worstScore, 4) }]}>
+                  {holeHistory.worstScore}
+                </Text>
+                <Text style={styles.statLabel}>Worst</Text>
+              </View>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{holeHistory.averageScore}</Text>
-              <Text style={styles.statLabel}>Avg Score</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: getScoreColor(holeHistory.bestScore, 4) }]}>
-                {holeHistory.bestScore}
-              </Text>
-              <Text style={styles.statLabel}>Best</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: getScoreColor(holeHistory.worstScore, 4) }]}>
-                {holeHistory.worstScore}
-              </Text>
-              <Text style={styles.statLabel}>Worst</Text>
-            </View>
-          </View>
 
-          {/* Recent Rounds */}
-          <Text style={styles.sectionTitle}>Recent Rounds</Text>
-          <ScrollView style={styles.recentRoundsList}>
-            {holeHistory.recentRounds.map((round, index) => {
-              const netScore = round.totalScore - round.par;
-              return (
-                <View key={index} style={styles.roundItem}>
-                  <Text style={styles.roundDate}>
-                    {formatDate(round.completedAt)}
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[styles.roundScore, { color: getScoreColor(round.totalScore, round.par) }]}>
-                      {round.totalScore}
+            {/* Recent Rounds */}
+            <Text style={styles.sectionTitle}>Recent Rounds</Text>
+            <View style={styles.recentRoundsList}>
+              {holeHistory.recentRounds.map((round, index) => {
+                const netScore = round.totalScore - round.par;
+                return (
+                  <View key={index} style={styles.roundItem}>
+                    <Text style={styles.roundDate}>
+                      {formatDate(round.completedAt)}
                     </Text>
-                    <Text style={[styles.roundNetScore, { color: getScoreColor(round.totalScore, round.par) }]}>
-                      ({netScore > 0 ? `+${netScore}` : netScore === 0 ? 'E' : netScore})
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[styles.roundScore, { color: getScoreColor(round.totalScore, round.par) }]}>
+                        {round.totalScore}
+                      </Text>
+                      <Text style={[styles.roundNetScore, { color: getScoreColor(round.totalScore, round.par) }]}>
+                        ({netScore > 0 ? `+${netScore}` : netScore === 0 ? 'E' : netScore})
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
+
+            {/* Historical Shot Analysis by Position */}
+            <View style={styles.shotAnalysis}>
+              <Text style={styles.sectionTitle}>Historical Shot Patterns</Text>
+              {(() => {
+                const shotPositionData = analyzeHistoricalDataByShotPosition(holeHistory);
+                const shotPositions = Object.keys(shotPositionData).sort();
+                
+                return shotPositions.map(positionKey => {
+                  const [shotType, shotNumber] = positionKey.split('-');
+                  const historicalData = shotPositionData[positionKey];
+                  
+                  return (
+                    <HistoricalOutcomeGrid
+                      key={positionKey}
+                      shotType={shotType as 'iron' | 'putt'}
+                      shotNumber={parseInt(shotNumber)}
+                      historicalData={historicalData}
+                      colors={colors}
+                    />
+                  );
+                });
+              })()}
+            </View>
           </ScrollView>
-
-          {/* Shot Analysis */}
-          <View style={styles.shotAnalysis}>
-            <Text style={styles.shotTypeTitle}>Common Iron Shots</Text>
-            <View style={styles.shotList}>
-              {holeHistory.commonShots.iron.slice(0, 10).map((shot, index) => (
-                <View key={index} style={styles.shotTag}>
-                  <Text style={styles.shotTagText}>{shot.direction}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Text style={styles.shotTypeTitle}>Common Putts</Text>
-            <View style={styles.shotList}>
-              {holeHistory.commonShots.putts.slice(0, 10).map((shot, index) => (
-                <View key={index} style={styles.shotTag}>
-                  <Text style={styles.shotTagText}>{shot.direction}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Close</Text>
@@ -1612,7 +1703,7 @@ const OutcomeGrid: React.FC<{
       gap: 4,
     },
     cell: {
-      aspectRatio: 1,
+      aspectRatio: 1.5, // 2:3 height:width ratio (width/height = 1.5)
       borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
@@ -1681,6 +1772,160 @@ const OutcomeGrid: React.FC<{
             })}
           </View>
         ))}
+      </View>
+    </View>
+  );
+};
+
+// Historical Outcome Grid Component
+const HistoricalOutcomeGrid: React.FC<{
+  shotType: 'iron' | 'putt';
+  shotNumber: number;
+  historicalData: { [key: string]: number };
+  colors: any;
+}> = ({ shotType, shotNumber, historicalData, colors }) => {
+  const outcomes = [
+    ['left\nlong', 'long', 'right\nlong'],
+    ['left', 'good', 'right'],
+    ['left\nshort', 'short', 'right\nshort']
+  ];
+
+  // Map display labels to stored values
+  const getOutcomeValue = (displayLabel: string) => {
+    const mapping: { [key: string]: string } = {
+      'left\nlong': 'left and long',
+      'long': 'long',
+      'right\nlong': 'right and long',
+      'left': 'left',
+      'good': 'good',
+      'right': 'right',
+      'left\nshort': 'left and short',
+      'short': 'short',
+      'right\nshort': 'right and short'
+    };
+    return mapping[displayLabel] || displayLabel;
+  };
+
+  const maxCount = Math.max(...Object.values(historicalData), 1);
+
+  const getIntensity = (outcome: string) => {
+    const count = historicalData[outcome] || 0;
+    return count / maxCount;
+  };
+
+  const styles = StyleSheet.create({
+    container: {
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    grid: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    row: {
+      flex: 1,
+      gap: 4,
+    },
+    cell: {
+      aspectRatio: 1.5, // 2:3 height:width ratio (width/height = 1.5)
+      borderRadius: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cellText: {
+      fontSize: 10,
+      fontWeight: '500',
+      textAlign: 'center',
+      lineHeight: 12,
+    },
+    countText: {
+      fontSize: 8,
+      marginTop: 2,
+      fontWeight: '600',
+    },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      gap: 4,
+    },
+    legendText: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      marginRight: 8,
+    },
+    legendCell: {
+      width: 12,
+      height: 12,
+      borderRadius: 2,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>
+        {shotType === 'iron' ? `Shot ${shotNumber}` : `Putt ${shotNumber}`} - Historical Patterns
+      </Text>
+      <View style={styles.grid}>
+        {outcomes.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {row.map((outcome) => {
+              const outcomeValue = getOutcomeValue(outcome);
+              const count = historicalData[outcomeValue] || 0;
+              const intensity = getIntensity(outcomeValue);
+              const isGood = outcomeValue === 'good';
+              
+              // Blue gradient scaling (light to dark)
+              const alpha = Math.max(0.1, intensity);
+              const backgroundColor = isGood 
+                ? `rgba(76, 175, 80, ${alpha})` 
+                : `rgba(33, 150, 243, ${alpha})`;
+              
+              return (
+                <View
+                  key={outcome}
+                  style={[
+                    styles.cell,
+                    { backgroundColor }
+                  ]}
+                >
+                  <Text style={[styles.cellText, { color: colors.text }]}>
+                    {outcome === 'good' ? 'Good' : outcome}
+                  </Text>
+                  {count > 0 && (
+                    <Text style={[styles.countText, { color: colors.text }]}>
+                      {count}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+      
+      {/* Frequency Legend */}
+      <View style={styles.legend}>
+        <Text style={styles.legendText}>Less</Text>
+        {[0, 0.25, 0.5, 0.75, 1].map((intensity, index) => (
+          <View
+            key={index}
+            style={[
+              styles.legendCell,
+              { backgroundColor: `rgba(33, 150, 243, ${intensity})` }
+            ]}
+          />
+        ))}
+        <Text style={styles.legendText}>More</Text>
       </View>
     </View>
   );
@@ -2001,6 +2246,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   const [showHistory, setShowHistory] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
   const [todaysDistance, setTodaysDistance] = useState<string>(hole?.todaysDistance?.toString() || '');
+  const [currentShotIndex, setCurrentShotIndex] = useState(0);
+  const [currentShotType, setCurrentShotType] = useState<'iron' | 'putt'>('iron');
   const scrollViewRef = useRef<ScrollView>(null);
   const expectedIronShots = hole ? Math.max(0, hole.par - 2) : 0; // par 3 = 1, par 4 = 2, par 5 = 3
   const expectedPutts = 2;
@@ -2008,6 +2255,52 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   // Check if all default iron shots have outcomes
   const allIronShotsHaveOutcomes = ironShots.length >= expectedIronShots && 
     ironShots.slice(0, expectedIronShots).every(shot => shot.direction);
+
+  // Get all shots in order (iron shots first, then putts)
+  const getAllShots = () => {
+    return [
+      ...ironShots.map((shot, index) => ({ shot, type: 'iron' as const, index, id: shot.id })),
+      ...putts.map((shot, index) => ({ shot, type: 'putt' as const, index, id: shot.id }))
+    ];
+  };
+
+  // Get current shot being displayed
+  const getCurrentShot = () => {
+    if (currentShotType === 'iron') {
+      return ironShots[currentShotIndex] || null;
+    } else {
+      return putts[currentShotIndex] || null;
+    }
+  };
+
+  // Calculate shot card height for snap behavior
+  const SHOT_CARD_HEIGHT = 400; // Increased height to accommodate full grids
+
+  // Snap to current shot
+  const snapToCurrentShot = () => {
+    const allShots = getAllShots();
+    const currentGlobalIndex = currentShotType === 'iron' ? currentShotIndex : ironShots.length + currentShotIndex;
+    const scrollY = currentGlobalIndex * SHOT_CARD_HEIGHT;
+    
+    scrollViewRef.current?.scrollTo({ y: scrollY, animated: true });
+  };
+
+  // Advance to next shot with snap
+  const advanceToNextShot = () => {
+    const allShots = getAllShots();
+    const currentGlobalIndex = currentShotType === 'iron' ? currentShotIndex : ironShots.length + currentShotIndex;
+    
+    if (currentGlobalIndex < allShots.length - 1) {
+      const nextShot = allShots[currentGlobalIndex + 1];
+      setCurrentShotType(nextShot.type);
+      setCurrentShotIndex(nextShot.index);
+      
+      // Snap to the next shot
+      setTimeout(() => {
+        snapToCurrentShot();
+      }, 100);
+    }
+  };
 
   // Expose saveCurrentData method to parent
   useImperativeHandle(ref, () => ({
@@ -2051,11 +2344,24 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     // Update today's distance when hole changes
     setTodaysDistance(hole?.todaysDistance?.toString() || '');
 
+    // Reset current shot to first shot when hole changes
+    setCurrentShotIndex(0);
+    setCurrentShotType('iron');
+
     // Scroll to top when hole changes
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
   }, [currentHole, expectedIronShots, expectedPutts, onLoadHoleData, hole]);
+
+  // Snap to current shot when shots change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      snapToCurrentShot();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [ironShots, putts, currentShotIndex, currentShotType]);
 
 
   const addIronShot = () => {
@@ -2103,6 +2409,13 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     }
     // Clear validation error when shots are updated
     setShowValidationError(false);
+    
+    // Auto-advance to next shot when outcome is selected
+    if (field === 'direction') {
+      setTimeout(() => {
+        advanceToNextShot();
+      }, 300); // Small delay to show the selection
+    }
   };
 
   const totalScore = ironShots.length + putts.length;
@@ -2225,9 +2538,9 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       gap: 8,
     },
     todaysDistanceLabel: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      fontWeight: '500',
+      fontSize: 18,
+      color: colors.text,
+      fontWeight: 'bold',
     },
     todaysDistanceInput: {
       width: 80,
@@ -2481,9 +2794,13 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       paddingHorizontal: 20,
       borderRadius: 12,
       alignItems: 'center',
+      minHeight: 50,
+      marginHorizontal: 4,
     },
     primaryButton: {
       backgroundColor: colors.primary,
+      borderWidth: 2,
+      borderColor: colors.primary,
     },
     secondaryButton: {
       backgroundColor: colors.surface,
@@ -2499,6 +2816,15 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     },
     secondaryButtonText: {
       color: colors.primary,
+    },
+    historyButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    historyButtonText: {
+      color: colors.text,
+      fontWeight: '600',
     },
     actionButton: {
       backgroundColor: colors.surface,
@@ -2552,20 +2878,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
             Par {hole.par} • Stroke Index {hole.strokeIndex}
             {hole.distanceYards && ` • ${hole.distanceYards} yards`}
           </Text>
-          
-          {/* Today's Distance Input */}
-          <View style={styles.todaysDistanceContainer}>
-            <Text style={styles.todaysDistanceLabel}>Today's Distance:</Text>
-            <TextInput
-              style={styles.todaysDistanceInput}
-              placeholder="yards"
-              placeholderTextColor={colors.textSecondary}
-              value={todaysDistance}
-              onChangeText={setTodaysDistance}
-              keyboardType="numeric"
-              maxLength={4}
-            />
-          </View>
           {handicap !== undefined && (
             <Text style={styles.bumpInfo}>
               {getBumpsForHole(hole) > 0 
@@ -2597,74 +2909,49 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         <View style={styles.progressFill} />
       </View>
 
-      <ScrollView ref={scrollViewRef} style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* History Button */}
-        <TouchableOpacity style={styles.historyButton} onPress={onShowHistory}>
-          <Text style={styles.historyButtonText}>View Hole History</Text>
-        </TouchableOpacity>
+      <ScrollView 
+        ref={scrollViewRef} 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        snapToInterval={SHOT_CARD_HEIGHT}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        onScroll={(event) => {
+          const offsetY = event.nativeEvent.contentOffset.y;
+          const currentIndex = Math.round(offsetY / SHOT_CARD_HEIGHT);
+          const allShots = getAllShots();
+          
+          if (currentIndex < allShots.length) {
+            const shot = allShots[currentIndex];
+            setCurrentShotType(shot.type);
+            setCurrentShotIndex(shot.index);
+          }
+        }}
+        scrollEventThrottle={16}
+      >
+        {/* Today's Distance Card */}
+        <View style={styles.todaysDistanceCard}>
+          <Text style={styles.todaysDistanceLabel}>Today's Distance:</Text>
+          <TextInput
+            style={styles.todaysDistanceInput}
+            placeholder="yards"
+            placeholderTextColor={colors.textSecondary}
+            value={todaysDistance}
+            onChangeText={setTodaysDistance}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+        </View>
 
-        {/* Iron Shots Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Iron Shots</Text>
+
+        {/* Iron Shots Header */}
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Iron Shots</Text>
             <Text style={styles.expectedText}>
               {expectedIronShots} shots for par {hole.par}
             </Text>
           </View>
-          
-          <View style={styles.shotList}>
-            {ironShots.map((shot, index) => (
-              <View key={shot.id} style={styles.shotCard}>
-                <View style={styles.shotHeader}>
-                  <Text style={styles.shotNumber}>Shot {index + 1}</Text>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeShot(shot.id, 'iron')}
-                  >
-                    <Text style={styles.removeButtonText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.shotFields}>
-                  
-                  <View style={styles.shotFieldRow}>
-                    <Dropdown
-                      options={LIE_OPTIONS}
-                      selectedValue={shot.lie || 'fairway'}
-                      onSelect={(value) => updateShot(shot.id, 'iron', 'lie', value)}
-                      style={styles.lieDropdown}
-                      textStyle={styles.dropdownText}
-                    />
-                  </View>
-                  
-                  <View style={styles.shotFieldRow}>
-                    <Dropdown
-                      options={clubs || []}
-                      selectedValue={shot.club || ''}
-                      onSelect={(value) => updateShot(shot.id, 'iron', 'club', value)}
-                      style={styles.clubDropdown}
-                      textStyle={styles.dropdownText}
-                      placeholder="Select club (optional)"
-                    />
-                  </View>
-                </View>
-                
-                {/* Outcome Grid for this shot */}
-                <OutcomeGrid
-                  shotType="iron"
-                  shotNumber={index + 1}
-                  historicalData={historicalData.iron}
-                  selectedOutcome={shot.direction}
-                  onSelect={(outcome) => {
-                    updateShot(shot.id, 'iron', 'direction', outcome);
-                  }}
-                  showError={showValidationError && !shot.direction}
-                  colors={colors}
-                />
-              </View>
-            ))}
-          </View>
-          
           {allIronShotsHaveOutcomes && (
             <TouchableOpacity style={styles.addButton} onPress={addIronShot}>
               <Text style={styles.addButtonText}>+ Add Iron Shot</Text>
@@ -2672,68 +2959,116 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           )}
         </View>
 
-        {/* Putts Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Putts</Text>
-            <Text style={styles.expectedText}>
-              {expectedPutts} putts expected
-            </Text>
-          </View>
-          
-          <View style={styles.shotList}>
-            {putts.map((putt, index) => (
-              <View key={putt.id} style={styles.shotCard}>
-                <View style={styles.shotHeader}>
-                  <Text style={styles.shotNumber}>Putt {index + 1}</Text>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeShot(putt.id, 'putt')}
-                  >
-                    <Text style={styles.removeButtonText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.shotFields}>
-                  
-                  <View style={styles.shotFieldRow}>
-                    <Dropdown
-                      options={PUTT_DISTANCE_OPTIONS.map(option => option.value)}
-                      selectedValue={putt.puttDistance || ''}
-                      onSelect={(value) => updateShot(putt.id, 'putt', 'puttDistance', value)}
-                      style={styles.dropdown}
-                      textStyle={styles.dropdownText}
-                      placeholder="Select distance (optional)"
-                    />
-                  </View>
-                </View>
-                
-                {/* Outcome Grid for this putt */}
-                <OutcomeGrid
-                  shotType="putt"
-                  shotNumber={index + 1}
-                  historicalData={historicalData.putts}
-                  selectedOutcome={putt.direction}
-                  onSelect={(outcome) => {
-                    updateShot(putt.id, 'putt', 'direction', outcome);
-                  }}
-                  showError={showValidationError && !putt.direction}
-                  colors={colors}
+        {/* All Shots - Iron Shots First */}
+        {ironShots.map((shot, index) => (
+          <View key={shot.id} style={[styles.shotCard, { height: SHOT_CARD_HEIGHT }]}>
+            <View style={styles.shotHeader}>
+              <Text style={styles.shotNumber}>Shot {index + 1}</Text>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeShot(shot.id, 'iron')}
+              >
+                <Text style={styles.removeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.shotFields}>
+              <View style={styles.shotFieldRow}>
+                <Dropdown
+                  options={LIE_OPTIONS}
+                  selectedValue={shot.lie || 'fairway'}
+                  onSelect={(value) => updateShot(shot.id, 'iron', 'lie', value)}
+                  style={styles.lieDropdown}
+                  textStyle={styles.dropdownText}
                 />
               </View>
-            ))}
+              
+              <View style={styles.shotFieldRow}>
+                <Dropdown
+                  options={clubs || []}
+                  selectedValue={shot.club || ''}
+                  onSelect={(value) => updateShot(shot.id, 'iron', 'club', value)}
+                  style={styles.clubDropdown}
+                  textStyle={styles.dropdownText}
+                  placeholder="Select club (optional)"
+                />
+              </View>
+            </View>
+            
+            {/* Outcome Grid for this shot */}
+            <OutcomeGrid
+              shotType="iron"
+              shotNumber={index + 1}
+              historicalData={historicalData.iron}
+              selectedOutcome={shot.direction}
+              onSelect={(outcome) => {
+                updateShot(shot.id, 'iron', 'direction', outcome);
+              }}
+              showError={showValidationError && !shot.direction}
+              colors={colors}
+            />
           </View>
-          
+        ))}
+
+
+        {/* Putter Header */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Putter</Text>
+          <Text style={styles.expectedText}>
+            {expectedPutts} putts expected
+          </Text>
+        </View>
+
+        {/* All Putts */}
+        {putts.map((putt, index) => (
+          <View key={putt.id} style={[styles.shotCard, { height: SHOT_CARD_HEIGHT }]}>
+            <View style={styles.shotHeader}>
+              <Text style={styles.shotNumber}>Putt {index + 1}</Text>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeShot(putt.id, 'putt')}
+              >
+                <Text style={styles.removeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.shotFields}>
+              <View style={styles.shotFieldRow}>
+                <Dropdown
+                  options={PUTT_DISTANCE_OPTIONS.map(option => option.value)}
+                  selectedValue={putt.puttDistance || ''}
+                  onSelect={(value) => updateShot(putt.id, 'putt', 'puttDistance', value)}
+                  style={styles.dropdown}
+                  textStyle={styles.dropdownText}
+                  placeholder="Select distance (optional)"
+                />
+              </View>
+            </View>
+            
+            {/* Outcome Grid for this putt */}
+            <OutcomeGrid
+              shotType="putt"
+              shotNumber={index + 1}
+              historicalData={historicalData.putts}
+              selectedOutcome={putt.direction}
+              onSelect={(outcome) => {
+                updateShot(putt.id, 'putt', 'direction', outcome);
+              }}
+              showError={showValidationError && !putt.direction}
+              colors={colors}
+            />
+          </View>
+        ))}
+
+        {/* Add Putt Button */}
+        <View style={[styles.addShotCard, { height: SHOT_CARD_HEIGHT, marginTop: 8 }]}>
           <TouchableOpacity style={styles.addButton} onPress={addPutt}>
             <Text style={styles.addButtonText}>+ Add Putt</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
-      {/* Bottom Buttons */}
-      <View style={styles.bottomButtons}>
-        {/* Action Buttons Row with Background */}
-        <View style={styles.actionButtonsContainer}>
+        {/* Action Buttons Card - Regular spacing, no magnetic centering */}
+        <View style={styles.actionButtonsCard}>
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity style={[styles.button, styles.actionButton]} onPress={handleViewSummary}>
               <Text style={[styles.buttonText, styles.actionButtonText]}>Summary</Text>
@@ -2744,21 +3079,25 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
             </TouchableOpacity>
           </View>
         </View>
+      </ScrollView>
+
+      {/* Navigation Buttons */}
+      <View style={styles.navigationButtons}>
+        <TouchableOpacity style={[styles.button, styles.historyButton]} onPress={onShowHistory}>
+          <Text style={[styles.buttonText, styles.historyButtonText]}>View Hole History</Text>
+        </TouchableOpacity>
         
-        {/* Navigation Buttons Row */}
-        <View style={styles.navigationButtonsRow}>
-          {currentHole > 1 && (
-            <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onPreviousHole}>
-              <Text style={[styles.buttonText, styles.secondaryButtonText]}>Previous</Text>
-            </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCompleteHole}>
-            <Text style={[styles.buttonText, styles.primaryButtonText]}>
-              {currentHole === 18 ? 'Complete Round' : 'Next Hole'}
-            </Text>
+        {currentHole > 1 && (
+          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onPreviousHole}>
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>Previous</Text>
           </TouchableOpacity>
-        </View>
+        )}
+        
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCompleteHole}>
+          <Text style={[styles.buttonText, styles.primaryButtonText]}>
+            {currentHole === 18 ? 'Complete Round' : 'Next Hole'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
