@@ -24,6 +24,7 @@ import {
   SettingsSection,
   SettingsFeedbackSection,
   SettingsText,
+  SettingsButton,
 } from '../components/SettingsComponents';
 
 interface FoodPhoto {
@@ -75,6 +76,7 @@ const FoodCamSettings: React.FC<{
             </SettingsText>
           </View>
         </SettingsSection>
+        <SettingsButton title="Close" onPress={onClose} variant="secondary" />
       </SettingsScrollView>
     </SettingsContainer>
   );

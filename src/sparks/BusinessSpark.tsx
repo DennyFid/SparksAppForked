@@ -110,14 +110,12 @@ const BusinessSimulatorSettings: React.FC<{
           </View>
         </SettingsSection>
 
-        <SettingsSection title="Actions">
-          <TouchableOpacity
-            onPress={onClose}
-            style={{ backgroundColor: '#e0e0e0', padding: 12, borderRadius: 8, alignItems: 'center' }}
-          >
-            <Text style={{ fontSize: 16, fontWeight: '600' }}>Close</Text>
-          </TouchableOpacity>
-        </SettingsSection>
+        <TouchableOpacity
+          onPress={onClose}
+          style={{ backgroundColor: '#e0e0e0', padding: 12, borderRadius: 8, alignItems: 'center' }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>Close</Text>
+        </TouchableOpacity>
       </SettingsScrollView>
     </SettingsContainer>
   );

@@ -196,8 +196,19 @@ const SoundboardSettings: React.FC<{
           ) : (
             editingSoundChips.map((chip) => (
               <SettingsItem key={chip.id}>
-                <View style={{ flex: 1 }}>
-                  <SettingsText variant="body">{chip.displayName}</SettingsText>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <SettingsInput
+                    placeholder="Enter sound name (Category: Name supported)"
+                    value={chip.name}
+                    onChangeText={(text) => {
+                      const { category, displayText } = parseTaskText(text);
+                      setEditingSoundChips(prev => prev.map(c =>
+                        c.id === chip.id
+                          ? { ...c, name: text, displayName: displayText, category }
+                          : c
+                      ));
+                    }}
+                  />
                   <SettingsText variant="caption">
                     {chip.category} • {chip.duration.toFixed(1)}s • {chip.playCount} plays
                   </SettingsText>
@@ -206,20 +217,23 @@ const SoundboardSettings: React.FC<{
               </SettingsItem>
             ))
           )}
+          {editingSoundChips.length > 0 && (
+            <View style={{ paddingTop: 8 }}>
+              <SettingsText variant="caption">Tap a name to edit, then use Save below.</SettingsText>
+            </View>
+          )}
         </SettingsSection>
 
-        <SettingsSection title="Add or Import">
+        <SettingsSection title="Import">
           <View style={{ padding: 16 }}>
-            <SettingsButton onPress={importAudioFile}>
-              Import Audio File
-            </SettingsButton>
+            <SettingsButton title="Import" onPress={importAudioFile} />
             <SettingsText variant="caption" style={{ marginTop: 8 }}>
-              You can also type names like "Category: Sound Name" to organize.
+              Uses the system file picker. To import an emailed file, save the attachment to Files first, then choose it here.
             </SettingsText>
           </View>
         </SettingsSection>
 
-        <SettingsSection title="Share">
+        <SettingsSection title="Share Sound">
           <View style={{ padding: 16, gap: 12 }}>
             <TouchableOpacity
               style={{
@@ -240,9 +254,7 @@ const SoundboardSettings: React.FC<{
               </Text>
             </TouchableOpacity>
 
-            <SettingsButton onPress={shareSelectedSound}>
-              Share Selected Sound
-            </SettingsButton>
+            <SettingsButton title="Share Sound" onPress={shareSelectedSound} />
           </View>
         </SettingsSection>
 
