@@ -667,6 +667,19 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       fontSize: 16,
       fontWeight: '600',
     },
+    deleteButton: {
+      backgroundColor: '#F44336',
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    deleteButtonText: {
+      color: '#fff',
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
     toggleButton: {
       backgroundColor: colors.surface,
       paddingVertical: 12,
@@ -859,6 +872,12 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
               multiline={true}
               onSubmitEditing={saveEditedTask}
               returnKeyType="done"
+              blurOnSubmit={true}
+              onKeyPress={(e) => {
+                if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                  saveEditedTask();
+                }
+              }}
             />
 
             {/* Done Toggle */}
@@ -921,10 +940,10 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.deleteButton]}
+                style={styles.deleteButton}
                 onPress={deleteEditedTask}
               >
-                <Text style={styles.deleteButtonText}>✕ Delete</Text>
+                <Text style={styles.deleteButtonText}>✕</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

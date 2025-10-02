@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -42,7 +43,7 @@ interface Hole {
 interface Shot {
   id: string;
   type: 'iron' | 'putt';
-  direction?: 'good' | 'left' | 'right' | 'long' | 'short' | 'left and short' | 'left and long' | 'right and short' | 'right and long';
+  direction?: 'good' | 'fire' | 'left' | 'right' | 'long' | 'short' | 'left and short' | 'left and long' | 'right and short' | 'right and long';
   lie?: 'fairway' | 'rough' | 'sand' | 'green' | 'ob'; // For iron shots
   puttDistance?: '<4ft' | '5-10ft' | '10+ft'; // For putts
   club?: string; // For iron shots
@@ -425,10 +426,11 @@ const HoleHistoryModal: React.FC<{
     },
     todaysDistanceCard: {
       backgroundColor: colors.surface,
-      margin: 20,
+      marginHorizontal: 20,
+      marginTop: 8,
       marginBottom: 0,
       borderRadius: 12,
-      padding: 16,
+      padding: 12,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -469,6 +471,10 @@ const HoleHistoryModal: React.FC<{
       margin: 20,
       marginTop: 8,
       marginBottom: 8,
+    },
+    addButtonContainer: {
+      marginTop: 20,
+      alignItems: 'center',
     },
     todaysDistanceContainer: {
       flexDirection: 'row',
@@ -574,7 +580,7 @@ const HoleHistoryModal: React.FC<{
               {holeHistory.recentRounds.map((round, index) => {
                 const netScore = round.totalScore - round.par;
                 return (
-                  <View key={index} style={styles.roundItem}>
+                  <View key={`recent-${round.id || index}`} style={styles.roundItem}>
                     <Text style={styles.roundDate}>
                       {formatDate(round.completedAt)}
                     </Text>
@@ -629,13 +635,11 @@ const HoleHistoryModal: React.FC<{
 const RoundSummaryScreen: React.FC<{
   round: Round;
   course: Course;
-  onNewRound: () => void;
-  onViewRounds: () => void;
   onClose: () => void;
   handicap?: number;
   getBumpsForHole: (hole: Hole) => number;
   colors: any;
-}> = ({ round, course, onNewRound, onViewRounds, onClose, handicap, getBumpsForHole, colors }) => {
+}> = ({ round, course, onClose, handicap, getBumpsForHole, colors }) => {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -651,6 +655,53 @@ const RoundSummaryScreen: React.FC<{
     if (netScore === 0) return '#2196F3'; // Blue for par
     if (netScore <= 2) return '#FF9800'; // Orange for bogey/double bogey
     return '#F44336'; // Red for worse
+  };
+
+  const hasFireShot = (holeNumber: number) => {
+    const holeScore = (round.holeScores || []).find(hs => hs.holeNumber === holeNumber);
+    if (!holeScore) return false;
+    return holeScore.shots.some(shot => shot.direction === 'fire');
+  };
+
+  // Calculate cumulative scores over par
+  const getCumulativeScores = () => {
+    const scores = [];
+    let grossCumulative = 0;
+    let netCumulative = 0;
+    
+    for (let holeNumber = 1; holeNumber <= 18; holeNumber++) {
+      const hole = (course.holes || []).find(h => h.number === holeNumber);
+      const holeScore = (round.holeScores || []).find(hs => hs.holeNumber === holeNumber);
+      
+      if (hole && holeScore) {
+        const grossOverPar = holeScore.totalScore - hole.par;
+        const bumps = handicap !== undefined ? getBumpsForHole(hole) : 0;
+        const netOverPar = grossOverPar - bumps;
+        
+        grossCumulative += grossOverPar;
+        netCumulative += netOverPar;
+        
+        scores.push({
+          hole: holeNumber,
+          gross: grossCumulative,
+          net: netCumulative,
+          par: hole.par,
+          score: holeScore.totalScore,
+          bumps
+        });
+      } else {
+        scores.push({
+          hole: holeNumber,
+          gross: null,
+          net: null,
+          par: hole?.par || 0,
+          score: 0,
+          bumps: 0
+        });
+      }
+    }
+    
+    return scores;
   };
 
   const styles = StyleSheet.create({
@@ -746,7 +797,7 @@ const RoundSummaryScreen: React.FC<{
       gap: 8,
     },
     holeCard: {
-      flex: 1,
+      width: '18%', // Fixed width instead of flex
       aspectRatio: 1,
       backgroundColor: colors.background,
       borderRadius: 8,
@@ -860,6 +911,120 @@ const RoundSummaryScreen: React.FC<{
     secondaryButtonText: {
       color: colors.primary,
     },
+    // Graph styles
+    graphContainer: {
+      margin: 20,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    graphTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    graph: {
+      height: 220,
+      width: 300,
+      position: 'relative',
+      paddingHorizontal: 8,
+      alignSelf: 'center',
+    },
+    graphLine: {
+      position: 'absolute',
+      height: 2,
+      backgroundColor: colors.primary,
+    },
+    graphLineNet: {
+      position: 'absolute',
+      height: 2,
+      backgroundColor: '#4CAF50',
+    },
+    graphPoint: {
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+    },
+    graphPointNet: {
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#4CAF50',
+    },
+    graphPointPositive: {
+      backgroundColor: '#F44336',
+    },
+    graphPointNegative: {
+      backgroundColor: '#4CAF50',
+    },
+    graphPointZero: {
+      backgroundColor: '#2196F3',
+    },
+    graphZeroLine: {
+      position: 'absolute',
+      left: 8,
+      right: 8,
+      height: 3,
+      backgroundColor: colors.border,
+      top: 100, // Center of 200px graph
+    },
+    customChart: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    graphDataPoint: {
+      position: 'absolute',
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      zIndex: 2,
+    },
+    graphFireEmoji: {
+      position: 'absolute',
+      fontSize: 16,
+      zIndex: 3,
+    },
+    graphLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      paddingHorizontal: 8,
+    },
+    graphLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    graphLegend: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginTop: 8,
+      gap: 16,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    legendColor: {
+      width: 12,
+      height: 12,
+      borderRadius: 2,
+    },
+    legendText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
   });
 
   // Calculate current total score for incomplete rounds
@@ -878,7 +1043,7 @@ const RoundSummaryScreen: React.FC<{
       
       <View style={styles.header}>
         <Text style={styles.title}>
-          {round.isComplete ? 'Round Complete!' : 'Round Summary'}
+          Round Summary
         </Text>
         <Text style={styles.subtitle}>
           {course.name} • {formatDate(round.completedAt || round.startedAt)}
@@ -918,7 +1083,7 @@ const RoundSummaryScreen: React.FC<{
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
-                          <View key={i} style={styles.bumpDot} />
+                          <View key={`${hole.number}-bump-${i}`} style={styles.bumpDot} />
                         ))}
                       </View>
                     )}
@@ -927,7 +1092,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? score : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </View>
@@ -949,7 +1114,7 @@ const RoundSummaryScreen: React.FC<{
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
-                          <View key={i} style={styles.bumpDot} />
+                          <View key={`${hole.number}-bump-${i}`} style={styles.bumpDot} />
                         ))}
                       </View>
                     )}
@@ -958,7 +1123,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? score : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </View>
@@ -985,7 +1150,7 @@ const RoundSummaryScreen: React.FC<{
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
-                          <View key={i} style={styles.bumpDot} />
+                          <View key={`${hole.number}-bump-${i}`} style={styles.bumpDot} />
                         ))}
                       </View>
                     )}
@@ -994,7 +1159,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? score : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </View>
@@ -1016,7 +1181,7 @@ const RoundSummaryScreen: React.FC<{
                     {bumps > 0 && (
                       <View style={styles.bumpIndicators}>
                         {Array.from({ length: bumps }, (_, i) => (
-                          <View key={i} style={styles.bumpDot} />
+                          <View key={`${hole.number}-bump-${i}`} style={styles.bumpDot} />
                         ))}
                       </View>
                     )}
@@ -1025,7 +1190,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? score : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </View>
@@ -1035,6 +1200,226 @@ const RoundSummaryScreen: React.FC<{
           </View>
         </View>
       </View>
+
+      {/* Score Graphs */}
+      {(() => {
+        const scores = getCumulativeScores();
+        if (scores.length === 0) {
+          return (
+            <View style={styles.graphContainer}>
+              <Text style={styles.graphTitle}>Cumulative Shots Over Par</Text>
+              <View style={styles.graph}>
+                <Text style={{ textAlign: 'center', color: colors.text, marginTop: 40 }}>
+                  Complete some holes to see your score progression
+                </Text>
+              </View>
+            </View>
+          );
+        }
+        
+        const maxValue = Math.max(...scores.map(s => Math.max(s.gross || 0, s.net || 0)));
+        const minValue = Math.min(...scores.map(s => Math.min(s.gross || 0, s.net || 0)));
+        const range = maxValue - minValue;
+        const graphHeight = 100;
+        
+        // Define validScores for both graphs
+        const validGrossScores = scores.filter(s => s.gross !== null);
+        const validNetScores = scores.filter(s => s.net !== null);
+        
+        return (
+          <View>
+            {/* Gross Score Graph */}
+            <View style={styles.graphContainer}>
+              <Text style={styles.graphTitle}>Cumulative Shots Over Par</Text>
+              <View style={styles.graph}>
+                {(() => {
+                  const validScores = validGrossScores;
+                  if (validScores.length < 2) {
+                    return (
+                      <Text style={{ textAlign: 'center', color: colors.text, marginTop: 40 }}>
+                        Complete at least 2 holes to see score progression
+                      </Text>
+                    );
+                  }
+                  
+                  // Prepare data for LineChart
+                  const chartData = validScores.map((score, index) => {
+                    const holeHasFire = round.holeScores?.some(hs => 
+                      hs.holeNumber === score.hole && 
+                      hs.shots?.some(shot => shot.direction === 'fire')
+                    );
+                    
+                    return {
+                      value: score.gross,
+                      label: score.hole.toString(),
+                      dataPointText: score.gross > 0 ? `+${score.gross}` : score.gross.toString(),
+                      dataPointColor: colors.primary,
+                      dataPointRadius: 6,
+                      customDataPoint: holeHasFire ? (
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 12, marginBottom: 2 }}>🔥</Text>
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: colors.primary,
+                          }} />
+                        </View>
+                      ) : undefined,
+                    };
+                  });
+                  
+                  return (
+                    <View style={styles.graph}>
+                      {/* Zero line */}
+                      <View style={[styles.graphZeroLine, { top: 100 }]} />
+                      
+                      {/* Custom line chart - dots only */}
+                      <View style={styles.customChart}>
+                        {chartData.map((point, index) => {
+                          const x = index * (280 / (chartData.length - 1));
+                          const y = 100 - (point.value * 20); // Scale factor of 20
+                          
+                          return (
+                            <View key={`point-${index}`}>
+                              {/* Data point */}
+                              <View
+                                style={[
+                                  styles.graphDataPoint,
+                                  {
+                                    left: x - 6,
+                                    top: y - 6,
+                                    backgroundColor: colors.primary,
+                                  },
+                                ]}
+                              />
+                              {/* Fire emoji if applicable */}
+                              {point.customDataPoint && (
+                                <Text
+                                  style={[
+                                    styles.graphFireEmoji,
+                                    {
+                                      left: x - 8,
+                                      top: y - 20,
+                                    },
+                                  ]}
+                                >
+                                  🔥
+                                </Text>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })()}
+              </View>
+              <View style={styles.graphLabels}>
+                {validGrossScores.map((score, index) => (
+                  <Text key={`gross-${score.hole}`} style={styles.graphLabel}>{score.hole}</Text>
+                ))}
+              </View>
+            </View>
+
+            {/* Net Score Graph */}
+            {handicap !== undefined && (
+              <View style={styles.graphContainer}>
+                <Text style={styles.graphTitle}>Cumulative Shots Over Net Par</Text>
+                <View style={styles.graph}>
+                  {(() => {
+                    const validScores = validNetScores;
+                    if (validScores.length < 2) {
+                      return (
+                        <Text style={{ textAlign: 'center', color: colors.text, marginTop: 40 }}>
+                          Complete at least 2 holes to see net score progression
+                        </Text>
+                      );
+                    }
+                    
+                    // Prepare data for LineChart
+                    const chartData = validScores.map((score, index) => {
+                      const holeHasFire = round.holeScores?.some(hs => 
+                        hs.holeNumber === score.hole && 
+                        hs.shots?.some(shot => shot.direction === 'fire')
+                      );
+                      
+                      return {
+                        value: score.net,
+                        label: score.hole.toString(),
+                        dataPointText: score.net > 0 ? `+${score.net}` : score.net.toString(),
+                        dataPointColor: '#4CAF50',
+                        dataPointRadius: 6,
+                        customDataPoint: holeHasFire ? (
+                          <View style={{ alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, marginBottom: 2 }}>🔥</Text>
+                            <View style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              backgroundColor: '#4CAF50',
+                            }} />
+                          </View>
+                        ) : undefined,
+                      };
+                    });
+                    
+                    return (
+                      <View style={styles.graph}>
+                        {/* Zero line */}
+                        <View style={[styles.graphZeroLine, { top: 100 }]} />
+                        
+                        {/* Custom line chart - dots only */}
+                        <View style={styles.customChart}>
+                          {chartData.map((point, index) => {
+                            const x = index * (280 / (chartData.length - 1));
+                            const y = 100 - (point.value * 20); // Scale factor of 20
+                            
+                            return (
+                              <View key={`net-point-${index}`}>
+                                {/* Data point */}
+                                <View
+                                  style={[
+                                    styles.graphDataPoint,
+                                    {
+                                      left: x - 6,
+                                      top: y - 6,
+                                      backgroundColor: '#4CAF50',
+                                    },
+                                  ]}
+                                />
+                                {/* Fire emoji if applicable */}
+                                {point.customDataPoint && (
+                                  <Text
+                                    style={[
+                                      styles.graphFireEmoji,
+                                      {
+                                        left: x - 8,
+                                        top: y - 20,
+                                      },
+                                    ]}
+                                  >
+                                    🔥
+                                  </Text>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </View>
+                <View style={styles.graphLabels}>
+                  {validNetScores.map((score, index) => (
+                    <Text key={`net-${score.hole}`} style={styles.graphLabel}>{score.hole}</Text>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Statistics */}
       <View style={styles.statsContainer}>
@@ -1062,16 +1447,6 @@ const RoundSummaryScreen: React.FC<{
         </View>
       </View>
 
-      {/* Buttons */}
-      <View style={styles.buttons}>
-        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onNewRound}>
-          <Text style={[styles.buttonText, styles.primaryButtonText]}>Start New Round</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onViewRounds}>
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>View All Rounds</Text>
-        </TouchableOpacity>
-      </View>
     </ScrollView>
   );
 };
@@ -1680,7 +2055,7 @@ const GolfTrackerSettings: React.FC<{
                   const isIncomplete = !round.isComplete;
                   
                   return (
-                    <View key={round.id} style={styles.roundItem}>
+                    <View key={`round-${round.id}-${index}`} style={styles.roundItem}>
                       <View style={styles.roundInfo}>
                         <Text style={styles.roundCourse}>
                           {course?.name || 'Unknown Course'}
@@ -1812,14 +2187,15 @@ const GolfTrackerSettingsStyles = StyleSheet.create({
   },
   roundActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 4,
     alignItems: 'center',
+    minHeight: 20,
   },
   editButton: {
     backgroundColor: '#2196F3',
@@ -1828,7 +2204,7 @@ const GolfTrackerSettingsStyles = StyleSheet.create({
     backgroundColor: '#F44336',
   },
   actionButtonText: {
-    fontSize: 12,
+    fontSize: 8,
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -1861,7 +2237,9 @@ const OutcomeGrid: React.FC<{
   onSelect: (outcome: string) => void;
   showError?: boolean;
   colors: any;
-}> = ({ shotType, shotNumber, historicalData, selectedOutcome, onSelect, showError = false, colors }) => {
+  onFlameAnimation?: () => void;
+}> = ({ shotType, shotNumber, historicalData, selectedOutcome, onSelect, showError = false, colors, onFlameAnimation }) => {
+  
   const outcomes = [
     ['left\nlong', 'left', 'left\nshort'],
     ['long', 'good', 'short'],
@@ -1955,7 +2333,7 @@ const OutcomeGrid: React.FC<{
             {row.map((outcome) => {
               const outcomeValue = getOutcomeValue(outcome);
               const count = historicalData[outcomeValue] || 0;
-              const isSelected = selectedOutcome === outcomeValue;
+              const isSelected = selectedOutcome === outcomeValue || (selectedOutcome === 'fire' && outcome === 'good');
               const isGood = outcomeValue === 'good';
               
               // Determine cell color based on position
@@ -1990,6 +2368,10 @@ const OutcomeGrid: React.FC<{
                     }
                   ]}
                   onPress={() => onSelect(outcomeValue)}
+                  onLongPress={isGood ? () => {
+                    onSelect('fire');
+                    onFlameAnimation?.();
+                  } : undefined}
                 >
                   <Text style={[
                     styles.cellText, 
@@ -1998,9 +2380,9 @@ const OutcomeGrid: React.FC<{
                       fontWeight: isSelected ? '600' : '500'
                     }
                   ]}>
-                    {outcome === 'good' ? 'good' : outcome}
+                    {outcome === 'good' ? (selectedOutcome === 'fire' ? '🔥' : 'good') : outcome}
                   </Text>
-                  {count > 0 && !isSelected && (
+                  {count > 0 && !isSelected && outcome !== 'good' && (
                     <Text style={[styles.countText, { color: colors.textSecondary }]}>
                       {count}
                     </Text>
@@ -2433,7 +2815,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   handicap?: number;
   getBumpsForHole: (hole: Hole) => number;
   colors: any;
-}>(({ course, currentHole, currentRound, data, onNextHole, onPreviousHole, onCompleteHole, onShowHistory, onSaveHoleData, onLoadHoleData, onUpdateTodaysDistance, onEndRound, onViewSummary, onClose, clubs, handicap, getBumpsForHole, colors }, ref) => {
+  onFlameAnimation: () => void;
+}>(({ course, currentHole, currentRound, data, onNextHole, onPreviousHole, onCompleteHole, onShowHistory, onSaveHoleData, onLoadHoleData, onUpdateTodaysDistance, onEndRound, onViewSummary, onClose, clubs, handicap, getBumpsForHole, colors, onFlameAnimation }, ref) => {
   const hole = (course.holes || []).find(h => h.number === currentHole);
   const [ironShots, setIronShots] = useState<Shot[]>([]);
   const [putts, setPutts] = useState<Shot[]>([]);
@@ -2552,11 +2935,11 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     setCurrentShotIndex(0);
     setCurrentShotType('iron');
 
-    // Scroll to top when hole changes
+    // Scroll to first shot when hole changes
     setTimeout(() => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
-  }, [currentHole, expectedIronShots, expectedPutts, onLoadHoleData, hole]);
+  }, [currentHole, expectedIronShots, expectedPutts, hole]);
 
   // Snap to current shot when shots change
   useEffect(() => {
@@ -2572,17 +2955,22 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     const newShot: Shot = {
       id: `iron-${Date.now()}-${Math.random()}`,
       type: 'iron',
-      lie: 'fairway',
+      lie: 'green',
       timestamp: Date.now(),
     };
     setIronShots(prev => {
       const newShots = [...prev, newShot];
-      // Scroll to the newly added shot
-      setTimeout(() => {
-        const newShotIndex = newShots.length - 1;
-        const scrollY = newShotIndex * SHOT_CARD_HEIGHT;
-        scrollViewRef.current?.scrollTo({ y: scrollY, animated: true });
-      }, 100);
+      
+      // If the previous shot has lie 'green', change it to 'fairway'
+      if (prev.length > 0 && prev[prev.length - 1].lie === 'green') {
+        const updatedPrevShots = [...prev];
+        updatedPrevShots[updatedPrevShots.length - 1] = {
+          ...updatedPrevShots[updatedPrevShots.length - 1],
+          lie: 'fairway'
+        };
+        return [...updatedPrevShots, newShot];
+      }
+      
       return newShots;
     });
     HapticFeedback.light();
@@ -2595,17 +2983,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       puttDistance: '5-10ft',
       timestamp: Date.now(),
     };
-    setPutts(prev => {
-      const newPutts = [...prev, newPutt];
-      // Scroll to the newly added putt
-      setTimeout(() => {
-        const allShots = [...ironShots, ...newPutts];
-        const newPuttIndex = allShots.length - 1;
-        const scrollY = newPuttIndex * SHOT_CARD_HEIGHT;
-        scrollViewRef.current?.scrollTo({ y: scrollY, animated: true });
-      }, 100);
-      return newPutts;
-    });
+    setPutts(prev => [...prev, newPutt]);
     HapticFeedback.light();
   };
 
@@ -2633,12 +3011,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     // Clear validation error when shots are updated
     setShowValidationError(false);
     
-    // Auto-advance to next shot when outcome is selected
-    if (field === 'direction') {
-      setTimeout(() => {
-        advanceToNextShot();
-      }, 300); // Small delay to show the selection
-    }
+    // No auto-advance - let user manually navigate
   };
 
   const totalScore = ironShots.length + putts.length;
@@ -3096,31 +3469,74 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       marginBottom: 20,
     },
     permanentNavigation: {
-      flexDirection: 'row',
-      padding: 12,
-      paddingBottom: 40,
-      gap: 6,
+      padding: 8,
+      paddingBottom: 12,
       backgroundColor: '#f5f5f5', // Light gray background
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      minHeight: 60,
+      minHeight: 70,
+    },
+    navRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 12,
+      marginBottom: 4,
     },
     navButton: {
-      flex: 1,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 8,
-      paddingVertical: 8,
-      paddingHorizontal: 4,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      minWidth: 0,
+      minWidth: 80,
     },
     navButtonText: {
       color: colors.text,
       fontWeight: '600',
       fontSize: 16,
+    },
+    arrowButton: {
+      backgroundColor: colors.primary, // Blue for navigation
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 50,
+    },
+    arrowButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 18,
+    },
+    endRoundButton: {
+      backgroundColor: '#f44336', // Red for end round
+      borderWidth: 1,
+      borderColor: '#d32f2f',
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 120,
+      flex: 1,
+    },
+    endRoundButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 16,
+    },
+    disabledButton: {
+      backgroundColor: '#e0e0e0',
+      borderColor: '#bdbdbd',
+    },
+    disabledButtonText: {
+      color: '#9e9e9e',
     },
   });
 
@@ -3176,6 +3592,23 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         <View style={styles.progressFill} />
       </View>
 
+      {/* Today's Distance Card - Outside ScrollView */}
+      <View style={[styles.todaysDistanceCard, { paddingHorizontal: 20 }]}>
+        <View style={styles.todaysDistanceContainer}>
+          <Text style={styles.todaysDistanceLabel}>Today's Distance (optional):</Text>
+          <TextInput
+            style={styles.todaysDistanceInput}
+            placeholder="yards"
+            placeholderTextColor={colors.textSecondary}
+            value={todaysDistance}
+            onChangeText={setTodaysDistance}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+        </View>
+      </View>
+
+
       <ScrollView 
         ref={scrollViewRef} 
         style={styles.content} 
@@ -3196,32 +3629,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
         }}
         scrollEventThrottle={16}
       >
-        {/* Today's Distance Card */}
-        <View style={styles.todaysDistanceCard}>
-          <View style={styles.todaysDistanceContainer}>
-            <Text style={styles.todaysDistanceLabel}>Today's Distance (optional):</Text>
-            <TextInput
-              style={styles.todaysDistanceInput}
-              placeholder="yards"
-              placeholderTextColor={colors.textSecondary}
-              value={todaysDistance}
-              onChangeText={setTodaysDistance}
-              keyboardType="numeric"
-              maxLength={4}
-            />
-          </View>
-        </View>
-
-
-        {/* Iron Shots Header */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Iron Shots</Text>
-            <Text style={styles.expectedText}>
-              {expectedIronShots} shots for par {hole.par}
-            </Text>
-          </View>
-        </View>
 
         {/* All Shots - Iron Shots First */}
         {ironShots.map((shot, index) => (
@@ -3270,26 +3677,21 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               onSelect={(outcome) => {
                 updateShot(shot.id, 'iron', 'direction', outcome);
               }}
+              onFlameAnimation={onFlameAnimation}
               showError={showValidationError && !shot.direction}
               colors={colors}
             />
+            
+            {/* Add Iron Shot Button - Only in last iron shot card */}
+            {index === ironShots.length - 1 && (
+              <View style={styles.addButtonContainer}>
+                <TouchableOpacity style={styles.addButton} onPress={addIronShot}>
+                  <Text style={styles.addButtonText}>+ Add Iron Shot</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ))}
-
-        {/* Add Iron Shot Button - Always visible */}
-        <View style={styles.addShotContainer}>
-          <TouchableOpacity style={styles.addButton} onPress={addIronShot}>
-            <Text style={styles.addButtonText}>+ Add Iron Shot</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Putter Header */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Putter</Text>
-          <Text style={styles.expectedText}>
-            {expectedPutts} putts expected
-          </Text>
-        </View>
 
         {/* All Putts */}
         {putts.map((putt, index) => (
@@ -3327,51 +3729,76 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
               onSelect={(outcome) => {
                 updateShot(putt.id, 'putt', 'direction', outcome);
               }}
+              onFlameAnimation={onFlameAnimation}
               showError={showValidationError && !putt.direction}
               colors={colors}
             />
+            
+            {/* Add Putt Button - Only in last putt card */}
+            {index === putts.length - 1 && (
+              <View style={styles.addButtonContainer}>
+                <TouchableOpacity style={styles.addButton} onPress={addPutt}>
+                  <Text style={styles.addButtonText}>+ Add Putt</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ))}
-
-        {/* Add Putt Button */}
-        <View style={styles.addPuttContainer}>
-          <TouchableOpacity style={styles.addButton} onPress={addPutt}>
-            <Text style={styles.addButtonText}>+ Add Putt</Text>
-          </TouchableOpacity>
-        </View>
 
 
       </ScrollView>
 
       {/* Permanent Navigation - Fixed above spark bottom navigation */}
       <View style={styles.permanentNavigation}>
-        <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onClose}>
-          <Text style={[styles.buttonText, styles.navButtonText]}>✕</Text>
-        </TouchableOpacity>
-        
-        {currentHole > 1 && (
-          <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onPreviousHole}>
-            <Text style={[styles.buttonText, styles.navButtonText]}>←</Text>
+        {/* Top Row */}
+        <View style={styles.navRow}>
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.arrowButton, 
+              currentHole <= 1 && styles.disabledButton
+            ]} 
+            onPress={currentHole > 1 ? onPreviousHole : undefined}
+            disabled={currentHole <= 1}
+          >
+            <Text style={[
+              styles.buttonText, 
+              styles.arrowButtonText,
+              currentHole <= 1 && styles.disabledButtonText
+            ]}>←</Text>
           </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onShowHistory}>
-          <Text style={[styles.buttonText, styles.navButtonText]}>📊</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.button, styles.navButton]} onPress={handleViewSummary}>
-          <Text style={[styles.buttonText, styles.navButtonText]}>📋</Text>
-        </TouchableOpacity>
-        
-        {currentHole < 18 ? (
-          <TouchableOpacity style={[styles.button, styles.navButton]} onPress={handleCompleteHole}>
-            <Text style={[styles.buttonText, styles.navButtonText]}>→</Text>
+          
+          <TouchableOpacity style={[styles.button, styles.endRoundButton]} onPress={handleEndRound}>
+            <Text style={[styles.buttonText, styles.endRoundButtonText]}>End Round</Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.button, styles.navButton]} onPress={handleEndRound}>
-            <Text style={[styles.buttonText, styles.navButtonText]}>🏁</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.arrowButton,
+              currentHole >= 18 && styles.disabledButton
+            ]} 
+            onPress={currentHole < 18 ? handleCompleteHole : undefined}
+            disabled={currentHole >= 18}
+          >
+            <Text style={[
+              styles.buttonText, 
+              styles.arrowButtonText,
+              currentHole >= 18 && styles.disabledButtonText
+            ]}>→</Text>
           </TouchableOpacity>
-        )}
+        </View>
+        
+        {/* Bottom Row */}
+        <View style={styles.navRow}>
+          <TouchableOpacity style={[styles.button, styles.navButton]} onPress={handleViewSummary}>
+            <Text style={[styles.buttonText, styles.navButtonText]}>Round Summary</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.button, styles.navButton]} onPress={onShowHistory}>
+            <Text style={[styles.buttonText, styles.navButtonText]}>Hole History</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -3606,6 +4033,11 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showHandicapOnboarding, setShowHandicapOnboarding] = useState(false);
+  const [roundEnded, setRoundEnded] = useState(false);
+  const [flameAnimation, setFlameAnimation] = useState<{ visible: boolean; flames: Array<{ id: string; x: number; y: number; rotation: number; scale: number; targetY: number; translateY: Animated.Value }> }>({
+    visible: false,
+    flames: []
+  });
 
   // Load saved data on mount
   useEffect(() => {
@@ -3683,6 +4115,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   const handleSelectCourse = (course: Course) => {
     setSelectedCourse(course);
     setCurrentHole(1);
+    setRoundEnded(false); // Reset round ended state when starting new round
     
     // Create new round
     const newRound: Round = {
@@ -3745,7 +4178,15 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
       setCurrentScreen('round-summary');
     } else {
-      setCurrentHole(holeScore.holeNumber + 1);
+      const nextHole = holeScore.holeNumber + 1;
+      setCurrentHole(nextHole);
+      
+      // Clear any temporary data for the next hole to ensure it starts fresh
+      setTempHoleData(prev => {
+        const updated = { ...prev };
+        delete updated[nextHole];
+        return updated;
+      });
     }
 
     HapticFeedback.success();
@@ -3757,7 +4198,15 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       if (holeDetailRef.current) {
         holeDetailRef.current.saveCurrentData();
       }
-      setCurrentHole(prev => prev + 1);
+      const nextHole = currentHole + 1;
+      setCurrentHole(nextHole);
+      
+      // Clear any temporary data for the next hole to ensure it starts fresh
+      setTempHoleData(prev => {
+        const updated = { ...prev };
+        delete updated[nextHole];
+        return updated;
+      });
     }
   };
 
@@ -3916,6 +4365,11 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     }));
     setCurrentScreen('hole-detail');
     setCurrentHole(1); // Start from hole 1 when editing
+    
+    // Force scroll to top after a brief delay to ensure the screen is rendered
+    setTimeout(() => {
+      // This will be handled by the HoleDetailScreen's useEffect
+    }, 200);
   };
 
   const handleDeleteRound = (roundId: string) => {
@@ -3940,7 +4394,47 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         currentRound: undefined,
       }));
     }
+    setRoundEnded(true);
     setCurrentScreen('round-summary');
+  };
+
+  const triggerFlameAnimation = () => {
+    // Create multiple flame emojis starting from bottom, animating to top
+    const flames = Array.from({ length: 8 }, (_, i) => {
+      const startY = 600 + Math.random() * 200; // Start from bottom of screen
+      const targetY = Math.random() * 200 + 50; // Target position near top
+      const translateY = new Animated.Value(startY);
+      
+      // Start the animation
+      Animated.timing(translateY, {
+        toValue: targetY,
+        duration: 2000 + Math.random() * 1000, // Random duration between 2-3 seconds
+        useNativeDriver: true,
+      }).start();
+      
+      return {
+        id: `flame-${i}-${Date.now()}`,
+        x: Math.random() * 300 + 50, // Random x position
+        y: startY,
+        rotation: 0, // No rotation - normal orientation
+        scale: Math.random() * 0.6 + 0.8, // Random scale between 0.8 and 1.4
+        targetY: targetY,
+        translateY: translateY,
+      };
+    });
+
+    setFlameAnimation({
+      visible: true,
+      flames
+    });
+
+    // Hide animation after 3 seconds
+    setTimeout(() => {
+      setFlameAnimation({
+        visible: false,
+        flames: []
+      });
+    }, 3000);
   };
 
   // Calculate bumps for a hole based on handicap
@@ -3997,17 +4491,6 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     }
   };
 
-  const handleNewRound = () => {
-    setCurrentScreen('course-selection');
-    setSelectedCourse(null);
-    setCurrentRound(null);
-    setCurrentHole(1);
-  };
-
-  const handleViewRounds = () => {
-    // TODO: Implement rounds list view
-    setCurrentScreen('course-selection');
-  };
 
   const handleUpdateCourse = (courseId: string, updates: Partial<Course>) => {
     setData(prev => ({
@@ -4091,6 +4574,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           handicap={data.settings.handicap}
           getBumpsForHole={getBumpsForHole}
           colors={colors}
+          onFlameAnimation={triggerFlameAnimation}
         />
       )}
 
@@ -4098,9 +4582,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         <RoundSummaryScreen
           round={currentRound}
           course={selectedCourse}
-          onNewRound={handleNewRound}
-          onViewRounds={handleViewRounds}
-          onClose={() => setCurrentScreen('hole-detail')}
+          onClose={() => setCurrentScreen(roundEnded ? 'course-selection' : 'hole-detail')}
           handicap={data.settings.handicap}
           getBumpsForHole={getBumpsForHole}
           colors={colors}
@@ -4129,6 +4611,38 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           onSetHandicap={handleSetHandicap}
           colors={colors}
         />
+      )}
+
+      {/* Flame Animation Overlay */}
+      {flameAnimation.visible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          zIndex: 1000,
+        }}>
+          {flameAnimation.flames.map((flame) => (
+            <Animated.Text
+              key={flame.id}
+              style={{
+                position: 'absolute',
+                left: flame.x,
+                top: 0, // Fixed top position
+                fontSize: 30,
+                transform: [
+                  { translateY: flame.translateY },
+                  { scale: flame.scale }
+                ],
+                opacity: 0.8,
+              }}
+            >
+              🔥
+            </Animated.Text>
+          ))}
+        </View>
       )}
     </View>
   );
