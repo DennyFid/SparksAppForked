@@ -22,6 +22,9 @@ interface TodoItem {
   createdDate: string; // ISO date string when created
   category?: string; // Parsed category from text (e.g., "work" from "work: finish project")
   displayText: string; // Text without category prefix
+  // Hidden field used only for ordering within the same day/completed group
+  // We store a local timestamp in ms captured at edit/create/complete time
+  sortTimeMs?: number;
 }
 
 interface TodoSparkProps {
@@ -207,6 +210,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       completed: false,
       dueDate: getTodayDateString(),
       createdDate: new Date().toISOString(),
+      sortTimeMs: Date.now(),
     };
 
     setTodos(prev => [...prev, newTask]);
@@ -238,6 +242,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
           completed: newCompleted,
           completedDate: newCompleted ? today : undefined,
           dueDate: newCompleted ? today : task.dueDate, // Set due date to today when completed
+          sortTimeMs: Date.now(), // refresh ordering time
         };
       }
       return task;
@@ -275,7 +280,8 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
             category,
             dueDate: selectedDate,
             completed: editCompleted,
-            completedDate: editCompleted ? today : undefined
+            completedDate: editCompleted ? today : undefined,
+            sortTimeMs: Date.now(),
           }
         : task
     ));
@@ -372,11 +378,17 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
 
         // Among incomplete tasks, sort by due date
         if (!a.completed && !b.completed) {
-          return a.dueDate.localeCompare(b.dueDate);
+          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          if (dateCmp !== 0) return dateCmp;
+          // Then by hidden time field ascending (older first)
+          return (a.sortTimeMs || 0) - (b.sortTimeMs || 0);
         }
 
         // Among completed tasks, sort by completion time (most recent first)
-        return (b.completedDate || '').localeCompare(a.completedDate || '');
+        const cmp = (b.completedDate || '').localeCompare(a.completedDate || '');
+        if (cmp !== 0) return cmp;
+        // Then by hidden time field descending (newer completed first)
+        return (b.sortTimeMs || 0) - (a.sortTimeMs || 0);
       });
   };
 
@@ -524,6 +536,15 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       paddingHorizontal: 8,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+    },
+    todoItemToday: {
+      backgroundColor: colors.surface,
+    },
+    todoItemTomorrow: {
+      backgroundColor: '#F3E8FF', // light purple
+    },
+    todoItemFuture: {
+      backgroundColor: colors.background,
     },
     lastItem: {
       borderBottomWidth: 0,
@@ -801,7 +822,16 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
           filteredTodos.map((todo, index) => (
             <TouchableOpacity
               key={todo.id}
-              style={[styles.todoItem, index === filteredTodos.length - 1 && styles.lastItem]}
+              style={[
+                styles.todoItem,
+                // background color by due date
+                todo.dueDate === getTodayDateString()
+                  ? styles.todoItemToday
+                  : (todo.dueDate === getTomorrowDateString()
+                      ? styles.todoItemTomorrow
+                      : styles.todoItemFuture),
+                index === filteredTodos.length - 1 && styles.lastItem
+              ]}
               onPress={() => toggleTask(todo.id)}
               onLongPress={() => handleLongPress(todo)}
             >
