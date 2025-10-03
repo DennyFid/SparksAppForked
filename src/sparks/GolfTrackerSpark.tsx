@@ -2373,8 +2373,18 @@ const OutcomeGrid: React.FC<{
               
               // Determine cell color based on position
               const getCellColor = () => {
-                if (isSelected) return colors.primary;
-                if (isGood) return '#E8F5E8'; // Light green for center
+                if (isSelected) {
+                  // Check if fire is selected (special case for good cell)
+                  if (selectedOutcome === 'fire' && outcome === 'good') {
+                    return '#FF8C00'; // Burnt orange for fire
+                  }
+                  // Check if good is selected
+                  if (selectedOutcome === 'good' && outcomeValue === 'good') {
+                    return '#228B22'; // Dark green for good
+                  }
+                  return colors.primary; // Default selection color
+                }
+                if (isGood) return '#E8F5E8'; // Light green for center when not selected
                 
                 // Corner cells (bad outcomes) - light red
                 if (outcomeValue === 'left and long' || outcomeValue === 'right and long' || 
