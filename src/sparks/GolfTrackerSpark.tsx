@@ -392,31 +392,6 @@ const HoleHistoryModal: React.FC<{
       marginBottom: 12,
       marginTop: 16,
     },
-    recentRoundsList: {
-      marginBottom: 16,
-    },
-    roundItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      marginBottom: 8,
-    },
-    roundDate: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    roundScore: {
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    roundNetScore: {
-      fontSize: 12,
-      marginLeft: 8,
-    },
     shotAnalysis: {
       marginTop: 16,
     },
@@ -609,28 +584,6 @@ const HoleHistoryModal: React.FC<{
               </View>
             </View>
 
-            {/* Recent Rounds */}
-            <Text style={styles.sectionTitle}>Recent Rounds</Text>
-            <View style={styles.recentRoundsList}>
-              {holeHistory.recentRounds.map((round, index) => {
-                const netScore = round.totalScore - round.par;
-                return (
-                  <View key={`recent-${round.holeNumber}-${round.courseId}-${index}`} style={styles.roundItem}>
-                    <Text style={styles.roundDate}>
-                      {formatDate(round.completedAt)}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[styles.roundScore, { color: getScoreColor(round.totalScore, round.par) }]}>
-                        {round.totalScore}
-                      </Text>
-                      <Text style={[styles.roundNetScore, { color: getScoreColor(round.totalScore, round.par) }]}>
-                        ({netScore > 0 ? `+${netScore}` : netScore === 0 ? 'E' : netScore})
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
 
             {/* Historical Shot Analysis by Position */}
             <View style={styles.shotAnalysis}>
@@ -672,10 +625,14 @@ const RoundSummaryScreen: React.FC<{
   course: Course;
   onClose: () => void;
   onHolePress?: (holeNumber: number) => void;
+  onReturnToRound?: () => void;
+  onEndRound?: () => void;
   handicap?: number;
   getBumpsForHole: (hole: Hole) => number;
   colors: any;
-}> = ({ round, course, onClose, onHolePress, handicap, getBumpsForHole, colors }) => {
+}> = ({ round, course, onClose, onHolePress, onReturnToRound, onEndRound, handicap, getBumpsForHole, colors }) => {
+  console.log('RoundSummaryScreen props:', { onReturnToRound: !!onReturnToRound, onEndRound: !!onEndRound });
+  
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -878,6 +835,50 @@ const RoundSummaryScreen: React.FC<{
       borderRadius: 3,
       backgroundColor: colors.primary,
     },
+    topActionButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+      gap: 10,
+    },
+    bottomActionButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 20,
+      gap: 10,
+    },
+    returnToRoundButton: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    returnToRoundButtonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    endRoundButton: {
+      flex: 1,
+      backgroundColor: colors.error || '#ff4444',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    endRoundButtonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '600',
+    },
     closeButton: {
       position: 'absolute',
       top: 20,
@@ -1073,9 +1074,19 @@ const RoundSummaryScreen: React.FC<{
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-        <Text style={styles.closeButtonText}>×</Text>
-      </TouchableOpacity>
+      {/* Top Action Buttons */}
+      <View style={styles.topActionButtons}>
+        {onReturnToRound && (
+          <TouchableOpacity style={styles.returnToRoundButton} onPress={onReturnToRound}>
+            <Text style={styles.returnToRoundButtonText}>Return to Round</Text>
+          </TouchableOpacity>
+        )}
+        {onEndRound && (
+          <TouchableOpacity style={styles.endRoundButton} onPress={onEndRound}>
+            <Text style={styles.endRoundButtonText}>End Round</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
       <View style={styles.header}>
         <Text style={styles.title}>
@@ -1503,6 +1514,20 @@ const RoundSummaryScreen: React.FC<{
         </View>
       </View>
 
+      {/* Bottom Action Buttons */}
+      <View style={styles.bottomActionButtons}>
+        {onReturnToRound && (
+          <TouchableOpacity style={styles.returnToRoundButton} onPress={onReturnToRound}>
+            <Text style={styles.returnToRoundButtonText}>Return to Round</Text>
+          </TouchableOpacity>
+        )}
+        {onEndRound && (
+          <TouchableOpacity style={styles.endRoundButton} onPress={onEndRound}>
+            <Text style={styles.endRoundButtonText}>End Round</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
     </ScrollView>
   );
 };
@@ -1787,11 +1812,17 @@ const GolfTrackerSettings: React.FC<{
   };
 
   // Rounds management functions
-  const sortedRounds = (data.rounds || []).sort((a, b) => 
+  // Deduplicate rounds by ID to prevent duplicate display
+  const deduplicatedRounds = (data.rounds || []).filter((round, index, self) => 
+    index === self.findIndex(r => r.id === round.id)
+  );
+  
+  const sortedRounds = deduplicatedRounds.sort((a, b) => 
     (b.completedAt || b.startedAt) - (a.completedAt || a.startedAt)
   );
   
   const displayedRounds = showAllRounds ? sortedRounds : sortedRounds.slice(0, 10);
+  
   
   const handleShowMoreRounds = () => {
     setShowAllRounds(true);
@@ -2213,7 +2244,6 @@ const GolfTrackerSettings: React.FC<{
             ) : (
               <>
                 {displayedRounds.map((round, index) => {
-                  console.log('Rendering round:', { id: round.id, courseId: round.courseId, courseName: round.courseName, isComplete: round.isComplete });
                   const course = courses.find(c => c.id === round.courseId);
                   const netScore = round.totalScore - round.totalPar;
                   const isIncomplete = !round.isComplete;
@@ -2221,7 +2251,7 @@ const GolfTrackerSettings: React.FC<{
                   const canEdit = !data.currentRound || isActiveRound;
                   
                   return (
-                    <View key={`round-${round.id}-${index}`} style={styles.roundItem}>
+                    <View key={round.id} style={styles.roundItem}>
                       <View style={styles.roundInfo}>
                         <Text style={styles.roundCourse}>
                           {course?.name || 'Unknown Course'}
@@ -3410,32 +3440,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
 
   const historicalData = getHistoricalShotData();
 
-  const handleEndRound = () => {
-    Alert.alert(
-      'End Round',
-      'Are you sure you want to end this round? You can resume it later from the course selection screen.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Round',
-          style: 'destructive',
-          onPress: () => {
-            // Save current data before ending round
-            console.log('Saving hole data before ending round:', {
-              currentHole,
-              shots: shots || [],
-              putts: putts || [],
-              shotsCount: (shots || []).length,
-              puttsCount: (putts || []).length
-            });
-            onSaveHoleData(currentHole, shots || [], putts || []);
-            // Call parent's end round handler
-            onEndRound();
-          },
-        },
-      ]
-    );
-  };
 
   const styles = StyleSheet.create({
     container: {
@@ -4397,7 +4401,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
             <Text style={[styles.buttonText, styles.navButtonText]}>Round Summary</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.button, styles.endRoundButton]} onPress={handleEndRound}>
+          <TouchableOpacity style={[styles.button, styles.endRoundButton]} onPress={onEndRound}>
             <Text style={[styles.buttonText, styles.endRoundButtonText]}>End Round</Text>
           </TouchableOpacity>
         </View>
@@ -4641,15 +4645,6 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     flames: []
   });
 
-  // Debug useEffect to monitor state changes
-  useEffect(() => {
-    console.log('State changed:', { 
-      currentScreen, 
-      selectedCourse: selectedCourse?.name || 'null', 
-      currentRound: currentRound?.id || 'null',
-      dataCurrentRound: data.currentRound?.id || 'null'
-    });
-  }, [currentScreen, selectedCourse, currentRound, data.currentRound]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -4885,16 +4880,36 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
             : round
         );
 
+        const updatedCurrentRound = {
+          ...currentRound,
+          holeScores: [
+            ...(currentRound.holeScores || []).filter(hs => hs.holeNumber !== holeNumber),
+            holeScore
+          ]
+        };
+
+        console.log('Updating current round with hole data:', {
+          holeNumber,
+          updatedHoleScores: updatedCurrentRound.holeScores.length,
+          currentRoundId: currentRound.id
+        });
+
         return {
           ...prev,
           rounds: updatedRounds,
-          currentRound: {
-            ...currentRound,
-            holeScores: [
-              ...(currentRound.holeScores || []).filter(hs => hs.holeNumber !== holeNumber),
-              holeScore
-            ]
-          }
+          currentRound: updatedCurrentRound
+        };
+      });
+
+      // Also update local currentRound state to stay in sync
+      setCurrentRound(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          holeScores: [
+            ...(prev.holeScores || []).filter(hs => hs.holeNumber !== holeNumber),
+            holeScore
+          ]
         };
       });
     }
@@ -5058,30 +5073,68 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   };
 
   const handleEndRound = () => {
-    // Save current hole data before ending the round
-    if (holeDetailRef.current) {
-      holeDetailRef.current.saveCurrentData();
-    }
+    console.log('End Round clicked - saving current hole and going to round summary');
     
     if (currentRound) {
+      console.log('Saving current hole and going to round summary:', { id: currentRound.id, courseName: currentRound.courseName });
+      
+      // Save current hole data FIRST
+      try {
+        if (holeDetailRef.current) {
+          console.log('Calling saveCurrentData from holeDetailRef');
+          holeDetailRef.current.saveCurrentData();
+        } else {
+          console.log('holeDetailRef.current is null - cannot save current data');
+        }
+      } catch (error) {
+        console.error('Error calling saveCurrentData:', error);
+      }
+      
+      // Go to round summary with round still active
+      setCurrentScreen('round-summary');
+    } else {
+      console.log('No current round to save');
+      setCurrentScreen('round-summary');
+    }
+  };
+
+  const handleHolePress = (holeNumber: number) => {
+    setCurrentHole(holeNumber);
+    setCurrentScreen('hole-detail');
+  };
+
+  const handleActuallyEndRound = () => {
+    console.log('Actually ending round - marking as complete and going to settings');
+    
+    if (currentRound) {
+      // Create the completed round
       const completedRound = {
         ...currentRound,
         completedAt: Date.now(),
         isComplete: true,
       };
-      setData(prev => ({
-        ...prev,
-        rounds: [...(prev.rounds || []), completedRound],
-        currentRound: undefined,
-      }));
+      console.log('Saving completed round:', completedRound);
+      
+      // Save the completed round to the rounds array
+      setData(prev => {
+        const newRounds = [...(prev.rounds || []), completedRound];
+        console.log('Rounds after adding completed round:', newRounds.map(r => ({ id: r.id, courseName: r.courseName })));
+        
+        return {
+          ...prev,
+          rounds: newRounds,
+          currentRound: undefined, // Clear the active round
+        };
+      });
+      
+      // Clear the current round
       setCurrentRound(null);
+      setCurrentScreen('course-selection');
     }
-    setRoundEnded(true);
-    setCurrentScreen('round-summary');
   };
 
-  const handleHolePress = (holeNumber: number) => {
-    setCurrentHole(holeNumber);
+  const handleReturnToRound = () => {
+    console.log('Return to round clicked - going back to hole detail');
     setCurrentScreen('hole-detail');
   };
 
@@ -5294,22 +5347,24 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
         <RoundSummaryScreen
           round={currentRound}
           course={selectedCourse}
-          onClose={() => setCurrentScreen(roundEnded ? 'course-selection' : 'hole-detail')}
+          onClose={() => {
+            // Clear currentRound when leaving round summary
+            setCurrentRound(null);
+            setData(prev => ({
+              ...prev,
+              currentRound: undefined,
+            }));
+            setCurrentScreen(roundEnded ? 'course-selection' : 'hole-detail');
+          }}
           onHolePress={handleHolePress}
+          onReturnToRound={handleReturnToRound}
+          onEndRound={handleActuallyEndRound}
           handicap={data.settings.handicap}
           getBumpsForHole={getBumpsForHole}
           colors={colors}
         />
       )}
       
-      {/* Debug info for round summary rendering */}
-      {currentScreen === 'round-summary' && (
-        <View style={{ position: 'absolute', top: 50, left: 10, backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, borderRadius: 5 }}>
-          <Text style={{ color: 'white', fontSize: 12 }}>
-            Debug: currentScreen={currentScreen}, selectedCourse={selectedCourse?.name || 'null'}, currentRound={currentRound?.id || 'null'}
-          </Text>
-        </View>
-      )}
 
       <CreateCourseModal
         visible={showCreateModal}
