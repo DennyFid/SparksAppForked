@@ -48,6 +48,7 @@ interface Shot {
   puttDistance?: '<4ft' | '5-10ft' | '10+ft'; // For putts
   club?: string; // For shots
   timestamp: number;
+  poorShot?: boolean; // For 💩 feature
 }
 
 interface HoleScore {
@@ -684,6 +685,12 @@ const RoundSummaryScreen: React.FC<{
     return holeScore.shots.some(shot => shot.direction === 'fire');
   };
 
+  const hasPoorShot = (holeNumber: number) => {
+    const holeScore = (round.holeScores || []).find(hs => hs.holeNumber === holeNumber);
+    if (!holeScore) return false;
+    return holeScore.shots.some(shot => shot.poorShot === true);
+  };
+
   // Calculate cumulative scores over par
   const getCumulativeScores = () => {
     const scores = [];
@@ -1172,7 +1179,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}${hasPoorShot(hole.number) ? ' 💩' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </TouchableOpacity>
@@ -1208,7 +1215,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}${hasPoorShot(hole.number) ? ' 💩' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </TouchableOpacity>
@@ -1249,7 +1256,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}${hasPoorShot(hole.number) ? ' 💩' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </TouchableOpacity>
@@ -1285,7 +1292,7 @@ const RoundSummaryScreen: React.FC<{
                       styles.holeScore,
                       { color: score > 0 ? getScoreColor(score, hole.par) : colors.textSecondary }
                     ]}>
-                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}` : '-'}
+                      {score > 0 ? `${score}${hasFireShot(hole.number) ? ' 🔥' : ''}${hasPoorShot(hole.number) ? ' 💩' : ''}` : '-'}
                     </Text>
                     <Text style={styles.holePar}>Par {hole.par}</Text>
                   </TouchableOpacity>
@@ -1343,6 +1350,10 @@ const RoundSummaryScreen: React.FC<{
                       hs.holeNumber === score.hole && 
                       hs.shots?.some(shot => shot.direction === 'fire')
                     );
+                    const holeHasPoorShot = round.holeScores?.some(hs => 
+                      hs.holeNumber === score.hole && 
+                      hs.shots?.some(shot => shot.poorShot === true)
+                    );
                     
                     return {
                       value: score.gross,
@@ -1350,9 +1361,13 @@ const RoundSummaryScreen: React.FC<{
                       dataPointText: score.gross > 0 ? `+${score.gross}` : score.gross.toString(),
                       dataPointColor: colors.primary,
                       dataPointRadius: 6,
-                      customDataPoint: holeHasFire ? (
+                      holeHasFire,
+                      holeHasPoorShot,
+                      customDataPoint: (holeHasFire || holeHasPoorShot) ? (
                         <View style={{ alignItems: 'center' }}>
-                          <Text style={{ fontSize: 12, marginBottom: 2 }}>🔥</Text>
+                          <Text style={{ fontSize: 12, marginBottom: 2 }}>
+                            {holeHasFire ? '🔥' : ''}{holeHasPoorShot ? '💩' : ''}
+                          </Text>
                           <View style={{
                             width: 8,
                             height: 8,
@@ -1388,7 +1403,7 @@ const RoundSummaryScreen: React.FC<{
                                   },
                                 ]}
                               />
-                              {/* Fire emoji if applicable */}
+                              {/* Fire and poop emojis if applicable */}
                               {point.customDataPoint && (
                                 <Text
                                   style={[
@@ -1399,7 +1414,7 @@ const RoundSummaryScreen: React.FC<{
                                     },
                                   ]}
                                 >
-                                  🔥
+                                  {point.holeHasFire ? '🔥' : ''}{point.holeHasPoorShot ? '💩' : ''}
                                 </Text>
                               )}
                             </View>
@@ -1438,6 +1453,10 @@ const RoundSummaryScreen: React.FC<{
                         hs.holeNumber === score.hole && 
                         hs.shots?.some(shot => shot.direction === 'fire')
                       );
+                      const holeHasPoorShot = round.holeScores?.some(hs => 
+                        hs.holeNumber === score.hole && 
+                        hs.shots?.some(shot => shot.poorShot === true)
+                      );
                       
                       return {
                         value: score.net,
@@ -1445,9 +1464,13 @@ const RoundSummaryScreen: React.FC<{
                         dataPointText: score.net > 0 ? `+${score.net}` : score.net.toString(),
                         dataPointColor: '#4CAF50',
                         dataPointRadius: 6,
-                        customDataPoint: holeHasFire ? (
+                        holeHasFire,
+                        holeHasPoorShot,
+                        customDataPoint: (holeHasFire || holeHasPoorShot) ? (
                           <View style={{ alignItems: 'center' }}>
-                            <Text style={{ fontSize: 12, marginBottom: 2 }}>🔥</Text>
+                            <Text style={{ fontSize: 12, marginBottom: 2 }}>
+                              {holeHasFire ? '🔥' : ''}{holeHasPoorShot ? '💩' : ''}
+                            </Text>
                             <View style={{
                               width: 8,
                               height: 8,
@@ -1483,7 +1506,7 @@ const RoundSummaryScreen: React.FC<{
                                     },
                                   ]}
                                 />
-                                {/* Fire emoji if applicable */}
+                                {/* Fire and poop emojis if applicable */}
                                 {point.customDataPoint && (
                                   <Text
                                     style={[
@@ -1494,7 +1517,7 @@ const RoundSummaryScreen: React.FC<{
                                       },
                                     ]}
                                   >
-                                    🔥
+                                    {point.holeHasFire ? '🔥' : ''}{point.holeHasPoorShot ? '💩' : ''}
                                   </Text>
                                 )}
                               </View>
@@ -2538,11 +2561,14 @@ const OutcomeGrid: React.FC<{
   shotNumber: number;
   historicalData: { [key: string]: number };
   selectedOutcome?: string;
+  isPoorShot?: boolean;
   onSelect: (outcome: string) => void;
+  onPoopSelect?: (outcome: string) => void;
   showError?: boolean;
   colors: any;
   onFlameAnimation?: () => void;
-}> = ({ shotType, shotNumber, historicalData, selectedOutcome, onSelect, showError = false, colors, onFlameAnimation }) => {
+  onPoopAnimation?: () => void;
+}> = ({ shotType, shotNumber, historicalData, selectedOutcome, isPoorShot = false, onSelect, onPoopSelect, showError = false, colors, onFlameAnimation, onPoopAnimation }) => {
   
   const outcomes = [
     ['left\nlong', 'left', 'left\nshort'],
@@ -2676,7 +2702,7 @@ const OutcomeGrid: React.FC<{
                   style={[
                     styles.cell,
                     {
-                      backgroundColor: getCellColor(),
+                      backgroundColor: isSelected && isPoorShot ? '#D2B48C' : getCellColor(), // Light brown for poor shots
                       borderColor: isSelected ? colors.primary : colors.border,
                       borderWidth: isSelected ? 2 : 1,
                     }
@@ -2685,7 +2711,10 @@ const OutcomeGrid: React.FC<{
                   onLongPress={isGood ? () => {
                     onSelect('fire');
                     onFlameAnimation?.();
-                  } : undefined}
+                  } : () => {
+                    onPoopSelect?.(outcomeValue);
+                    onPoopAnimation?.();
+                  }}
                 >
                   <Text style={[
                     styles.cellText, 
@@ -2694,7 +2723,7 @@ const OutcomeGrid: React.FC<{
                       fontWeight: isSelected ? '600' : '500'
                     }
                   ]}>
-                    {outcome === 'good' ? (selectedOutcome === 'fire' ? '🔥' : 'good') : outcome}
+                    {outcome === 'good' ? (selectedOutcome === 'fire' ? '🔥' : 'good') : (isSelected && isPoorShot ? `${outcome} 💩` : outcome)}
                   </Text>
                   {count > 0 && !isSelected && outcome !== 'good' && (
                     <Text style={[styles.countText, { color: colors.textSecondary }]}>
@@ -3130,7 +3159,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   getBumpsForHole: (hole: Hole) => number;
   colors: any;
   onFlameAnimation: () => void;
-}>(({ course, currentHole, currentRound, data, onNextHole, onPreviousHole, onCompleteHole, onShowHistory, onSaveHoleData, onLoadHoleData, onUpdateTodaysDistance, onEndRound, onViewSummary, onClose, clubs, handicap, getBumpsForHole, colors, onFlameAnimation }, ref) => {
+  onPoopAnimation: () => void;
+}>(({ course, currentHole, currentRound, data, onNextHole, onPreviousHole, onCompleteHole, onShowHistory, onSaveHoleData, onLoadHoleData, onUpdateTodaysDistance, onEndRound, onViewSummary, onClose, clubs, handicap, getBumpsForHole, colors, onFlameAnimation, onPoopAnimation }, ref) => {
   const hole = (course.holes || []).find(h => h.number === currentHole);
   const [shots, setShots] = useState<Shot[]>([]);
   const [putts, setPutts] = useState<Shot[]>([]);
@@ -4271,10 +4301,16 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 shotNumber={shotInfo.shotNumber}
                 historicalData={shotInfo.isShot ? (historicalData.shot || {}) : (historicalData.putts || {})}
                 selectedOutcome={shotInfo.shot.direction}
+                isPoorShot={shotInfo.shot.poorShot === true}
                 onSelect={(outcome) => {
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
                 }}
+                onPoopSelect={(outcome) => {
+                  updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
+                  updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', true);
+                }}
                 onFlameAnimation={onFlameAnimation}
+                onPoopAnimation={onPoopAnimation}
                 showError={showValidationError && !shotInfo.shot.direction}
                 colors={colors}
               />
@@ -4671,6 +4707,11 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   const [flameAnimation, setFlameAnimation] = useState<{ visible: boolean; flames: Array<{ id: string; x: number; y: number; rotation: number; scale: number; targetY: number; translateY: Animated.Value }> }>({
     visible: false,
     flames: []
+  });
+
+  const [poopAnimation, setPoopAnimation] = useState<{ visible: boolean; poops: Array<{ id: string; x: number; y: number; rotation: number; scale: number; targetY: number; translateY: Animated.Value }> }>({
+    visible: false,
+    poops: []
   });
 
 
@@ -5174,6 +5215,24 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     setCurrentScreen('hole-detail');
   };
 
+  const handleViewSummary = () => {
+    console.log('View summary clicked - saving current hole and going to round summary');
+    
+    // Save current hole data first
+    try {
+      if (holeDetailRef.current) {
+        console.log('Calling saveCurrentData from holeDetailRef');
+        holeDetailRef.current.saveCurrentData();
+      } else {
+        console.log('holeDetailRef.current is null - cannot save current data');
+      }
+    } catch (error) {
+      console.error('Error calling saveCurrentData:', error);
+    }
+    
+    setCurrentScreen('round-summary');
+  };
+
   const triggerFlameAnimation = () => {
     // Create multiple flame emojis starting from bottom, animating to top
     const flames = Array.from({ length: 8 }, (_, i) => {
@@ -5209,6 +5268,45 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
       setFlameAnimation({
         visible: false,
         flames: []
+      });
+    }, 3000);
+  };
+
+  const triggerPoopAnimation = () => {
+    // Create multiple poop emojis starting from top, animating down
+    const poops = Array.from({ length: 6 }, (_, i) => {
+      const startY = -100 - Math.random() * 100; // Start from above screen
+      const targetY = 600 + Math.random() * 200; // Target position near bottom
+      const translateY = new Animated.Value(startY);
+      
+      // Start the animation
+      Animated.timing(translateY, {
+        toValue: targetY,
+        duration: 1500 + Math.random() * 1000, // Random duration between 1.5-2.5 seconds
+        useNativeDriver: true,
+      }).start();
+      
+      return {
+        id: `poop-${i}-${Date.now()}`,
+        x: Math.random() * 300 + 50, // Random x position
+        y: startY,
+        rotation: Math.random() * 360, // Random rotation for more realistic falling
+        scale: Math.random() * 0.4 + 0.6, // Random scale between 0.6 and 1.0
+        targetY: targetY,
+        translateY: translateY,
+      };
+    });
+
+    setPoopAnimation({
+      visible: true,
+      poops
+    });
+
+    // Hide animation after 3 seconds
+    setTimeout(() => {
+      setPoopAnimation({
+        visible: false,
+        poops: []
       });
     }, 3000);
   };
@@ -5369,13 +5467,14 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
           onLoadHoleData={handleLoadHoleData}
           onUpdateTodaysDistance={handleUpdateTodaysDistance}
           onEndRound={handleEndRound}
-          onViewSummary={() => setCurrentScreen('round-summary')}
+          onViewSummary={handleViewSummary}
           onClose={() => setCurrentScreen('course-selection')}
           clubs={data.settings.clubs || DEFAULT_CLUBS}
           handicap={data.settings.handicap}
           getBumpsForHole={getBumpsForHole}
           colors={colors}
           onFlameAnimation={triggerFlameAnimation}
+          onPoopAnimation={triggerPoopAnimation}
         />
       )}
 
@@ -5453,6 +5552,40 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
               }}
             >
               🔥
+            </Animated.Text>
+          ))}
+        </View>
+      )}
+
+      {/* Poop Animation Overlay */}
+      {poopAnimation.visible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          zIndex: 1000,
+          backgroundColor: 'rgba(139, 69, 19, 0.1)', // Light brown background
+        }}>
+          {poopAnimation.poops.map((poop) => (
+            <Animated.Text
+              key={poop.id}
+              style={{
+                position: 'absolute',
+                left: poop.x,
+                top: 0, // Fixed top position
+                fontSize: 25,
+                transform: [
+                  { translateY: poop.translateY },
+                  { scale: poop.scale },
+                  { rotate: `${poop.rotation}deg` }
+                ],
+                opacity: 0.9,
+              }}
+            >
+              💩
             </Animated.Text>
           ))}
         </View>
