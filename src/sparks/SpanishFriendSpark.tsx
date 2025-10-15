@@ -169,6 +169,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
     }
   };
 
+
   // Beach planning conversation - function to get conversation with dynamic name
   const getConversation = () => [
     { spanish: `¡Hola ${userName || 'Isaac'}! ¿Qué tal tu día?`, english: `Hi ${userName || 'Isaac'}! How's your day?`, speaker: 'friend1' },
@@ -576,6 +577,7 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
     </View>
   );
 };

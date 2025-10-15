@@ -17,6 +17,7 @@ import {
   SettingsText,
   SettingsRemoveButton
 } from '../components/SettingsComponents';
+import AddPhraseModal, { Phrase } from '../components/AddPhraseModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -94,18 +95,13 @@ const FlashcardSettings: React.FC<{
   onClose: () => void;
 }> = ({ cards, onSave, onClose }) => {
   const [customCards, setCustomCards] = useState<TranslationCard[]>(cards);
-  const [newCard, setNewCard] = useState<FlashcardSettings>({ english: '', spanish: '' });
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  const addCustomCard = () => {
-    if (!newCard.english.trim() || !newCard.spanish.trim()) {
-      Alert.alert('Error', 'Please enter both English and Spanish phrases');
-      return;
-    }
-
+  const addCustomCard = (newPhrase: Omit<Phrase, 'id'>) => {
     const newTranslationCard: TranslationCard = {
       id: Math.max(...customCards.map(c => c.id), 0) + 1,
-      english: newCard.english.trim(),
-      spanish: newCard.spanish.trim(),
+      english: newPhrase.english.trim(),
+      spanish: newPhrase.spanish.trim(),
       correctCount: 0,
       incorrectCount: 0,
       lastAsked: null,
@@ -113,7 +109,6 @@ const FlashcardSettings: React.FC<{
     };
 
     setCustomCards([...customCards, newTranslationCard]);
-    setNewCard({ english: '', spanish: '' });
     HapticFeedback.success();
   };
 
@@ -141,17 +136,7 @@ const FlashcardSettings: React.FC<{
         />
 
         <SettingsSection title="Add New Phrase">
-          <SettingsInput
-            placeholder="English phrase"
-            value={newCard.english}
-            onChangeText={(text) => setNewCard({ ...newCard, english: text })}
-          />
-          <SettingsInput
-            placeholder="Spanish translation"
-            value={newCard.spanish}
-            onChangeText={(text) => setNewCard({ ...newCard, spanish: text })}
-          />
-          <SettingsButton title="Add Phrase" onPress={addCustomCard} />
+          <SettingsButton title="+ Add New Phrase" onPress={() => setShowAddModal(true)} />
         </SettingsSection>
 
         <SettingsSection title={`Your Phrases (${customCards.length})`}>
@@ -165,6 +150,14 @@ const FlashcardSettings: React.FC<{
 
         <SaveCancelButtons onSave={saveSettings} onCancel={onClose} />
       </SettingsScrollView>
+
+      <AddPhraseModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAddPhrase={addCustomCard}
+        initialSpeaker="friend1"
+        showSpeakerSelection={false}
+      />
     </SettingsContainer>
   );
 };
@@ -200,6 +193,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [sessionActive, setSessionActive] = useState(false);
   const [seenCards, setSeenCards] = useState<Set<number>>(new Set()); // Track which cards we've already shown
   const [audioSessionSet, setAudioSessionSet] = useState(false);
+  const [showAddPhraseModal, setShowAddPhraseModal] = useState(false);
 
   // Animation values
   const celebrationAnimation = useRef(new Animated.Value(0)).current;
@@ -422,6 +416,22 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     return sessionQueue[0];
   };
 
+  const handleAddPhrase = (newPhrase: Omit<Phrase, 'id'>) => {
+    const newCard: TranslationCard = {
+      id: Date.now(),
+      english: newPhrase.english,
+      spanish: newPhrase.spanish,
+      correctCount: 0,
+      incorrectCount: 0,
+      lastAsked: null,
+      needsReview: false
+    };
+    
+    const updatedCards = [...cards, newCard];
+    setCards(updatedCards);
+    setSparkData('flashcards', { cards: updatedCards });
+  };
+
   const startNextCard = () => {
     if (!sessionActive) {
       return;
@@ -571,6 +581,39 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       alignItems: 'center',
       marginTop: 20,
       marginBottom: 20,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+      paddingHorizontal: 20,
+      marginBottom: 10,
+    },
+    addPhraseButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 25,
+      minWidth: 120,
+    },
+    addPhraseButtonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    centeredAddButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 32,
+      paddingVertical: 16,
+      borderRadius: 30,
+      marginBottom: 20,
+      alignSelf: 'center',
+    },
+    centeredAddButtonText: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
     },
     title: {
       fontSize: 28,
@@ -840,7 +883,15 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
       <View style={styles.header}>
-        <Text style={styles.title}>🃏 Spanish Flashcards</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>🃏 Spanish Flashcards</Text>
+          <TouchableOpacity 
+            style={styles.addPhraseButton}
+            onPress={() => setShowAddPhraseModal(true)}
+          >
+            <Text style={styles.addPhraseButtonText}>+ Add Phrase</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subtitle}>Learn Spanish. Easy. </Text>
         
         <View style={styles.progressBars}>
@@ -876,20 +927,12 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
 
       {!sessionActive ? (
         <View style={styles.startContainer}>
-          <View style={styles.cardContainer}>
-            <Text style={styles.statsText}>
-              Ready to practice {cards.length} phrases
-            </Text>
-            {totalAsked > 0 && (
-              <Text style={styles.statsText}>
-                Last session: {answeredCorrectly.size}/{totalAsked} correct
-              </Text>
-            )}
-          </View>
+          <TouchableOpacity style={styles.centeredAddButton} onPress={() => setShowAddPhraseModal(true)}>
+            <Text style={styles.centeredAddButtonText}>+ Add New Phrase</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.startButton} onPress={startNewSession}>
             <Text style={styles.startButtonText}>Start Learning</Text>
           </TouchableOpacity>
-
         </View>
       ) : sessionActive && currentCard ? (
         <View>
@@ -1008,6 +1051,15 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
           </View>
         </Animated.View>
       )}
+
+      {/* Add Phrase Modal */}
+      <AddPhraseModal
+        visible={showAddPhraseModal}
+        onClose={() => setShowAddPhraseModal(false)}
+        onAddPhrase={handleAddPhrase}
+        initialSpeaker="friend1"
+        showSpeakerSelection={false}
+      />
     </ScrollView>
   );
 };
