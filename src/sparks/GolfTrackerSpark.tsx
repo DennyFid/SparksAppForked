@@ -5504,7 +5504,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     <View style={styles.container}>
       {currentScreen === 'course-selection' && (
         <CourseSelectionScreen
-          courses={data.courses || []}
+          courses={data.courses.sort((a, b) => a.name.localeCompare(b.name)) || []}
           onSelectCourse={handleSelectCourse}
           onCreateCourse={() => setShowCreateModal(true)}
           colors={colors}

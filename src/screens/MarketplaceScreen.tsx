@@ -27,7 +27,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     },
     header: {
       padding: 24,
-      paddingTop: 44, // Additional spacing for iOS Dynamic Island
+      paddingTop: 60, // Additional spacing for iOS Dynamic Island
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
@@ -47,12 +47,13 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       padding: 24,
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
     },
     sparkCard: {
       width: '31%',
       aspectRatio: 1.1,
       marginBottom: 16,
+      marginHorizontal: '1%',
       backgroundColor: colors.surface,
       borderRadius: 12,
       shadowColor: '#000',
