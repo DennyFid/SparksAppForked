@@ -8,6 +8,7 @@ import { FlashcardsSpark } from '../sparks/FlashcardsSpark';
 import { BusinessSpark } from '../sparks/BusinessSpark';
 import { PackingListSpark } from '../sparks/PackingListSpark';
 import { TodoSpark } from '../sparks/TodoSpark';
+import ToviewSpark from '../sparks/ToviewSpark';
 import { FoodCamSpark } from '../sparks/FoodCamSpark';
 import { SpanishFriendSpark } from '../sparks/SpanishFriendSpark';
 import { TeeTimeTimerSpark } from '../sparks/TeeTimeTimerSpark';
@@ -102,6 +103,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       available: true,
     },
     component: TodoSpark,
+  },
+  'toview': {
+    metadata: {
+      id: 'toview',
+      title: 'Toview',
+      description: 'Track movies, books, and shows to watch with view dates',
+      icon: '👁️',
+      category: 'utility',
+      difficulty: 'easy',
+      estimatedTime: 5,
+      available: true,
+    },
+    component: ToviewSpark,
   },
   'food-cam': {
     metadata: {

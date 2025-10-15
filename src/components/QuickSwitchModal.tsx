@@ -53,6 +53,12 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
   const handleSelectSpark = (sparkId: string) => {
     console.log('QuickSwitchModal: Selecting spark ID:', sparkId);
     console.log('QuickSwitchModal: Available recent sparks:', recentSparks);
+    
+    if (!sparkId) {
+      console.error('QuickSwitchModal: Invalid sparkId:', sparkId);
+      return;
+    }
+    
     HapticFeedback.light();
     onSelectSpark(sparkId);
     onClose();
@@ -142,12 +148,13 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
 
   const availableSparks = recentSparks
     .map(sparkId => {
-      console.log('QuickSwitchModal: Mapping sparkId:', sparkId);
       const spark = getSparkById(sparkId);
-      console.log('QuickSwitchModal: Found spark:', spark);
       return spark;
     })
-    .filter(spark => spark !== null);
+    .filter(spark => {
+      const isValid = spark !== null && spark !== undefined && spark.metadata?.id !== undefined;
+      return isValid;
+    });
 
   return (
     <Modal
@@ -177,9 +184,9 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
             <ScrollView style={styles.sparkList} showsVerticalScrollIndicator={false}>
               {availableSparks.map((spark, index) => (
                 <TouchableOpacity
-                  key={spark.id}
+                  key={spark.metadata.id}
                   style={styles.sparkItem}
-                  onPress={() => handleSelectSpark(spark.id)}
+                  onPress={() => handleSelectSpark(spark.metadata.id)}
                 >
                   <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                   <View style={styles.sparkInfo}>

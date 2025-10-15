@@ -67,6 +67,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         preferences: state.preferences,
         isFirstLaunch: state.isFirstLaunch,
+        recentSparks: state.recentSparks,
       }),
     }
   )

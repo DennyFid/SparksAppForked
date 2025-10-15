@@ -233,6 +233,13 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
     });
   };
 
+  const getTotalCaloriesForDate = (dateString: string): number => {
+    const photosForDate = photosByDate[dateString] || [];
+    return photosForDate.reduce((total, photo) => {
+      return total + (photo.calories || 0);
+    }, 0);
+  };
+
   const handlePhotoResult = async (result: ImagePicker.ImagePickerResult) => {
     if (!result.canceled && result.assets?.[0]) {
       HapticFeedback.light();
@@ -693,7 +700,13 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
         ) : (
           sortedDates.map(date => (
             <View key={date} style={styles.dateSection}>
-              <Text style={styles.dateHeader}>{formatDate(date)}</Text>
+              <Text style={styles.dateHeader}>
+                {formatDate(date)}
+                {(() => {
+                  const totalCalories = getTotalCaloriesForDate(date);
+                  return totalCalories > 0 ? ` (${totalCalories} calories)` : '';
+                })()}
+              </Text>
               <View style={styles.photoGrid}>
                 {photosByDate[date].map(photo => (
                   <TouchableOpacity

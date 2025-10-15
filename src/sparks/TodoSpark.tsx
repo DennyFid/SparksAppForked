@@ -318,6 +318,11 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     const date = new Date();
     date.setDate(date.getDate() + days);
     setSelectedDate(date.toISOString().split('T')[0]);
+    
+    // Auto-save and close modal when quick date is selected
+    setTimeout(() => {
+      saveEditedTask();
+    }, 100); // Small delay to ensure state is updated
   };
 
   // Determine category status for chip styling and ordering

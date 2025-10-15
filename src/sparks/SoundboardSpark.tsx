@@ -1031,11 +1031,13 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       marginBottom: 20,
     },
     categoryTabs: {
-      flexDirection: 'row',
       marginBottom: 20,
       maxHeight: 40,
       flexGrow: 0,
       flexShrink: 0,
+    },
+    categoryTabsContainer: {
+      flexDirection: 'row',
     },
     categoryTab: {
       paddingHorizontal: 12,
@@ -1149,25 +1151,28 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       {categories.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryTabs}>
-          <TouchableOpacity
-            style={[styles.categoryTab, !selectedCategory && styles.categoryTabActive]}
-            onPress={() => setSelectedCategory(null)}
-          >
-            <Text style={[styles.categoryTabText, !selectedCategory && styles.categoryTabTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
-          {categories.map(category => (
+          <View style={styles.categoryTabsContainer}>
             <TouchableOpacity
-              key={category}
-              style={[styles.categoryTab, selectedCategory === category && styles.categoryTabActive]}
-              onPress={() => setSelectedCategory(category)}
+              key="all"
+              style={[styles.categoryTab, !selectedCategory && styles.categoryTabActive]}
+              onPress={() => setSelectedCategory(null)}
             >
-              <Text style={[styles.categoryTabText, selectedCategory === category && styles.categoryTabTextActive]}>
-                {category}
+              <Text style={[styles.categoryTabText, !selectedCategory && styles.categoryTabTextActive]}>
+                All
               </Text>
             </TouchableOpacity>
-          ))}
+            {categories.map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[styles.categoryTab, selectedCategory === category && styles.categoryTabActive]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[styles.categoryTabText, selectedCategory === category && styles.categoryTabTextActive]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
       )}
 
