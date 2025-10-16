@@ -29,6 +29,10 @@ interface SparkState {
   getUserSparks: () => string[];
   isUserSpark: (sparkId: string) => boolean;
   
+  // Custom ordering
+  reorderUserSparks: (fromIndex: number, toIndex: number) => void;
+  moveSparkToPosition: (sparkId: string, newPosition: number) => void;
+  
   // Favorites
   favoriteSparkIds: string[];
   addToFavorites: (sparkId: string) => void;
@@ -42,7 +46,7 @@ export const useSparkStore = create<SparkState>()(
       // Initial state
       sparkProgress: {},
       sparkData: {},
-      userSparkIds: ['spinner', 'flashcards', 'business-sim', 'quick-convert'], // Default sparks
+      userSparkIds: [], // No default sparks - user starts with empty collection
       favoriteSparkIds: [],
       
       // Actions
@@ -93,6 +97,26 @@ export const useSparkStore = create<SparkState>()(
       getUserSparks: () => get().userSparkIds,
       
       isUserSpark: (sparkId) => get().userSparkIds.includes(sparkId),
+      
+      // Custom ordering methods
+      reorderUserSparks: (fromIndex, toIndex) =>
+        set((state) => {
+          const newUserSparkIds = [...state.userSparkIds];
+          const [movedItem] = newUserSparkIds.splice(fromIndex, 1);
+          newUserSparkIds.splice(toIndex, 0, movedItem);
+          return { userSparkIds: newUserSparkIds };
+        }),
+      
+      moveSparkToPosition: (sparkId, newPosition) =>
+        set((state) => {
+          const currentIndex = state.userSparkIds.indexOf(sparkId);
+          if (currentIndex === -1) return state;
+          
+          const newUserSparkIds = [...state.userSparkIds];
+          const [movedItem] = newUserSparkIds.splice(currentIndex, 1);
+          newUserSparkIds.splice(newPosition, 0, movedItem);
+          return { userSparkIds: newUserSparkIds };
+        }),
       
       addToFavorites: (sparkId) =>
         set((state) => ({

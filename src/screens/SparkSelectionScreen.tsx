@@ -1,10 +1,12 @@
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MySparkStackParamList } from '../types/navigation';
 import { getAllSparks, getSparkById } from '../components/SparkRegistry';
 import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { HapticFeedback } from '../utils/haptics';
 
 type SparkSelectionNavigationProp = StackNavigationProp<MySparkStackParamList, 'MySparksList'>;
 
@@ -14,12 +16,39 @@ interface Props {
 
 
 export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
-  const { getUserSparks } = useSparkStore();
+  const { getUserSparks, reorderUserSparks, moveSparkToPosition } = useSparkStore();
   const { colors } = useTheme();
+  const [isReordering, setIsReordering] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const userSparkIds = getUserSparks();
   
   // Filter to only show user's sparks
   const userSparks = userSparkIds.map(sparkId => getSparkById(sparkId)).filter(Boolean);
+
+  const handleLongPress = (index: number) => {
+    if (userSparks.length <= 1) return; // Can't reorder with 1 or fewer items
+    
+    setIsReordering(true);
+    setDraggedIndex(index);
+    HapticFeedback.medium();
+    
+    Alert.alert(
+      'Reorder Sparks',
+      'Drag and drop to reorder your sparks. Tap "Done" when finished.',
+      [
+        { text: 'Cancel', onPress: () => setIsReordering(false) },
+        { text: 'Done', onPress: () => setIsReordering(false) }
+      ]
+    );
+  };
+
+  const handleDragEnd = (fromIndex: number, toIndex: number) => {
+    if (fromIndex !== toIndex) {
+      reorderUserSparks(fromIndex, toIndex);
+      HapticFeedback.success();
+    }
+    setDraggedIndex(null);
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -79,41 +108,133 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
       color: colors.text,
       textAlign: 'center',
     },
+    reorderHint: {
+      fontSize: 12,
+      color: colors.primary,
+      textAlign: 'center',
+      marginTop: 8,
+      fontStyle: 'italic',
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 24,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: 32,
+    },
+    discoverButton: {
+      paddingHorizontal: 32,
+      paddingVertical: 16,
+      borderRadius: 12,
+    },
+    discoverButtonText: {
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    dragHint: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 4,
+    },
   });
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Sparks</Text>
-        <Text style={styles.subtitle}>{userSparks.length} spark{userSparks.length !== 1 ? 's' : ''} in your collection</Text>
+        <Text style={styles.subtitle}>
+          {userSparks.length === 0 
+            ? 'No sparks yet - discover some in the marketplace!' 
+            : `${userSparks.length} spark${userSparks.length !== 1 ? 's' : ''} in your collection`
+          }
+        </Text>
+        {isReordering && (
+          <Text style={styles.reorderHint}>Long press and drag to reorder</Text>
+        )}
       </View>
-      <ScrollView>
-        <View style={styles.grid}>
-          {userSparks.map((spark) => {
-            if (!spark) return null;
-            
-            return (
-              <TouchableOpacity
-                key={spark.metadata.id}
-                style={[
-                  styles.sparkCard,
-                  { opacity: spark.metadata.available ? 1 : 0.6 }
-                ]}
-                onPress={() => {
-                  if (spark.metadata.available) {
-                    navigation.navigate('Spark', { sparkId: spark.metadata.id });
-                  }
-                }}
-              >
-                <View style={styles.sparkCardContent}>
-                  <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
-                  <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+      
+      {userSparks.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>✨</Text>
+          <Text style={styles.emptyTitle}>Your collection is empty</Text>
+          <Text style={styles.emptySubtitle}>
+            Discover amazing sparks in the marketplace and add them to your collection
+          </Text>
+          <TouchableOpacity
+            style={[styles.discoverButton, { backgroundColor: colors.primary }]}
+            onPress={() => navigation.navigate('Marketplace')}
+          >
+            <Text style={[styles.discoverButtonText, { color: colors.background }]}>
+              Discover Sparks
+            </Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView>
+          <View style={styles.grid}>
+            {userSparks.map((spark, index) => {
+              if (!spark) return null;
+              
+              return (
+                <PanGestureHandler
+                  key={spark.metadata.id}
+                  onHandlerStateChange={(event) => {
+                    if (event.nativeEvent.state === State.END && isReordering) {
+                      // Handle drag end logic here
+                      handleDragEnd(index, index); // Simplified for now
+                    }
+                  }}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.sparkCard,
+                      { 
+                        opacity: spark.metadata.available ? 1 : 0.6,
+                        transform: draggedIndex === index ? [{ scale: 1.05 }] : [{ scale: 1 }],
+                        elevation: draggedIndex === index ? 8 : 2,
+                        shadowOpacity: draggedIndex === index ? 0.3 : 0.1,
+                      }
+                    ]}
+                    onPress={() => {
+                      if (spark.metadata.available && !isReordering) {
+                        navigation.navigate('Spark', { sparkId: spark.metadata.id });
+                      }
+                    }}
+                    onLongPress={() => handleLongPress(index)}
+                    delayLongPress={500}
+                  >
+                    <View style={styles.sparkCardContent}>
+                      <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                      <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
+                      {isReordering && (
+                        <Text style={styles.dragHint}>⋮⋮</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </PanGestureHandler>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 };

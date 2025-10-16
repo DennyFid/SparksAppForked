@@ -66,6 +66,8 @@
     <string>FoodCam accesses your photo library to save and select food photos for your diary.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>This app uses speech synthesis for language learning in flashcards.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>TripStory captures your location when taking photos to document your travel experiences.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UIBackgroundModes</key>

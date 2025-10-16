@@ -7,6 +7,8 @@ export interface SparkMetadata {
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedTime: number; // in minutes
   available: boolean;
+  createdAt: string; // ISO date string
+  rating: number; // 1-5 stars
 }
 
 export interface SparkConfig {
