@@ -291,6 +291,36 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     HapticFeedback.success();
   };
 
+  // Save edited task with specific date (for quick date selection)
+  const saveEditedTaskWithDate = (dateString: string) => {
+    if (!editingTask || !editText.trim()) {
+      Alert.alert('Error', 'Task text cannot be empty');
+      return;
+    }
+
+    const { category, displayText } = parseTaskText(editText.trim());
+
+    const today = getTodayDateString();
+    setTodos(prev => prev.map(task =>
+      task.id === editingTask.id
+        ? {
+            ...task,
+            text: editText.trim(),
+            displayText,
+            category,
+            dueDate: dateString,
+            completed: editCompleted,
+            completedDate: editCompleted ? today : undefined,
+            sortTimeMs: Date.now(),
+          }
+        : task
+    ));
+
+    setEditModalVisible(false);
+    setEditingTask(null);
+    HapticFeedback.success();
+  };
+
   const deleteEditedTask = () => {
     if (!editingTask) return;
 
@@ -317,11 +347,12 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   const selectQuickDate = (days: number) => {
     const date = new Date();
     date.setDate(date.getDate() + days);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    const newDateString = date.toISOString().split('T')[0];
+    setSelectedDate(newDateString);
     
     // Auto-save and close modal when quick date is selected
     setTimeout(() => {
-      saveEditedTask();
+      saveEditedTaskWithDate(newDateString);
     }, 100); // Small delay to ensure state is updated
   };
 

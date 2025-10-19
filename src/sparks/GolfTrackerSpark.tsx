@@ -3751,14 +3751,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       alignItems: 'center',
       marginBottom: 8,
     },
-    shotHeaderWithNavigation: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 0,
-      marginBottom: 20,
-      paddingHorizontal: 8,
-    },
     shotNavButton: {
       height: 32,
       paddingHorizontal: 12,
@@ -4172,7 +4164,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       fontWeight: '500',
     },
     shotGridContainer: {
-      paddingVertical: 12,
+      paddingVertical: 8,
       backgroundColor: colors.background,
       borderTopWidth: 1,
       borderTopColor: colors.border,
@@ -4180,6 +4172,36 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       borderBottomColor: colors.border,
       position: 'relative',
       marginTop: 4,
+    },
+    shotNavigationButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 4,
+      marginBottom: 4,
+    },
+    outcomeGridNavigation: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      marginTop: 8,
+    },
+    navigationPill: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      minWidth: 40,
+      alignItems: 'center',
+    },
+    navigationPillText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
     },
     shotNavigationArrows: {
       position: 'absolute',
@@ -4452,44 +4474,57 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 colors={colors}
               />
               
-              {/* Shot Header - Moved below outcome grid with Prev/Next buttons */}
-              <View style={styles.shotHeaderWithNavigation}>
-                <TouchableOpacity
-                  style={[
-                    styles.shotNavButton,
-                    !canGoPrevious && styles.disabledShotNavButton
-                  ]}
-                  onPress={goToPreviousShot}
-                  disabled={!canGoPrevious}
-                >
-                  <Text style={[
-                    styles.shotNavButtonText,
-                    !canGoPrevious && styles.disabledShotNavButtonText
-                  ]}>← Prev</Text>
-                </TouchableOpacity>
+              {/* Dynamic Navigation Pills - Show next/prev shot abbreviations */}
+              <View style={styles.outcomeGridNavigation}>
+                {/* Previous shot pill */}
+                {canGoPrevious && (
+                  <TouchableOpacity
+                    style={styles.navigationPill}
+                    onPress={goToPreviousShot}
+                  >
+                    <Text style={styles.navigationPillText}>
+                      {(() => {
+                        const prevShotIndex = currentShotIndex - 1;
+                        if (prevShotIndex < (shots || []).length) {
+                          return `s${prevShotIndex + 1}`;
+                        } else {
+                          const puttIndex = prevShotIndex - (shots || []).length;
+                          return `p${puttIndex + 1}`;
+                        }
+                      })()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 
-                <TouchableOpacity
-                  style={styles.deleteShotButton}
-                  onPress={() => removeShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt')}
-                >
-                  <Text style={styles.deleteShotButtonText}>
-                    {shotInfo.type === 'shot' ? 'Delete Shot' : 'Delete Putt'}
-                  </Text>
-                </TouchableOpacity>
+                {/* Spacer to push next pill to the right */}
+                <View style={{ flex: 1 }} />
                 
-                <TouchableOpacity
-                  style={[
-                    styles.shotNavButton,
-                    !canGoNext && styles.disabledShotNavButton
-                  ]}
-                  onPress={goToNextShot}
-                  disabled={!canGoNext}
-                >
-                  <Text style={[
-                    styles.shotNavButtonText,
-                    !canGoNext && styles.disabledShotNavButtonText
-                  ]}>Next →</Text>
-                </TouchableOpacity>
+                {/* Next shot pill */}
+                {canGoNext && (
+                  <TouchableOpacity
+                    style={styles.navigationPill}
+                    onPress={goToNextShot}
+                  >
+                    <Text style={styles.navigationPillText}>
+                      {(() => {
+                        const nextShotIndex = currentShotIndex + 1;
+                        if (nextShotIndex < (shots || []).length) {
+                          return `s${nextShotIndex + 1}`;
+                        } else {
+                          const puttIndex = nextShotIndex - (shots || []).length;
+                          return `p${puttIndex + 1}`;
+                        }
+                      })()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              {/* Shot Header - Just the shot number now */}
+              <View style={styles.shotHeader}>
+                <Text style={styles.shotNumber}>
+                  {shotInfo.type === 'shot' ? `Shot ${shotInfo.shotNumber}` : `Putt ${shotInfo.shotNumber}`}
+                </Text>
               </View>
             </View>
           );
@@ -4499,6 +4534,54 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
 
       {/* Shot Grid Navigation */}
       <View style={styles.shotGridContainer}>
+        {/* Shot Navigation Buttons - Moved here to avoid accessibility issues with large fonts */}
+        <View style={styles.shotNavigationButtons}>
+          <TouchableOpacity
+            style={[
+              styles.shotNavButton,
+              !canGoPrevious && styles.disabledShotNavButton
+            ]}
+            onPress={goToPreviousShot}
+            disabled={!canGoPrevious}
+          >
+            <Text style={[
+              styles.shotNavButtonText,
+              !canGoPrevious && styles.disabledShotNavButtonText
+            ]}>← Prev</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.deleteShotButton}
+            onPress={() => {
+              const currentShotInfo = getCurrentShotInfo();
+              if (currentShotInfo) {
+                removeShot(currentShotInfo.shot.id, currentShotInfo.type === 'shot' ? 'shot' : 'putt');
+              }
+            }}
+          >
+            <Text style={styles.deleteShotButtonText}>
+              {(() => {
+                const currentShotInfo = getCurrentShotInfo();
+                return currentShotInfo ? (currentShotInfo.type === 'shot' ? 'Delete Shot' : 'Delete Putt') : 'Delete';
+              })()}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.shotNavButton,
+              !canGoNext && styles.disabledShotNavButton
+            ]}
+            onPress={goToNextShot}
+            disabled={!canGoNext}
+          >
+            <Text style={[
+              styles.shotNavButtonText,
+              !canGoNext && styles.disabledShotNavButtonText
+            ]}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+        
         {/* Shots Row */}
         <ScrollView 
           horizontal 

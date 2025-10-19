@@ -41,7 +41,6 @@ interface Trip {
   endDate: string;
   origin: string;
   destination: string;
-  lodging?: string;
   activities: Activity[];
   photos: TripPhoto[];
   status: 'planned' | 'active' | 'completed';
@@ -57,6 +56,11 @@ interface Activity {
   time: string;
   description?: string;
   photos: TripPhoto[];
+  location?: {
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
   createdAt: string;
 }
 
@@ -104,6 +108,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [showPhotoDetail, setShowPhotoDetail] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
   const [showActivitySelector, setShowActivitySelector] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const [showEditActivity, setShowEditActivity] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [editActivityName, setEditActivityName] = useState('');
+  const [editActivityTime, setEditActivityTime] = useState('');
+  const [editActivityDescription, setEditActivityDescription] = useState('');
+  const [editActivityLocation, setEditActivityLocation] = useState('');
+  const [showEditTrip, setShowEditTrip] = useState(false);
+  const [editTripTitle, setEditTripTitle] = useState('');
+  const [editTripStartDate, setEditTripStartDate] = useState('');
+  const [editTripEndDate, setEditTripEndDate] = useState('');
+  const [editTripOrigin, setEditTripOrigin] = useState('');
+  const [editTripDestination, setEditTripDestination] = useState('');
 
   // New trip form
   const [newTripTitle, setNewTripTitle] = useState('');
@@ -111,7 +129,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [newTripEndDate, setNewTripEndDate] = useState('');
   const [newTripOrigin, setNewTripOrigin] = useState('');
   const [newTripDestination, setNewTripDestination] = useState('');
-  const [newTripLodging, setNewTripLodging] = useState('');
 
   // New activity form
   const [newActivityName, setNewActivityName] = useState('');
@@ -171,7 +188,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       endDate: newTripEndDate,
       origin: newTripOrigin,
       destination: newTripDestination,
-      lodging: newTripLodging || undefined,
       activities: [],
       photos: [],
       status: new Date(newTripStartDate + 'T00:00:00') > new Date() ? 'planned' : 
@@ -189,7 +205,6 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setNewTripEndDate('');
     setNewTripOrigin('');
     setNewTripDestination('');
-    setNewTripLodging('');
     setShowCreateTrip(false);
     
     HapticFeedback.success();
@@ -231,7 +246,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     HapticFeedback.success();
   };
 
-  const capturePhoto = async () => {
+  const capturePhoto = async (activity?: Activity) => {
     try {
       // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -255,7 +270,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -290,12 +305,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           console.log('Location not available:', error);
         }
 
-        const photoDate = selectedDate ? new Date(selectedDate + 'T12:00:00').toISOString() : new Date().toISOString();
+        // Use activity's date if available, otherwise selectedDate, otherwise today
+        const dateToUse = (activity?.startDate || selectedDate) || new Date().toISOString().split('T')[0];
+        const photoDate = new Date(dateToUse + 'T12:00:00').toISOString();
         
         const newPhoto: TripPhoto = {
           id: Date.now().toString(),
           tripId: currentTrip!.id,
-          activityId: selectedActivity?.id,
+          activityId: (activity || selectedActivity)?.id,
           uri: asset.uri,
           timestamp: photoDate,
           location: location || undefined,
@@ -314,7 +331,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         );
 
         await saveTrips(updatedTrips);
-        setCurrentTrip(updatedTrips.find(t => t.id === currentTrip!.id) || null);
+        const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
+        setCurrentTrip(updatedTrip);
         
         setShowPhotoCapture(false);
         setSelectedActivity(null);
@@ -335,10 +353,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
-  const addFromGallery = async () => {
+  const addFromGallery = async (activity?: Activity) => {
+    console.log('📷 addFromGallery called with activity:', activity?.id, activity?.name);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -373,12 +392,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           console.log('Location not available:', error);
         }
 
-        const photoDate = selectedDate ? new Date(selectedDate + 'T12:00:00').toISOString() : new Date().toISOString();
+        // Use activity's date if available, otherwise selectedDate, otherwise today
+        const dateToUse = (activity?.startDate || selectedDate) || new Date().toISOString().split('T')[0];
+        const photoDate = new Date(dateToUse + 'T12:00:00').toISOString();
         
         const newPhoto: TripPhoto = {
           id: Date.now().toString(),
           tripId: currentTrip!.id,
-          activityId: selectedActivity?.id,
+          activityId: (activity || selectedActivity)?.id,
           uri: asset.uri,
           timestamp: photoDate,
           location: location || undefined,
@@ -396,8 +417,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             : trip
         );
 
+        console.log('Before save - currentTrip photos count:', currentTrip?.photos.length);
+        console.log('New photo being added from gallery:', newPhoto);
+        
         await saveTrips(updatedTrips);
-        setCurrentTrip(updatedTrips.find(t => t.id === currentTrip!.id) || null);
+        const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
+        setCurrentTrip(updatedTrip);
+        
+        console.log('After save - updatedTrip photos count:', updatedTrip?.photos.length);
+        console.log('Updated trip photos:', updatedTrip?.photos.map(p => ({ id: p.id, activityId: p.activityId })));
         
         setShowPhotoCapture(false);
         setSelectedActivity(null);
@@ -443,6 +471,164 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setShowPhotoDetail(false);
     setSelectedPhoto(null);
     HapticFeedback.success();
+  };
+
+  const deletePhoto = async () => {
+    if (!selectedPhoto || !currentTrip) return;
+
+    Alert.alert(
+      'Delete Photo',
+      'Are you sure you want to delete this photo? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            const updatedTrips = trips.map(trip => 
+              trip.id === currentTrip.id 
+                ? { 
+                    ...trip, 
+                    photos: trip.photos.filter(p => p.id !== selectedPhoto.id),
+                    updatedAt: new Date().toISOString() 
+                  }
+                : trip
+            );
+
+            await saveTrips(updatedTrips);
+            setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
+            setShowPhotoDetail(false);
+            setSelectedPhoto(null);
+            HapticFeedback.success();
+          }
+        }
+      ]
+    );
+  };
+
+  const openEditActivity = (activity: Activity) => {
+    setEditingActivity(activity);
+    setEditActivityName(activity.name);
+    setEditActivityTime(activity.time);
+    setEditActivityDescription(activity.description || '');
+    setEditActivityLocation(activity.location?.address || '');
+    setShowEditActivity(true);
+  };
+
+  const updateActivity = async () => {
+    if (!editingActivity || !currentTrip) return;
+
+    const updatedActivity: Activity = {
+      ...editingActivity,
+      name: editActivityName,
+      time: editActivityTime,
+      description: editActivityDescription,
+      location: editActivityLocation ? { address: editActivityLocation } : undefined,
+    };
+
+    const updatedTrips = trips.map(trip => 
+      trip.id === currentTrip.id 
+        ? { 
+            ...trip, 
+            activities: trip.activities.map(a => a.id === editingActivity.id ? updatedActivity : a),
+            updatedAt: new Date().toISOString() 
+          }
+        : trip
+    );
+
+    await saveTrips(updatedTrips);
+    setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
+    setShowEditActivity(false);
+    setEditingActivity(null);
+    HapticFeedback.success();
+  };
+
+  const deleteActivity = async () => {
+    if (!editingActivity || !currentTrip) return;
+
+    Alert.alert(
+      'Delete Activity',
+      'Are you sure you want to delete this activity? This will also delete all associated photos. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            const updatedTrips = trips.map(trip => 
+              trip.id === currentTrip.id 
+                ? { 
+                    ...trip, 
+                    activities: trip.activities.filter(a => a.id !== editingActivity.id),
+                    photos: trip.photos.filter(p => p.activityId !== editingActivity.id),
+                    updatedAt: new Date().toISOString() 
+                  }
+                : trip
+            );
+
+            await saveTrips(updatedTrips);
+            setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
+            setShowEditActivity(false);
+            setEditingActivity(null);
+            HapticFeedback.success();
+          }
+        }
+      ]
+    );
+  };
+
+  const openEditTrip = () => {
+    if (!currentTrip) return;
+    setEditTripTitle(currentTrip.title);
+    setEditTripStartDate(currentTrip.startDate);
+    setEditTripEndDate(currentTrip.endDate);
+    setEditTripOrigin(currentTrip.origin);
+    setEditTripDestination(currentTrip.destination);
+    setShowEditTrip(true);
+  };
+
+  const updateTrip = async () => {
+    if (!currentTrip) return;
+
+    const updatedTrip: Trip = {
+      ...currentTrip,
+      title: editTripTitle,
+      startDate: editTripStartDate,
+      endDate: editTripEndDate,
+      origin: editTripOrigin,
+      destination: editTripDestination,
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedTrips = trips.map(trip => trip.id === currentTrip.id ? updatedTrip : trip);
+    await saveTrips(updatedTrips);
+    setCurrentTrip(updatedTrip);
+    setShowEditTrip(false);
+    HapticFeedback.success();
+  };
+
+  const deleteTrip = async () => {
+    if (!currentTrip) return;
+
+    Alert.alert(
+      'Delete Trip',
+      'Are you sure you want to delete this trip? This will also delete all activities and photos. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            const updatedTrips = trips.filter(trip => trip.id !== currentTrip.id);
+            await saveTrips(updatedTrips);
+            setCurrentTrip(null);
+            setShowTripDetail(false);
+            setShowEditTrip(false);
+            HapticFeedback.success();
+          }
+        }
+      ]
+    );
   };
 
   const openInMaps = () => {
@@ -774,16 +960,6 @@ Created with TripStory ✈️
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Lodging (Optional)</Text>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-              value={newTripLodging}
-              onChangeText={setNewTripLodging}
-              placeholder="Hotel, Airbnb, etc."
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
         </ScrollView>
 
         <View style={styles.modalFooter}>
@@ -936,13 +1112,13 @@ Created with TripStory ✈️
           <View style={styles.photoButtonContainer}>
             <TouchableOpacity
               style={[styles.photoButton, { backgroundColor: colors.primary }]}
-              onPress={capturePhoto}
+              onPress={() => capturePhoto()}
             >
               <Text style={[styles.photoButtonText, { color: colors.background }]}>📸 Snap</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.photoButton, styles.addPhotoButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}
-              onPress={addFromGallery}
+              onPress={() => addFromGallery()}
             >
               <Text style={[styles.photoButtonText, { color: colors.primary }]}>📷 Add</Text>
             </TouchableOpacity>
@@ -1041,6 +1217,12 @@ Created with TripStory ✈️
 
           <View style={styles.modalFooter}>
             <TouchableOpacity
+              style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
+              onPress={deletePhoto}
+            >
+              <Text style={[styles.deleteButtonText, { color: 'white' }]}>🗑️ Delete Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.createButton, { backgroundColor: colors.primary }]}
               onPress={updatePhotoDetails}
             >
@@ -1113,6 +1295,356 @@ Created with TripStory ✈️
     );
   };
 
+  const renderEditActivityModal = () => (
+    <Modal visible={showEditActivity} animationType="slide" presentationStyle="pageSheet">
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Activity</Text>
+          <TouchableOpacity onPress={() => setShowEditActivity(false)}>
+            <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Activity Name *</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editActivityName}
+              onChangeText={setEditActivityName}
+              placeholder="Enter activity name"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Time</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editActivityTime}
+              onChangeText={setEditActivityTime}
+              placeholder="HH:MM (e.g., 14:30)"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Description (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editActivityDescription}
+              onChangeText={setEditActivityDescription}
+              placeholder="Enter activity description"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Location (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editActivityLocation}
+              onChangeText={setEditActivityLocation}
+              placeholder="Enter location address"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
+            onPress={deleteActivity}
+          >
+            <Text style={[styles.deleteButtonText, { color: 'white' }]}>🗑️ Delete Activity</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: colors.primary }]}
+            onPress={updateActivity}
+          >
+            <Text style={[styles.createButtonText, { color: colors.background }]}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderEditTripModal = () => (
+    <Modal visible={showEditTrip} animationType="slide" presentationStyle="pageSheet">
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.modalHeader}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Trip</Text>
+          <TouchableOpacity onPress={() => setShowEditTrip(false)}>
+            <Text style={[styles.modalClose, { color: colors.primary }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Trip Title *</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editTripTitle}
+              onChangeText={setEditTripTitle}
+              placeholder="Enter trip title"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Start Date *</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editTripStartDate}
+              onChangeText={setEditTripStartDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>End Date *</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editTripEndDate}
+              onChangeText={setEditTripEndDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Origin</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editTripOrigin}
+              onChangeText={setEditTripOrigin}
+              placeholder="Where are you traveling from?"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Destination</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+              value={editTripDestination}
+              onChangeText={setEditTripDestination}
+              placeholder="Where are you traveling to?"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
+            onPress={deleteTrip}
+          >
+            <Text style={[styles.deleteButtonText, { color: 'white' }]}>🗑️ Delete Trip</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: colors.primary }]}
+            onPress={updateTrip}
+          >
+            <Text style={[styles.createButtonText, { color: colors.background }]}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderMapViewModal = () => {
+    if (!currentTrip) return null;
+
+    // Get all activities with locations (either from activity location or inferred from photos)
+    
+    const activitiesWithLocations = currentTrip.activities.map(activity => {
+      // First check if activity has explicit location
+      if (activity.location?.latitude && activity.location?.longitude) {
+        return {
+          ...activity,
+          latitude: activity.location.latitude,
+          longitude: activity.location.longitude,
+          hasPhoto: activity.photos.length > 0
+        };
+      }
+
+      // If no explicit location, try to infer from photos
+      const activityPhotos = currentTrip.photos.filter(photo => photo.activityId === activity.id);
+      if (activityPhotos.length > 0 && activityPhotos[0].location) {
+        return {
+          ...activity,
+          latitude: activityPhotos[0].location!.latitude,
+          longitude: activityPhotos[0].location!.longitude,
+          hasPhoto: true
+        };
+      }
+
+      return null;
+    }).filter((activity): activity is NonNullable<typeof activity> => activity !== null);
+
+    // Generate OpenStreetMap tile URL
+    const generateMapTileUrl = () => {
+      if (activitiesWithLocations.length === 0) return null;
+      
+      // Calculate center point
+      const avgLat = activitiesWithLocations.reduce((sum, a) => sum + a.latitude, 0) / activitiesWithLocations.length;
+      const avgLng = activitiesWithLocations.reduce((sum, a) => sum + a.longitude, 0) / activitiesWithLocations.length;
+      
+      // Use zoom level 13 for good detail
+      const zoom = 13;
+      const tileX = Math.floor((avgLng + 180) / 360 * Math.pow(2, zoom));
+      const tileY = Math.floor((1 - Math.log(Math.tan(avgLat * Math.PI / 180) + 1 / Math.cos(avgLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+      
+      return `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
+    };
+
+    // Calculate marker position on the map
+    const calculateMarkerPosition = (lat: number, lng: number) => {
+      if (activitiesWithLocations.length === 0) return { x: 0, y: 0 };
+      
+      // Calculate center point
+      const avgLat = activitiesWithLocations.reduce((sum, a) => sum + a.latitude, 0) / activitiesWithLocations.length;
+      const avgLng = activitiesWithLocations.reduce((sum, a) => sum + a.longitude, 0) / activitiesWithLocations.length;
+      
+      // Simple positioning relative to center (this is approximate)
+      const latDiff = lat - avgLat;
+      const lngDiff = lng - avgLng;
+      
+      // Map to screen coordinates (400x300 is our map size)
+      const x = 200 + (lngDiff * 1000); // Scale factor for longitude
+      const y = 150 - (latDiff * 1000); // Scale factor for latitude, inverted for screen coordinates
+      
+      return { x: Math.max(0, Math.min(400, x)), y: Math.max(0, Math.min(300, y)) };
+    };
+
+    return (
+      <Modal visible={showMapView} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Trip Map</Text>
+            <TouchableOpacity onPress={() => setShowMapView(false)}>
+              <Text style={[styles.modalClose, { color: colors.primary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.mapContainer}>
+              {activitiesWithLocations.length === 0 ? (
+                <View style={[styles.mapImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ color: '#666', textAlign: 'center', fontSize: 16 }}>
+                    📍 No location data available{'\n'}
+                    Take photos with location enabled{'\n'}
+                    or add manual locations to activities
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.mapImageContainer}>
+                  {/* OpenStreetMap Background */}
+                  {generateMapTileUrl() && (
+                    <Image 
+                      source={{ uri: generateMapTileUrl()! }} 
+                      style={styles.mapBackground}
+                      resizeMode="cover"
+                    />
+                  )}
+                  
+                  {/* Activity Markers with Photos */}
+                  {activitiesWithLocations.map((activity, index) => {
+                    const firstPhoto = currentTrip.photos.find(p => p.activityId === activity.id);
+                    const markerPosition = calculateMarkerPosition(activity.latitude, activity.longitude);
+                    
+                    return (
+                      <View 
+                        key={activity.id} 
+                        style={[
+                          styles.mapMarker, 
+                          { 
+                            left: markerPosition.x, 
+                            top: markerPosition.y 
+                          }
+                        ]}
+                      >
+                        {firstPhoto ? (
+                          <TouchableOpacity
+                            onPress={() => {
+                              const url = `https://maps.apple.com/?q=${activity.latitude},${activity.longitude}`;
+                              Linking.openURL(url).catch(err => {
+                                console.error('Error opening maps:', err);
+                                Alert.alert('Error', 'Could not open maps application');
+                              });
+                            }}
+                          >
+                            <Image 
+                              source={{ uri: firstPhoto.uri }} 
+                              style={styles.markerPhoto}
+                            />
+                            <View style={styles.markerLabel}>
+                              <Text style={styles.markerText}>{activity.name}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.markerDot}
+                            onPress={() => {
+                              const url = `https://maps.apple.com/?q=${activity.latitude},${activity.longitude}`;
+                              Linking.openURL(url).catch(err => {
+                                console.error('Error opening maps:', err);
+                                Alert.alert('Error', 'Could not open maps application');
+                              });
+                            }}
+                          >
+                            <Text style={styles.markerDotText}>{index + 1}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+              
+              <View style={styles.mapLegend}>
+                <Text style={[styles.legendTitle, { color: colors.text }]}>Legend:</Text>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendMarker, { backgroundColor: '#007AFF', borderRadius: 15, width: 20, height: 20 }]} />
+                  <Text style={[styles.legendText, { color: colors.text }]}>Activities with photos (shows first photo)</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendMarker, { backgroundColor: '#007AFF', borderRadius: 15, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>1</Text>
+                  </View>
+                  <Text style={[styles.legendText, { color: colors.text }]}>Activities without photos (numbered)</Text>
+                </View>
+                <Text style={[styles.legendText, { color: colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
+                  Tap any marker to open in Maps
+                </Text>
+              </View>
+
+              <View style={styles.mapActivityList}>
+                <Text style={[styles.activityListTitle, { color: colors.text }]}>Activities on Map:</Text>
+                {activitiesWithLocations.map((activity, index) => (
+                  <View key={activity.id} style={[styles.activityListItem, { borderColor: colors.border }]}>
+                    <View style={[styles.activityMarker, { backgroundColor: activity.hasPhoto ? 'red' : 'blue' }]} />
+                    <Text style={[styles.mapActivityName, { color: colors.text }]}>{activity.name}</Text>
+                    <Text style={[styles.mapActivityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
+                  </View>
+                ))}
+                {activitiesWithLocations.length === 0 && (
+                  <Text style={[styles.noActivitiesText, { color: colors.textSecondary }]}>
+                    No activities with location data found. Add photos with location or set activity locations manually.
+                  </Text>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderTripDetailView = () => {
     if (!currentTrip) return null;
 
@@ -1132,7 +1664,15 @@ Created with TripStory ✈️
           </TouchableOpacity>
         </View>
         <View style={styles.tripTitleContainer}>
-          <Text style={[styles.tripDetailTitle, { color: colors.text }]}>{currentTrip.title}</Text>
+          <View style={styles.tripTitleRow}>
+            <Text style={[styles.tripDetailTitle, { color: colors.text }]}>{currentTrip.title}</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={openEditTrip}
+            >
+              <Text style={styles.editButtonText}>✏️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView style={styles.tripDetailContent}>
@@ -1204,7 +1744,15 @@ Created with TripStory ✈️
                 {dayActivities.map((activity) => (
                   <View key={activity.id} style={[styles.activityContainer, { borderColor: colors.border }]}>
                     <View style={styles.activityHeader}>
-                      <Text style={[styles.activityName, { color: colors.text }]}>{activity.name}</Text>
+                      <View style={styles.activityTitleContainer}>
+                        <Text style={[styles.activityName, { color: colors.text }]}>{activity.name}</Text>
+                        <TouchableOpacity 
+                          style={styles.editButton}
+                          onPress={() => openEditActivity(activity)}
+                        >
+                          <Text style={styles.editButtonText}>✏️</Text>
+                        </TouchableOpacity>
+                      </View>
                       {activity.time && (
                         <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
                       )}
@@ -1234,9 +1782,10 @@ Created with TripStory ✈️
                       <TouchableOpacity
                         style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
                         onPress={() => {
+                          console.log('📸 Snap button pressed for activity:', activity.id, activity.name);
                           setSelectedActivity(activity);
                           setSelectedDate(activity.startDate);
-                          capturePhoto();
+                          capturePhoto(activity);
                         }}
                       >
                         <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
@@ -1244,9 +1793,10 @@ Created with TripStory ✈️
                       <TouchableOpacity
                         style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
                         onPress={() => {
+                          console.log('📷 Add button pressed for activity:', activity.id, activity.name);
                           setSelectedActivity(activity);
                           setSelectedDate(activity.startDate);
-                          addFromGallery();
+                          addFromGallery(activity);
                         }}
                       >
                         <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
@@ -1276,10 +1826,10 @@ Created with TripStory ✈️
           })}
         </ScrollView>
 
-        {/* Share Button */}
-        <View style={styles.shareContainer}>
+        {/* Share and Map View Buttons - Side by Side */}
+        <View style={styles.bottomButtonsContainer}>
           <TouchableOpacity
-            style={[styles.shareButton, { backgroundColor: colors.primary }]}
+            style={[styles.bottomButton, { backgroundColor: colors.primary }]}
             onPress={() => {
               Alert.alert(
                 'Share Trip Story',
@@ -1292,8 +1842,20 @@ Created with TripStory ✈️
               );
             }}
           >
-            <Text style={[styles.shareButtonText, { color: colors.background }]}>
-              📤 Share Trip Story
+            <Text style={[styles.bottomButtonText, { color: colors.background }]}>
+              📤 Share
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.bottomButton, { backgroundColor: colors.secondary }]}
+            onPress={() => {
+              setMapLoadError(false);
+              setShowMapView(true);
+            }}
+          >
+            <Text style={[styles.bottomButtonText, { color: colors.background }]}>
+              🗺️ Map
             </Text>
           </TouchableOpacity>
         </View>
@@ -1303,6 +1865,9 @@ Created with TripStory ✈️
         {renderPhotoCaptureModal()}
         {renderPhotoDetailModal()}
         {renderActivitySelectorModal()}
+        {renderMapViewModal()}
+        {renderEditActivityModal()}
+        {renderEditTripModal()}
       </View>
     );
   };
@@ -1464,6 +2029,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
+  tripTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
   addButtonContainer: {
     position: 'absolute',
     top: 60,
@@ -1546,6 +2117,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
+    minHeight: 48,
+    textAlignVertical: 'center',
   },
   modalFooter: {
     padding: 20,
@@ -1559,6 +2132,17 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deleteButtonText: {
+    fontSize: 16,
     fontWeight: '600',
   },
   closeButton: {
@@ -1685,10 +2269,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   activityHeader: {
+    marginBottom: 2,
+  },
+  activityTitleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  editButton: {
+    padding: 4,
+  },
+  editButtonText: {
+    fontSize: 16,
   },
   activityName: {
     fontSize: 16,
@@ -1824,21 +2417,156 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
-  shareContainer: {
+  bottomButtonsContainer: {
+    flexDirection: 'row',
     padding: 20,
     paddingTop: 10,
+    paddingBottom: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
+    gap: 12,
   },
-  shareButton: {
+  bottomButton: {
+    flex: 1,
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
   },
-  shareButtonText: {
+  bottomButtonText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  mapContainer: {
+    alignItems: 'center',
+    padding: 16,
+  },
+  mapImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  mapImageContainer: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  mapBackground: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  mapMarker: {
+    position: 'absolute',
+    zIndex: 10,
+  },
+  markerPhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  markerLabel: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    alignSelf: 'center',
+  },
+  markerText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  markerDot: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#007AFF',
+    borderWidth: 3,
+    borderColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  markerDotText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  mapLegend: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  legendTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendMarker: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 14,
+  },
+  mapActivityList: {
+    width: '100%',
+  },
+  activityListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  activityListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  activityMarker: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  mapActivityName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  mapActivityTime: {
+    fontSize: 14,
+  },
+  noActivitiesText: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 20,
   },
 });
 
