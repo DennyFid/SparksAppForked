@@ -1,7 +1,10 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking, Modal } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
+import { StarRating } from './StarRating';
+import { FeedbackService } from '../services/FeedbackService';
+import { AnalyticsService } from '../services/AnalyticsService';
 
 interface SettingsContainerProps {
   children: React.ReactNode;
@@ -405,53 +408,428 @@ export const SettingsRemoveButton: React.FC<SettingsRemoveButtonProps> = ({
   );
 };
 
-interface SettingsFeedbackSectionProps {
+// Enhanced Feedback Modal Component
+interface FeedbackModalProps {
+  visible: boolean;
+  onClose: () => void;
   sparkName: string;
+  sparkId: string;
+  onSubmit: (rating: number, feedback: string) => void;
 }
 
-export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = ({ sparkName }) => {
-  const handleShareFeedback = async () => {
-    const subject = encodeURIComponent(`${sparkName} Feedback - Sparks App`);
-    const body = encodeURIComponent(`Hi Matt,
+const FeedbackModal: React.FC<FeedbackModalProps> = ({ visible, onClose, sparkName, sparkId, onSubmit }) => {
+  const { colors } = useTheme();
+  const [feedback, setFeedback] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-I'd like to share some feedback about ${sparkName}:
-
-[Please share your thoughts, suggestions, or issues here]
-
-Thanks!`);
-
-    const emailUrl = `mailto:matt@dyor.com?subject=${subject}&body=${body}`;
-
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
     try {
-      const canOpen = await Linking.canOpenURL(emailUrl);
-      if (canOpen) {
-        await Linking.openURL(emailUrl);
-        HapticFeedback.success();
-      } else {
-        Alert.alert(
-          'Email Not Available',
-          'Please send your feedback to matt@dyor.com',
-          [
-            { text: 'OK', onPress: () => HapticFeedback.light() }
-          ]
-        );
-      }
+      await onSubmit(0, feedback); // Rating is handled separately now
+      HapticFeedback.success();
+      onClose();
+      // Reset form
+      setFeedback('');
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'Could not open email app. Please send feedback to matt@dyor.com',
-        [
-          { text: 'OK', onPress: () => HapticFeedback.light() }
-        ]
-      );
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const styles = StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '90%',
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    feedbackInput: {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      minHeight: 120,
+      textAlignVertical: 'top',
+      marginBottom: 20,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    button: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.border,
+    },
+    submitButton: {
+      backgroundColor: colors.primary,
+      opacity: isSubmitting ? 0.6 : 1,
+    },
+    buttonText: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cancelButtonText: {
+      color: colors.text,
+    },
+    submitButtonText: {
+      color: '#fff',
+    },
+  });
+
   return (
-    <SettingsSection title="Feedback">
-      <SettingsButton
-        title="📧 Share Feedback"
-        onPress={handleShareFeedback}
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Share Feedback</Text>
+          <Text style={styles.modalSubtitle}>Your feedback helps us improve {sparkName}</Text>
+
+          <TextInput
+            style={styles.feedbackInput}
+            placeholder="Share your thoughts, suggestions, or issues..."
+            placeholderTextColor={colors.textSecondary}
+            value={feedback}
+            onChangeText={setFeedback}
+            multiline
+            numberOfLines={5}
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+              <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, styles.submitButton]} 
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              <Text style={[styles.buttonText, styles.submitButtonText]}>
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Feedback Item Component
+interface FeedbackItemProps {
+  rating: number;
+  feedback: string;
+  response?: string;
+  createdAt: string;
+}
+
+const FeedbackItem: React.FC<FeedbackItemProps> = ({ rating, feedback, response, createdAt }) => {
+  const { colors } = useTheme();
+
+  const styles = StyleSheet.create({
+    item: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    rating: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    ratingText: {
+      fontSize: 14,
+      color: colors.text,
+      marginLeft: 8,
+    },
+    date: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    feedback: {
+      fontSize: 14,
+      color: colors.text,
+      marginBottom: response ? 12 : 0,
+    },
+    response: {
+      backgroundColor: colors.primary + '20',
+      borderRadius: 6,
+      padding: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    responseLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    responseText: {
+      fontSize: 14,
+      color: colors.text,
+    },
+  });
+
+  return (
+    <View style={styles.item}>
+      <View style={styles.header}>
+        {rating > 0 ? (
+          <View style={styles.rating}>
+            <StarRating rating={rating} onRatingChange={() => {}} disabled size={16} />
+            <Text style={styles.ratingText}>{rating}/5</Text>
+          </View>
+        ) : (
+          <Text style={styles.ratingText}>💬 Feedback</Text>
+        )}
+        <Text style={styles.date}>{new Date(createdAt).toLocaleDateString()}</Text>
+      </View>
+      
+      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      
+      {response && (
+        <View style={styles.response}>
+          <Text style={styles.responseLabel}>Response:</Text>
+          <Text style={styles.responseText}>{response}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+interface SettingsFeedbackSectionProps {
+  sparkName: string;
+  sparkId?: string;
+}
+
+export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = ({ sparkName, sparkId = 'app' }) => {
+  const { colors } = useTheme();
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load user feedback on mount
+  useEffect(() => {
+    loadUserFeedback();
+  }, []);
+
+  const loadUserFeedback = async () => {
+    try {
+      setIsLoading(true);
+      // Get device ID for this user
+      const sessionInfo = AnalyticsService.getSessionInfo();
+      const deviceId = sessionInfo.userId || 'anonymous';
+      const feedbacks = await FeedbackService.getUserFeedback(deviceId, sparkId);
+      setUserFeedbacks(feedbacks || []);
+    } catch (error) {
+      console.error('Error loading feedback:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmitFeedback = async (rating: number, feedback: string) => {
+    try {
+      const sessionInfo = AnalyticsService.getSessionInfo();
+      const deviceId = sessionInfo.userId || 'anonymous';
+      
+      // Submit feedback only (rating is handled separately)
+      const feedbackData: any = {
+        userId: deviceId,
+        sparkId,
+        sparkName,
+        rating: 0, // No rating for feedback-only submissions
+        sessionId: sessionInfo.sessionId,
+        platform: 'ios' as 'ios' | 'android' | 'web',
+      };
+      
+      // Only add feedback if it's not empty
+      if (feedback.trim()) {
+        feedbackData.feedback = feedback.trim();
+      }
+      
+      await FeedbackService.submitFeedback(feedbackData);
+
+      // Track analytics
+      await AnalyticsService.trackFeatureUsage('feedback_submitted', sparkId, sparkName, {
+        rating: 0,
+        hasFeedback: !!feedback.trim(),
+      });
+
+      // Reload feedback list
+      await loadUserFeedback();
+      
+      Alert.alert('Thank You!', 'Your feedback has been submitted successfully.');
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      throw error;
+    }
+  };
+
+  const handleRatingSubmit = async (rating: number) => {
+    try {
+      const sessionInfo = AnalyticsService.getSessionInfo();
+      const deviceId = sessionInfo.userId || 'anonymous';
+      
+      // Submit rating only
+      await FeedbackService.submitFeedback({
+        userId: deviceId,
+        sparkId,
+        sparkName,
+        rating,
+        sessionId: sessionInfo.sessionId,
+        platform: 'ios' as 'ios' | 'android' | 'web',
+      });
+
+      // Track analytics
+      await AnalyticsService.trackFeatureUsage('rating_submitted', sparkId, sparkName, {
+        rating,
+        hasFeedback: false,
+      });
+
+      // Reload feedback list
+      await loadUserFeedback();
+      
+      HapticFeedback.success();
+      Alert.alert('Thank You!', `Your ${rating}-star rating has been recorded.`);
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      Alert.alert('Error', 'Failed to submit rating. Please try again.');
+    }
+  };
+
+  const styles = StyleSheet.create({
+    section: {
+      backgroundColor: colors.surface,
+      padding: 20,
+      borderRadius: 12,
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 15,
+    },
+    appRatingContainer: {
+      alignItems: 'center',
+      marginBottom: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      minHeight: 80,
+    },
+    appRatingLabel: {
+      fontSize: 16,
+      color: colors.text,
+      marginBottom: 16,
+    },
+    feedbackButton: {
+      backgroundColor: colors.primary,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    feedbackButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    feedbackList: {
+      marginTop: 8,
+    },
+    emptyState: {
+      textAlign: 'center',
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontStyle: 'italic',
+    },
+  });
+
+  return (
+    <SettingsSection title="Feedback & Rating">
+      {/* App Rating */}
+      <View style={styles.appRatingContainer}>
+        <Text style={styles.appRatingLabel}>Rate {sparkName}</Text>
+        <StarRating
+          rating={0}
+          onRatingChange={(rating) => {
+            if (rating > 0) {
+              handleRatingSubmit(rating);
+            }
+          }}
+          size={18}
+        />
+      </View>
+
+      {/* Submit Feedback Button */}
+      <TouchableOpacity style={styles.feedbackButton} onPress={() => setShowFeedbackModal(true)}>
+        <Text style={styles.feedbackButtonText}>💬 Share Feedback</Text>
+      </TouchableOpacity>
+
+      {/* Feedback List */}
+      {userFeedbacks.length > 0 && (
+        <View style={styles.feedbackList}>
+          <Text style={styles.sectionTitle}>Your Feedback</Text>
+          {userFeedbacks.map((item, index) => (
+            <FeedbackItem
+              key={index}
+              rating={item.rating}
+              feedback={item.feedback || ''}
+              response={item.response}
+              createdAt={item.createdAt}
+            />
+          ))}
+        </View>
+      )}
+
+      {!isLoading && userFeedbacks.length === 0 && (
+        <Text style={styles.emptyState}>No feedback submitted yet</Text>
+      )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        sparkName={sparkName}
+        sparkId={sparkId}
+        onSubmit={handleSubmitFeedback}
       />
     </SettingsSection>
   );

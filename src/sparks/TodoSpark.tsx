@@ -12,6 +12,9 @@ import {
   SettingsText,
   SettingsButton
 } from '../components/SettingsComponents';
+import { FeedbackModal } from '../components/FeedbackModal';
+import { FeedbackService } from '../services/FeedbackService';
+import { AnalyticsService } from '../services/AnalyticsService';
 
 interface TodoItem {
   id: number;
@@ -84,6 +87,11 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   const [showFutureTodos, setShowFutureTodos] = useState(false);
   const [showOlderDoneTodos, setShowOlderDoneTodos] = useState(false);
   const taskInputRef = useRef<TextInput>(null);
+  
+  // Feedback system state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(0);
+  const [completedActions, setCompletedActions] = useState<string[]>([]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -104,6 +112,22 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       setTodos(migratedTodos);
     }
   }, [getSparkData]);
+
+  // Initialize session tracking
+  useEffect(() => {
+    const startSession = () => {
+      setSessionStartTime(Date.now());
+      FeedbackService.startSession('todo');
+      AnalyticsService.trackSparkOpen('todo', 'Todo List');
+    };
+
+    startSession();
+
+    // Cleanup on unmount
+    return () => {
+      FeedbackService.endSession();
+    };
+  }, []);
 
   // Save data whenever todos change
   useEffect(() => {
@@ -214,6 +238,12 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     };
 
     setTodos(prev => [...prev, newTask]);
+    
+    // Track analytics
+    AnalyticsService.trackFeatureUsage('add_task', 'todo', 'Todo List', {
+      category: category || 'none',
+      hasDueDate: false
+    });
     
     // If a category is selected, pre-fill the input with the category prefix
     if (selectedCategory) {

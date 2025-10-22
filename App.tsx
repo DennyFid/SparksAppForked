@@ -8,6 +8,23 @@ import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useAppStore } from './src/store';
 import { NotificationService } from './src/utils/notifications';
 
+// Initialize Firebase
+let firebaseApp: any = null;
+try {
+  const firebase = require('@react-native-firebase/app');
+  firebaseApp = firebase.default;
+  
+  // Initialize Firebase app if not already initialized
+  if (!firebaseApp.apps.length) {
+    firebaseApp.initializeApp();
+    console.log('✅ Firebase app initialized');
+  } else {
+    console.log('✅ Firebase app already initialized');
+  }
+} catch (error) {
+  console.log('⚠️ Firebase not available:', error.message);
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>

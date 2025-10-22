@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { NotificationService } from '../utils/notifications';
 import { SettingsFeedbackSection } from '../components/SettingsComponents';
+import { AnalyticsService } from '../services/AnalyticsService';
+import { FeedbackService } from '../services/FeedbackService';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -20,6 +22,102 @@ export const SettingsScreen: React.FC = () => {
     preferences,
     setPreferences
   } = useAppStore();
+
+  // Privacy controls state
+  const [allowsAnalytics, setAllowsAnalytics] = useState(true);
+  const [allowsFeedback, setAllowsFeedback] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize analytics service
+  useEffect(() => {
+    const initializeAnalytics = async () => {
+      try {
+        await AnalyticsService.initialize();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error initializing analytics:', error);
+      }
+    };
+
+    initializeAnalytics();
+  }, []);
+
+  // Handle analytics toggle
+  const handleAnalyticsToggle = async (enabled: boolean) => {
+    setAllowsAnalytics(enabled);
+    HapticFeedback.light();
+    
+    if (!enabled) {
+      Alert.alert(
+        'Analytics Disabled',
+        'Analytics help us improve the app. You can re-enable this anytime in settings.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Handle feedback toggle
+  const handleFeedbackToggle = async (enabled: boolean) => {
+    setAllowsFeedback(enabled);
+    HapticFeedback.light();
+    
+    if (!enabled) {
+      Alert.alert(
+        'Feedback Disabled',
+        'Feedback helps us improve the app. You can re-enable this anytime in settings.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Test analytics functionality
+  const handleTestAnalytics = async () => {
+    try {
+      console.log('🧪 Starting analytics test...');
+      console.log('🧪 AnalyticsService available:', !!AnalyticsService);
+      console.log('🧪 AnalyticsService.trackFeatureUsage available:', !!AnalyticsService.trackFeatureUsage);
+      
+      await AnalyticsService.trackFeatureUsage('test_analytics', 'settings', 'Settings Screen', {
+        testData: 'Analytics test from settings',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Force flush events immediately
+      console.log('🧪 Forcing event flush...');
+      await AnalyticsService.flushEvents();
+      
+      Alert.alert('Success', 'Test analytics event sent! Check console logs and Firebase Console → Analytics → Events.');
+    } catch (error) {
+      console.error('❌ Analytics test error:', error);
+      Alert.alert('Error', 'Failed to send test analytics event: ' + error.message);
+    }
+  };
+
+  // Handle data deletion
+  const handleDeleteAnalyticsData = () => {
+    Alert.alert(
+      'Delete Analytics Data',
+      'This will permanently delete all your analytics and feedback data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // TODO: Get actual user ID
+              const userId = 'anonymous-user';
+              await FeedbackService.clearUserFeedback(userId);
+              Alert.alert('Success', 'Your analytics data has been deleted.');
+            } catch (error) {
+              console.error('Error deleting analytics data:', error);
+              Alert.alert('Error', 'Failed to delete analytics data. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // Handle daily notification toggle
   const handleNotificationToggle = async (enabled: boolean) => {
@@ -154,6 +252,55 @@ export const SettingsScreen: React.FC = () => {
             thumbColor={preferences.dailyNotificationsEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Privacy & Analytics</Text>
+        
+        <View style={styles.settingItem}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>Analytics</Text>
+            <Text style={styles.settingDescription}>Help improve the app with usage data</Text>
+          </View>
+          <Switch
+            value={allowsAnalytics}
+            onValueChange={handleAnalyticsToggle}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={allowsAnalytics ? '#fff' : '#f4f3f4'}
+          />
+        </View>
+
+        <View style={styles.settingItem}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>Feedback Collection</Text>
+            <Text style={styles.settingDescription}>Allow feedback prompts and rating requests</Text>
+          </View>
+          <Switch
+            value={allowsFeedback}
+            onValueChange={handleFeedbackToggle}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={allowsFeedback ? '#fff' : '#f4f3f4'}
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: colors.warning || '#FF9500' }]} 
+          onPress={handleDeleteAnalyticsData}
+        >
+          <Text style={styles.actionButtonText}>🗑️ Delete Analytics Data</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: colors.primary }]} 
+          onPress={handleTestAnalytics}
+        >
+          <Text style={styles.actionButtonText}>📊 Test Analytics</Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.privacyNote}>
+          Your data is stored securely and never shared with third parties. 
+          You can delete your analytics data at any time.
+        </Text>
       </View>
 
       <View style={styles.section}>
@@ -356,5 +503,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+  },
+  privacyNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
+    lineHeight: 16,
   },
 });
