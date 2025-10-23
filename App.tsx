@@ -7,6 +7,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useAppStore } from './src/store';
 import { NotificationService } from './src/utils/notifications';
+import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
 
 // Initialize Firebase
 let firebaseApp: any = null;
@@ -43,6 +44,9 @@ function AppContent() {
     const initializeNotifications = async () => {
       // Set up notification handler
       await NotificationService.requestPermissions();
+      
+      // Initialize feedback notification service
+      await FeedbackNotificationService.initialize();
       
       // Register background task for notifications
       await NotificationService.registerBackgroundTask();

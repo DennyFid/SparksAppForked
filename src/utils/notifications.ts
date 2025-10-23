@@ -1,56 +1,98 @@
-import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
+// Dynamic imports for expo modules to handle cases where they're not available
+let Notifications: any = null;
+let TaskManager: any = null;
+let isNotificationsAvailable = false;
+let isTaskManagerAvailable = false;
+
+try {
+  const notificationsModule = require('expo-notifications');
+  Notifications = notificationsModule.default;
+  isNotificationsAvailable = true;
+  console.log('✅ Expo Notifications available');
+} catch (error) {
+  console.log('⚠️ Expo Notifications not available:', error.message);
+  isNotificationsAvailable = false;
+}
+
+try {
+  const taskManagerModule = require('expo-task-manager');
+  TaskManager = taskManagerModule.default;
+  isTaskManagerAvailable = true;
+  console.log('✅ Expo TaskManager available');
+} catch (error) {
+  console.log('⚠️ Expo TaskManager not available:', error.message);
+  isTaskManagerAvailable = false;
+}
+
 // Configure how notifications should be handled when the app is running
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const now = new Date();
-    console.log('=== NOTIFICATION HANDLER CALLED ===');
-    console.log('Time:', now.toLocaleTimeString());
-    console.log('Title:', notification.request.content.title);
-    console.log('Data:', notification.request.content.data);
-    console.log('Trigger:', notification.request.trigger);
-    
-    // Check if this is a scheduled notification that fired immediately (Expo Go limitation)
-    if (notification.request.trigger === null && notification.request.content.data?.type === 'test-scheduled') {
-      console.log('⚠️  SCHEDULED NOTIFICATION FIRED IMMEDIATELY');
-      console.log('This is a known Expo Go limitation - scheduled notifications may fire immediately.');
-      console.log('For proper testing, use a development build or standalone app.');
-    }
-    
-    // Show all notifications normally
-    return {
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    };
-  },
-});
+if (isNotificationsAvailable && Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const now = new Date();
+      console.log('=== NOTIFICATION HANDLER CALLED ===');
+      console.log('Time:', now.toLocaleTimeString());
+      console.log('Title:', notification.request.content.title);
+      console.log('Data:', notification.request.content.data);
+      console.log('Trigger:', notification.request.trigger);
+      
+      // Check if this is a scheduled notification that fired immediately (Expo Go limitation)
+      if (notification.request.trigger === null && notification.request.content.data?.type === 'test-scheduled') {
+        console.log('⚠️  SCHEDULED NOTIFICATION FIRED IMMEDIATELY');
+        console.log('This is a known Expo Go limitation - scheduled notifications may fire immediately.');
+        console.log('For proper testing, use a development build or standalone app.');
+      }
+      
+      // Show all notifications normally
+      return {
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      };
+    },
+  });
+} else {
+  console.log('⚠️ Notifications not available, skipping notification handler setup');
+}
 
 const DAILY_NOTIFICATION_IDENTIFIER = 'daily-sparks-reminder';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
 // Define background task for handling notifications
-TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
-  console.log('Background notification task executed:', { data, error, executionInfo });
-  
-  if (error) {
-    console.error('Background notification task error:', error);
-    return;
-  }
-  
-  if (data) {
-    console.log('Background notification data:', data);
-    // Handle the notification data here if needed
-  }
-});
+if (isTaskManagerAvailable && TaskManager) {
+  TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
+    console.log('Background notification task executed:', { data, error, executionInfo });
+    
+    if (error) {
+      console.error('Background notification task error:', error);
+      return;
+    }
+    
+    if (data) {
+      console.log('Background notification data:', data);
+      // Handle the notification data here if needed
+    }
+  });
+} else {
+  console.log('⚠️ TaskManager not available, skipping background task definition');
+}
 
 export class NotificationService {
   // Register background task for notifications
   static async registerBackgroundTask(): Promise<void> {
     try {
+      if (!isNotificationsAvailable || !Notifications) {
+        console.log('⚠️ Notifications not available, skipping background task registration');
+        return;
+      }
+
+      if (!isTaskManagerAvailable || !TaskManager) {
+        console.log('⚠️ TaskManager not available, skipping background task registration');
+        return;
+      }
+
       await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
       console.log('Background notification task registered');
     } catch (error) {
@@ -60,7 +102,13 @@ export class NotificationService {
 
   // Request permissions for notifications
   static async requestPermissions(): Promise<boolean> {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    try {
+      if (!isNotificationsAvailable || !Notifications) {
+        console.log('⚠️ Notifications not available, returning false');
+        return false;
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
@@ -106,6 +154,10 @@ export class NotificationService {
     }
 
     return true;
+    } catch (error) {
+      console.error('Error requesting notification permissions:', error);
+      return false;
+    }
   }
 
   // Schedule daily notification at 8 AM
@@ -153,6 +205,11 @@ export class NotificationService {
   // Cancel the daily notification
   static async cancelDailyNotification(): Promise<void> {
     try {
+      if (!isNotificationsAvailable || !Notifications) {
+        console.log('⚠️ Notifications not available, skipping cancel daily notification');
+        return;
+      }
+
       await Notifications.cancelScheduledNotificationAsync(DAILY_NOTIFICATION_IDENTIFIER);
       console.log('Daily notification cancelled');
     } catch (error) {
@@ -163,6 +220,11 @@ export class NotificationService {
   // Check if daily notifications are scheduled
   static async isDailyNotificationScheduled(): Promise<boolean> {
     try {
+      if (!isNotificationsAvailable || !Notifications) {
+        console.log('⚠️ Notifications not available, returning false for scheduled check');
+        return false;
+      }
+
       const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
       return scheduledNotifications.some(
         notification => notification.identifier === DAILY_NOTIFICATION_IDENTIFIER
@@ -175,6 +237,11 @@ export class NotificationService {
 
   // Handle notification response (when user taps notification)
   static addNotificationResponseListener(callback: (response: any) => void) {
+    if (!isNotificationsAvailable || !Notifications) {
+      console.log('⚠️ Notifications not available, cannot add response listener');
+      return null;
+    }
+    
     return Notifications.addNotificationResponseReceivedListener(callback);
   }
 

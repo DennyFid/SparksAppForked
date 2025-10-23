@@ -234,6 +234,73 @@ export class FirebaseService {
     }
   }
 
+  // Admin Response Management
+  static async updateFeedbackResponse(feedbackId: string, response: string): Promise<void> {
+    try {
+      await this.db.collection('feedback').doc(feedbackId).update({
+        response,
+        responseTimestamp: firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error updating feedback response:', error);
+      throw error;
+    }
+  }
+
+  static async getFeedbackById(feedbackId: string): Promise<SparkFeedback | null> {
+    try {
+      const doc = await this.db.collection('feedback').doc(feedbackId).get();
+      if (doc.exists) {
+        return {
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data()?.timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+        } as SparkFeedback;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting feedback by ID:', error);
+      throw error;
+    }
+  }
+
+  static async getAllFeedback(): Promise<SparkFeedback[]> {
+    try {
+      const snapshot = await this.db
+        .collection('feedback')
+        .orderBy('timestamp', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+      } as SparkFeedback));
+    } catch (error) {
+      console.error('Error getting all feedback:', error);
+      throw error;
+    }
+  }
+
+  static async getFeedbackBySpark(sparkId: string): Promise<SparkFeedback[]> {
+    try {
+      const snapshot = await this.db
+        .collection('feedback')
+        .where('sparkId', '==', sparkId)
+        .orderBy('timestamp', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+      } as SparkFeedback));
+    } catch (error) {
+      console.error('Error getting feedback by spark:', error);
+      throw error;
+    }
+  }
+
   // Feature Flags
   static async getFeatureFlags(userId: string): Promise<FeatureFlag[]> {
     try {

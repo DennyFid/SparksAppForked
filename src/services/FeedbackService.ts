@@ -1,5 +1,5 @@
 import { FirebaseService } from './ServiceFactory';
-import { AnalyticsService } from './AnalyticsService';
+import { FeedbackNotificationService } from './FeedbackNotificationService';
 import { SparkFeedback, AggregatedRating } from '../types/analytics';
 
 export class FeedbackService {
@@ -8,14 +8,51 @@ export class FeedbackService {
   private static currentSparkId: string | null = null;
   private static completedActions: string[] = [];
 
+  // Helper methods for dynamic analytics imports
+  private static async trackSparkOpen(sparkId: string): Promise<void> {
+    try {
+      const { AnalyticsService } = await import('./AnalyticsService');
+      await AnalyticsService.trackSparkOpen(sparkId);
+    } catch (error) {
+      console.error('Error tracking spark open:', error);
+    }
+  }
+
+  private static async trackSparkComplete(sparkId: string, duration: number, actions: string[]): Promise<void> {
+    try {
+      const { AnalyticsService } = await import('./AnalyticsService');
+      await AnalyticsService.trackSparkComplete(sparkId, 'Unknown Spark', duration, actions);
+    } catch (error) {
+      console.error('Error tracking spark complete:', error);
+    }
+  }
+
+  private static async trackUserEngagement(action: string, sparkId?: string): Promise<void> {
+    try {
+      const { AnalyticsService } = await import('./AnalyticsService');
+      await AnalyticsService.trackUserEngagement(action, sparkId);
+    } catch (error) {
+      console.error('Error tracking user engagement:', error);
+    }
+  }
+
+  private static async trackFeatureUsage(feature: string, sparkId: string, sparkName: string, properties?: object): Promise<void> {
+    try {
+      const { AnalyticsService } = await import('./AnalyticsService');
+      await AnalyticsService.trackFeatureUsage(feature, sparkId, sparkName, properties);
+    } catch (error) {
+      console.error('Error tracking feature usage:', error);
+    }
+  }
+
   // Session Management
   static startSession(sparkId: string): void {
     this.sessionStartTime = Date.now();
     this.currentSparkId = sparkId;
     this.completedActions = [];
     
-    // Track session start
-    AnalyticsService.trackSparkOpen(sparkId);
+    // Track session start with dynamic import
+    this.trackSparkOpen(sparkId);
   }
 
   static endSession(): void {
@@ -23,8 +60,8 @@ export class FeedbackService {
 
     const sessionDuration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
     
-    // Track session completion
-    AnalyticsService.trackSparkComplete(
+    // Track session completion with dynamic import
+    this.trackSparkComplete(
       this.currentSparkId,
       sessionDuration,
       this.completedActions
@@ -42,8 +79,8 @@ export class FeedbackService {
       this.completedActions.push(action);
     }
     
-    // Track user engagement
-    AnalyticsService.trackUserEngagement(action, this.currentSparkId || undefined);
+    // Track user engagement with dynamic import
+    this.trackUserEngagement(action, this.currentSparkId || undefined);
   }
 
   // Feedback Submission
@@ -76,11 +113,24 @@ export class FeedbackService {
     try {
       await FirebaseService.submitFeedback(feedback);
       
-      // Track feedback submission
-      AnalyticsService.trackFeatureUsage('feedback_submitted', feedbackData.sparkId, feedbackData.sparkName, {
+      // Track feedback submission with dynamic import
+      await this.trackFeatureUsage('feedback_submitted', feedbackData.sparkId, feedbackData.sparkName, {
         rating: feedbackData.rating,
         hasComment: !!feedbackData.feedback,
       });
+
+      // Send admin notification for new feedback
+      try {
+        await FeedbackNotificationService.sendAdminNotification(
+          feedbackData.sparkName,
+          feedbackData.feedback || 'No comment provided',
+          feedbackData.rating
+        );
+        console.log('✅ Admin notification sent for new feedback');
+      } catch (notificationError) {
+        console.error('⚠️ Error sending admin notification:', notificationError);
+        // Don't throw here - feedback was still submitted successfully
+      }
 
       // Add to local queue for offline support
       this.feedbackQueue.push(feedback as SparkFeedback);
@@ -116,8 +166,8 @@ export class FeedbackService {
     try {
       await FirebaseService.submitFeedback(feedback);
       
-      // Track feedback submission
-      AnalyticsService.trackFeatureUsage('feedback_submitted', sparkId, sparkId, {
+      // Track feedback submission with dynamic import
+      await this.trackFeatureUsage('feedback_submitted', sparkId, sparkId, {
         rating,
         hasComment: !!comment,
         feedbackType,
@@ -195,11 +245,11 @@ export class FeedbackService {
 
   // Analytics Integration
   static async trackFeedbackModalOpen(sparkId: string): Promise<void> {
-    AnalyticsService.trackFeatureUsage('feedback_modal_opened', { sparkId });
+    await this.trackFeatureUsage('feedback_modal_opened', sparkId, 'Unknown Spark', { sparkId });
   }
 
   static async trackFeedbackModalClose(sparkId: string, submitted: boolean): Promise<void> {
-    AnalyticsService.trackFeatureUsage('feedback_modal_closed', { 
+    await this.trackFeatureUsage('feedback_modal_closed', sparkId, 'Unknown Spark', { 
       sparkId, 
       submitted 
     });

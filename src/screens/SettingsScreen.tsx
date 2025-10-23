@@ -5,8 +5,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { NotificationService } from '../utils/notifications';
 import { SettingsFeedbackSection } from '../components/SettingsComponents';
+import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
+import { AdminResponseService } from '../services/AdminResponseService';
 import { AnalyticsService } from '../services/AnalyticsService';
 import { FeedbackService } from '../services/FeedbackService';
+import { getSparkById } from '../components/SparkRegistry';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -15,7 +18,9 @@ export const SettingsScreen: React.FC = () => {
     sparkData, 
     sparkProgress, 
     userSparkIds, 
-    favoriteSparkIds 
+    favoriteSparkIds,
+    reorderUserSparks,
+    removeSparkFromUser
   } = useSparkStore();
   
   const {
@@ -27,6 +32,11 @@ export const SettingsScreen: React.FC = () => {
   const [allowsAnalytics, setAllowsAnalytics] = useState(true);
   const [allowsFeedback, setAllowsFeedback] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showAdminManager, setShowAdminManager] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Spark management state
+  const [isReordering, setIsReordering] = useState(false);
 
   // Initialize analytics service
   useEffect(() => {
@@ -36,6 +46,11 @@ export const SettingsScreen: React.FC = () => {
         await AnalyticsService.initialize();
         setIsInitialized(true);
         console.log('✅ SettingsScreen: Analytics initialized successfully');
+        
+        // Check if current device is admin
+        const adminStatus = await AdminResponseService.isAdmin();
+        setIsAdmin(adminStatus);
+        console.log('🔑 Admin status:', adminStatus);
       } catch (error) {
         console.error('❌ SettingsScreen: Error initializing analytics:', error);
         setIsInitialized(false);
@@ -184,6 +199,39 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  // Spark management functions
+  const handleMoveUp = (index: number) => {
+    if (index > 0) {
+      reorderUserSparks(index, index - 1);
+      HapticFeedback.light();
+    }
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index < userSparkIds.length - 1) {
+      reorderUserSparks(index, index + 1);
+      HapticFeedback.light();
+    }
+  };
+
+  const handleRemoveSpark = (sparkId: string, sparkName: string) => {
+    Alert.alert(
+      'Remove Spark',
+      `Are you sure you want to remove "${sparkName}" from your collection?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            removeSparkFromUser(sparkId);
+            HapticFeedback.medium();
+          }
+        }
+      ]
+    );
+  };
+
   const getDataStats = () => {
     const totalSparks = userSparkIds.length;
     const totalProgress = Object.keys(sparkProgress).length;
@@ -207,6 +255,20 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.feedbackSection}>
         <SettingsFeedbackSection sparkName="Sparks App" />
       </View>
+
+      {/* Admin Section */}
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔑 Admin Tools</Text>
+          
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowAdminManager(true)}
+          >
+            <Text style={styles.actionButtonText}>📝 Manage Feedback & Responses</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Experience</Text>
@@ -376,6 +438,12 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.aboutValue}>AsyncStorage (Local)</Text>
         </View>
       </View>
+
+      {/* Admin Feedback Manager Modal */}
+      <AdminFeedbackManager
+        visible={showAdminManager}
+        onClose={() => setShowAdminManager(false)}
+      />
     </ScrollView>
   );
 };

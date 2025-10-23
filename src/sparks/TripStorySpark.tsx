@@ -20,7 +20,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as Print from 'expo-print';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -728,6 +727,21 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         </body>
         </html>
       `;
+
+      // Check if expo-print is available
+      let Print: any = null;
+      try {
+        const printModule = require('expo-print');
+        Print = printModule.default;
+      } catch (error) {
+        console.log('⚠️ Expo Print not available:', (error as Error).message);
+        Alert.alert(
+          'PDF Generation Not Available',
+          'PDF generation is not available in this environment. Please use a development build or standalone app for full functionality.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
       // Generate PDF
       const { uri } = await Print.printToFileAsync({ html });

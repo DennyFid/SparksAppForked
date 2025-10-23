@@ -4,7 +4,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { StarRating } from './StarRating';
 import { FeedbackService } from '../services/FeedbackService';
-import { AnalyticsService } from '../services/AnalyticsService';
+import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
+import { NotificationBadge } from './NotificationBadge';
 
 interface SettingsContainerProps {
   children: React.ReactNode;
@@ -649,6 +650,25 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
     loadUserFeedback();
   }, []);
 
+  // Mark responses as read when feedback is loaded
+  useEffect(() => {
+    const markResponsesAsRead = async () => {
+      try {
+        const sessionInfo = AnalyticsService.getSessionInfo();
+        const deviceId = sessionInfo.userId || 'anonymous';
+        
+        // Mark all responses as read for this spark
+        await FeedbackNotificationService.markAllResponsesAsRead(deviceId, sparkId);
+      } catch (error) {
+        console.error('Error marking responses as read:', error);
+      }
+    };
+
+    if (userFeedbacks.length > 0) {
+      markResponsesAsRead();
+    }
+  }, [userFeedbacks, sparkId]);
+
   const loadUserFeedback = async () => {
     try {
       setIsLoading(true);
@@ -822,6 +842,11 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
 
   return (
     <SettingsSection title="Feedback & Rating">
+      {/* Notification Badge */}
+      <View style={{ position: 'relative', alignSelf: 'flex-start' }}>
+        <NotificationBadge sparkId={sparkId} size="small" />
+      </View>
+      
       {/* App Rating */}
       <View style={styles.appRatingContainer}>
         <Text style={styles.appRatingLabel}>Rate {sparkName}</Text>
