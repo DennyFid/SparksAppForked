@@ -57,6 +57,8 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [editingVideo, setEditingVideo] = useState<ShortVideo | null>(null);
   const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editUrl, setEditUrl] = useState('');
   
 
   // Load saved videos
@@ -93,11 +95,18 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
 
   // Parse category and URL from input
   const parseCategoryAndUrl = (input: string): { category?: string; url: string } => {
-    // Look for pattern: "Category:: URL" (using double colon separator)
-    const doubleColonIndex = input.indexOf('::');
-    if (doubleColonIndex > 0) {
-      const potentialCategory = input.substring(0, doubleColonIndex).trim();
-      const remainingUrl = input.substring(doubleColonIndex + 2).trim();
+    // Find the last ':' that is not followed by '//'
+    let separatorIndex = -1;
+    for (let i = input.length - 1; i >= 0; i--) {
+      if (input[i] === ':' && !input.substring(i).startsWith('://')) {
+        separatorIndex = i;
+        break;
+      }
+    }
+    
+    if (separatorIndex > 0) {
+      const potentialCategory = input.substring(0, separatorIndex).trim();
+      const remainingUrl = input.substring(separatorIndex + 1).trim();
       
       // Check if the remaining part looks like a URL
       if (remainingUrl.startsWith('http') || remainingUrl.includes('youtube.com') || remainingUrl.includes('youtu.be')) {
@@ -218,7 +227,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
 
   // Handle category pill tap to populate input
   const handleCategoryPillTap = (category: string) => {
-    setNewUrl(`${category}:: `);
+    setNewUrl(`${category}: `);
     HapticFeedback.light();
   };
 
@@ -226,6 +235,8 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const handleVideoLongPress = (video: ShortVideo) => {
     setEditingVideo(video);
     setEditName(video.name || '');
+    setEditCategory(video.category || '');
+    setEditUrl(video.url);
     setShowModal(true);
     HapticFeedback.medium();
   };
@@ -235,15 +246,29 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     setShowModal(false);
     setEditingVideo(null);
     setEditName('');
+    setEditCategory('');
+    setEditUrl('');
   };
 
-  // Handle save video name
+  // Handle save video changes
   const handleSaveVideo = () => {
     if (!editingVideo) return;
+
+    const { category, url } = parseCategoryAndUrl(editUrl);
+    const videoId = parseYouTubeUrl(url);
+    
+    if (!videoId) {
+      Alert.alert('Error', 'Please enter a valid YouTube URL');
+      return;
+    }
 
     const updatedVideo = {
       ...editingVideo,
       name: editName.trim() || undefined,
+      category: category || 'Uncategorized',
+      url: url,
+      id: videoId,
+      thumbnail: getThumbnailUrl(videoId),
     };
 
     const updatedVideos = videos.map(v => v.id === editingVideo.id ? updatedVideo : v);
@@ -539,6 +564,52 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       paddingHorizontal: 16,
       fontSize: 16,
     },
+    multilineInput: {
+      height: 80,
+      textAlignVertical: 'top',
+      paddingTop: 12,
+    },
+    videoPreview: {
+      marginTop: 20,
+    },
+    previewLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
+    previewCard: {
+      width: 200,
+      height: 300,
+      borderRadius: 12,
+      borderWidth: 1,
+      overflow: 'hidden',
+      alignSelf: 'center',
+    },
+    previewThumbnail: {
+      width: '100%',
+      height: '100%',
+    },
+    previewPlaceholder: {
+      width: '100%',
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    previewPlaceholderText: {
+      fontSize: 48,
+    },
+    previewNamePill: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      right: 8,
+    },
+    previewCategoryPill: {
+      position: 'absolute',
+      bottom: 8,
+      left: 8,
+      right: 8,
+    },
     modalActions: {
       flexDirection: 'row',
       padding: 20,
@@ -608,7 +679,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.urlInput}
-              placeholder="Category:: https://youtube.com/shorts/..."
+              placeholder="Category: https://youtube.com/shorts/..."
               placeholderTextColor={colors.textSecondary}
               value={newUrl}
               onChangeText={setNewUrl}
@@ -726,7 +797,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
             </TouchableOpacity>
           </View>
           
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Video Name</Text>
               <TextInput
@@ -741,11 +812,72 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
                 onChangeText={setEditName}
                 autoCapitalize="words"
                 autoCorrect={true}
+                returnKeyType="next"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Category & URL</Text>
+              <TextInput
+                style={[styles.modalInput, styles.multilineInput, { 
+                  backgroundColor: colors.surface, 
+                  borderColor: colors.border,
+                  color: colors.text 
+                }]}
+                placeholder="Category: https://youtube.com/shorts/..."
+                placeholderTextColor={colors.textSecondary}
+                value={editUrl}
+                onChangeText={setEditUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                multiline={true}
+                numberOfLines={2}
                 returnKeyType="done"
                 onSubmitEditing={Keyboard.dismiss}
               />
             </View>
-          </View>
+
+            {/* Video Preview */}
+            {editingVideo && (
+              <View style={styles.videoPreview}>
+                <Text style={[styles.previewLabel, { color: colors.text }]}>Preview</Text>
+                <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {editingVideo.thumbnail ? (
+                    <Image
+                      source={{ uri: editingVideo.thumbnail }}
+                      style={styles.previewThumbnail}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.previewPlaceholder, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.previewPlaceholderText, { color: colors.textSecondary }]}>
+                        🎬
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Name pill preview */}
+                  {editName.trim() && (
+                    <View style={[styles.namePill, styles.previewNamePill, { backgroundColor: colors.secondary }]}>
+                      <Text style={[styles.namePillText, { color: colors.background }]}>
+                        {editName.trim()}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Category pill preview */}
+                  {parseCategoryAndUrl(editUrl).category && (
+                    <View style={[styles.categoryPill, styles.previewCategoryPill, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.categoryPillText, { color: colors.background }]}>
+                        {parseCategoryAndUrl(editUrl).category}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+          </ScrollView>
           
           <View style={[styles.modalActions, { borderTopColor: colors.border }]}>
             <TouchableOpacity
