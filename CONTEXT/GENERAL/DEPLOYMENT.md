@@ -51,7 +51,7 @@
    # Production build for App Store
    eas build --platform ios --profile production
 
-Need to remove simulator true for production builds
+Need to remove simulator true for production builds (or not:)
    "resourceClass": "m-medium", 
         "simulator": true
    ```

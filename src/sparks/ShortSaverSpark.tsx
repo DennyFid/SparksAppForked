@@ -236,7 +236,11 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     setEditingVideo(video);
     setEditName(video.name || '');
     setEditCategory(video.category || '');
-    setEditUrl(video.url);
+    
+    // Reconstruct the "Category: URL" format for editing
+    const categoryUrl = video.category ? `${video.category}: ${video.url}` : video.url;
+    setEditUrl(categoryUrl);
+    
     setShowModal(true);
     HapticFeedback.medium();
   };
