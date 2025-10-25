@@ -479,6 +479,285 @@ npx expo start --dev-client --verbose
 npx expo install --check
 ```
 
+## Production Builds (Local)
+
+### Overview
+
+Production builds are optimized, signed versions of your app ready for distribution to the App Store or Google Play Store. You can build these locally (free) or use EAS cloud builds (paid).
+
+### Local Production Build Process
+
+#### Step 1: Build Production App Locally
+
+**iOS Production Build:**
+```bash
+# Build iOS production app locally
+npx expo run:ios --device --configuration Release
+
+# This creates a production-ready app that can be submitted to App Store
+```
+
+**Android Production Build:**
+```bash
+# Build Android production app locally
+npx expo run:android --device --variant release
+
+# This creates a production-ready APK/AAB for Play Store
+```
+
+#### Step 2: Configure for Production
+
+**Update app.json for Production:**
+```json
+{
+  "expo": {
+    "name": "Sparks",
+    "slug": "sparks-app",
+    "version": "1.0.0",
+    "ios": {
+      "bundleIdentifier": "com.mattdyor.sparks",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.mattdyor.sparks",
+      "versionCode": 1
+    }
+  }
+}
+```
+
+#### Step 3: Sign the App
+
+**iOS Signing:**
+1. Open `ios/Sparks.xcworkspace` in Xcode
+2. Select your project in the navigator
+3. Go to "Signing & Capabilities"
+4. Select your Apple Developer Team
+5. Ensure "Automatically manage signing" is enabled
+
+**Android Signing:**
+1. Generate a keystore (if you don't have one):
+```bash
+keytool -genkey -v -keystore sparks-release-key.keystore -alias sparks-key-alias -keyalg RSA -keysize 2048 -validity 10000
+```
+
+2. Create `android/gradle.properties`:
+```properties
+MYAPP_RELEASE_STORE_FILE=sparks-release-key.keystore
+MYAPP_RELEASE_KEY_ALIAS=sparks-key-alias
+MYAPP_RELEASE_STORE_PASSWORD=your_store_password
+MYAPP_RELEASE_KEY_PASSWORD=your_key_password
+```
+
+3. Update `android/app/build.gradle`:
+```gradle
+android {
+    signingConfigs {
+        release {
+            if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
+                storeFile file(MYAPP_RELEASE_STORE_FILE)
+                storePassword MYAPP_RELEASE_STORE_PASSWORD
+                keyAlias MYAPP_RELEASE_KEY_ALIAS
+                keyPassword MYAPP_RELEASE_KEY_PASSWORD
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
+```
+
+### Publishing to App Stores
+
+#### Option 1: EAS Build (Recommended)
+
+**Build with EAS:**
+```bash
+# Build iOS for App Store
+eas build --platform ios --profile production
+
+# Build Android for Play Store
+eas build --platform android --profile production
+```
+
+**Submit to App Store:**
+```bash
+# Submit iOS to App Store
+eas submit --platform ios
+
+# Submit Android to Play Store
+eas submit --platform android
+```
+
+#### Option 2: Direct Xcode/Android Studio
+
+**iOS (Xcode):**
+1. Open `ios/Sparks.xcworkspace` in Xcode
+2. Select "Any iOS Device" as target
+3. Product → Archive
+4. Distribute App → App Store Connect
+5. Follow the upload wizard
+
+**Android (Android Studio):**
+1. Open `android/` folder in Android Studio
+2. Build → Generate Signed Bundle/APK
+3. Choose "Android App Bundle" for Play Store
+4. Select your keystore and sign
+5. Upload to Play Console
+
+### Production Configuration
+
+#### EAS Configuration (eas.json)
+
+```json
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "buildConfiguration": "Release",
+        "simulator": false
+      },
+      "android": {
+        "buildType": "aab"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "1234567890",
+        "appleTeamId": "ABCD123456"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}
+```
+
+#### Production Firebase Setup
+
+1. **Create Production Firebase Project:**
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create new project: "Sparks App Production"
+   - Enable Firestore, Auth, Analytics
+
+2. **Download Production Config Files:**
+   - iOS: `GoogleService-Info.plist` → `ios/Sparks/`
+   - Android: `google-services.json` → `android/app/`
+
+3. **Update Security Rules:**
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Production security rules
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /feedback/{feedbackId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+### Pre-Production Checklist
+
+#### Code Quality
+- [ ] Remove all `console.log` statements
+- [ ] Remove debug code and test data
+- [ ] Verify all features work correctly
+- [ ] Test on multiple devices
+- [ ] Check performance and memory usage
+
+#### App Store Requirements
+- [ ] App icon (1024x1024) ready
+- [ ] Screenshots for all device sizes
+- [ ] App description and keywords
+- [ ] Privacy policy URL
+- [ ] Age rating appropriate
+- [ ] No placeholder content
+
+#### Firebase Production
+- [ ] Production Firebase project created
+- [ ] Security rules configured
+- [ ] Analytics enabled
+- [ ] Crashlytics enabled (if using)
+- [ ] Performance monitoring enabled
+
+#### Build Verification
+- [ ] App builds without errors
+- [ ] All native modules work
+- [ ] Push notifications work
+- [ ] Firebase integration works
+- [ ] App size is reasonable (< 100MB)
+
+### Troubleshooting Production Builds
+
+#### Common Issues
+
+**1. Code Signing Issues (iOS)**
+```bash
+# Clean and rebuild
+cd ios
+rm -rf build
+pod deintegrate
+pod install
+cd ..
+npx expo run:ios --device --configuration Release
+```
+
+**2. Keystore Issues (Android)**
+```bash
+# Verify keystore
+keytool -list -v -keystore sparks-release-key.keystore
+
+# Check gradle.properties
+cat android/gradle.properties
+```
+
+**3. Bundle Size Too Large**
+```bash
+# Analyze bundle size
+npx expo export --platform ios
+npx expo export --platform android
+
+# Check for large dependencies
+npx expo install --check
+```
+
+**4. Firebase Production Issues**
+- Verify production config files are correct
+- Check Firebase project settings
+- Ensure security rules are properly configured
+- Test with production Firebase project
+
+### Cost Analysis
+
+#### Local Production Builds (Free)
+- **iOS**: Free (requires Mac + Apple Developer Account $99/year)
+- **Android**: Free (requires Google Play Console $25 one-time)
+- **Firebase**: Free tier (generous limits)
+- **Total**: $124/year (one-time Android + annual iOS)
+
+#### EAS Cloud Builds (Paid)
+- **iOS**: $0.10/minute (~$5-10 per build)
+- **Android**: $0.05/minute (~$3-5 per build)
+- **Submit**: $0.10/minute
+- **Total**: ~$10-20 per release
+
+**Recommendation**: Use local builds for production to avoid ongoing costs.
+
 ## Development vs Production
 
 ### Development Builds

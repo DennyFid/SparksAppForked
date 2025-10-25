@@ -62,7 +62,8 @@ export class AdminResponseService {
    */
   static async isAdmin(): Promise<boolean> {
     try {
-      const { AnalyticsService } = await import('./AnalyticsService');
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       return FeedbackNotificationService.isAdminDevice(sessionInfo.userId || '');
     } catch (error) {

@@ -197,6 +197,9 @@ npx expo start --android # Android emulator
 - ✅ TodoSpark with date management
 - ✅ iOS Dynamic Island spacing fixes
 
+### **Important Development Reminders**
+- ⚠️ **ALWAYS CHECK CURRENT DIRECTORY**: When encountering `ConfigError: The expected package.json path: /path/to/ios/package.json does not exist`, immediately run `pwd` to verify you're in the correct directory (`/Users/mattdyor/SparksApp`). This error typically means you're in the wrong folder (often the `ios/` subdirectory instead of the project root).
+
 ### **Architecture Strengths**
 - **Modular spark system** - easy to add new functionality
 - **Consistent data patterns** - predictable state management

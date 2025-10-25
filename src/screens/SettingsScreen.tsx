@@ -7,7 +7,7 @@ import { NotificationService } from '../utils/notifications';
 import { SettingsFeedbackSection } from '../components/SettingsComponents';
 import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
 import { AdminResponseService } from '../services/AdminResponseService';
-import { AnalyticsService } from '../services/AnalyticsService';
+import { ServiceFactory } from '../services/ServiceFactory';
 import { FeedbackService } from '../services/FeedbackService';
 import { getSparkById } from '../components/SparkRegistry';
 
@@ -43,6 +43,7 @@ export const SettingsScreen: React.FC = () => {
     const initializeAnalytics = async () => {
       try {
         console.log('🚀 SettingsScreen: Starting analytics initialization...');
+        const AnalyticsService = ServiceFactory.getAnalyticsService();
         await AnalyticsService.initialize();
         setIsInitialized(true);
         console.log('✅ SettingsScreen: Analytics initialized successfully');
@@ -92,6 +93,7 @@ export const SettingsScreen: React.FC = () => {
   const handleTestAnalytics = async () => {
     try {
       console.log('🧪 Starting analytics test...');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       console.log('🧪 AnalyticsService available:', !!AnalyticsService);
       console.log('🧪 AnalyticsService.trackFeatureUsage available:', !!AnalyticsService.trackFeatureUsage);
       

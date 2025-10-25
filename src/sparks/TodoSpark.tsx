@@ -14,7 +14,7 @@ import {
 } from '../components/SettingsComponents';
 import { FeedbackModal } from '../components/FeedbackModal';
 import { FeedbackService } from '../services/FeedbackService';
-import { AnalyticsService } from '../services/AnalyticsService';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 interface TodoItem {
   id: number;
@@ -118,6 +118,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     const startSession = () => {
       setSessionStartTime(Date.now());
       FeedbackService.startSession('todo');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       AnalyticsService.trackSparkOpen('todo', 'Todo List');
     };
 
@@ -240,6 +241,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     setTodos(prev => [...prev, newTask]);
     
     // Track analytics
+    const AnalyticsService = ServiceFactory.getAnalyticsService();
     AnalyticsService.trackFeatureUsage('add_task', 'todo', 'Todo List', {
       category: category || 'none',
       hasDueDate: false

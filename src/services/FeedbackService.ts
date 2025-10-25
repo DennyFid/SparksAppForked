@@ -11,7 +11,8 @@ export class FeedbackService {
   // Helper methods for dynamic analytics imports
   private static async trackSparkOpen(sparkId: string): Promise<void> {
     try {
-      const { AnalyticsService } = await import('./AnalyticsService');
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       await AnalyticsService.trackSparkOpen(sparkId);
     } catch (error) {
       console.error('Error tracking spark open:', error);
@@ -20,7 +21,8 @@ export class FeedbackService {
 
   private static async trackSparkComplete(sparkId: string, duration: number, actions: string[]): Promise<void> {
     try {
-      const { AnalyticsService } = await import('./AnalyticsService');
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       await AnalyticsService.trackSparkComplete(sparkId, 'Unknown Spark', duration, actions);
     } catch (error) {
       console.error('Error tracking spark complete:', error);
@@ -29,7 +31,8 @@ export class FeedbackService {
 
   private static async trackUserEngagement(action: string, sparkId?: string): Promise<void> {
     try {
-      const { AnalyticsService } = await import('./AnalyticsService');
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       await AnalyticsService.trackUserEngagement(action, sparkId);
     } catch (error) {
       console.error('Error tracking user engagement:', error);
@@ -38,7 +41,8 @@ export class FeedbackService {
 
   private static async trackFeatureUsage(feature: string, sparkId: string, sparkName: string, properties?: object): Promise<void> {
     try {
-      const { AnalyticsService } = await import('./AnalyticsService');
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       await AnalyticsService.trackFeatureUsage(feature, sparkId, sparkName, properties);
     } catch (error) {
       console.error('Error tracking feature usage:', error);

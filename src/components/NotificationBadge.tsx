@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
-import { AnalyticsService } from '../services/AnalyticsService';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 interface NotificationBadgeProps {
   sparkId?: string;
@@ -21,6 +21,7 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
+        const AnalyticsService = ServiceFactory.getAnalyticsService();
         const sessionInfo = AnalyticsService.getSessionInfo();
         const deviceId = sessionInfo.userId || 'anonymous';
         const count = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);

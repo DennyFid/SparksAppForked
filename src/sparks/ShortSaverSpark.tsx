@@ -61,10 +61,34 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const [editUrl, setEditUrl] = useState('');
   
 
+  // Save videos to storage
+  const saveVideos = (newVideos: ShortVideo[]) => {
+    setSparkData('short-saver', { videos: newVideos });
+    setVideos(newVideos);
+  };
+
   // Load saved videos
   useEffect(() => {
     loadVideos();
   }, []);
+
+  // Initialize with default video if no videos exist
+  useEffect(() => {
+    if (videos.length === 0) {
+      const defaultVideo: ShortVideo = {
+        id: 'ShKH1p_uWaA',
+        url: 'https://www.youtube.com/shorts/ShKH1p_uWaA',
+        title: 'Nate on fighting orangutan',
+        thumbnail: 'https://img.youtube.com/vi/ShKH1p_uWaA/maxresdefault.jpg',
+        addedAt: Date.now(),
+        category: 'Funny',
+        name: 'Nate on fighting orangutan'
+      };
+      
+      setVideos([defaultVideo]);
+      saveVideos([defaultVideo]);
+    }
+  }, [videos.length, saveVideos]);
 
   // Update filtered videos when videos or selectedCategory changes
   useEffect(() => {
@@ -80,11 +104,6 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     if (data?.videos) {
       setVideos(data.videos);
     }
-  };
-
-  const saveVideos = (newVideos: ShortVideo[]) => {
-    setSparkData('short-saver', { videos: newVideos });
-    setVideos(newVideos);
   };
 
   // Get all unique categories from videos

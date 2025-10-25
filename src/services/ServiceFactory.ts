@@ -8,6 +8,7 @@ import {
   SessionData 
 } from '../types/analytics';
 import { MockFirebaseService } from './MockFirebaseService';
+import { MockAnalyticsService } from './MockAnalyticsService';
 
 // Check if Firebase is available
 let firestore: any = null;
@@ -38,6 +39,21 @@ export class ServiceFactory {
     
     console.log('⚠️ Returning mock Firebase service');
     return MockFirebaseService;
+  }
+
+  static getAnalyticsService() {
+    console.log('🏭 ServiceFactory.getAnalyticsService called');
+    console.log('🏭 Firebase available:', isFirebaseAvailable);
+    
+    if (isFirebaseAvailable) {
+      console.log('✅ Returning real Analytics service');
+      // Import AnalyticsService directly to avoid circular dependency issues
+      const { AnalyticsService: RealAnalyticsService } = require('./AnalyticsService');
+      return RealAnalyticsService;
+    }
+    
+    console.log('⚠️ Returning mock Analytics service');
+    return MockAnalyticsService;
   }
 
   static isUsingMock() {

@@ -6,6 +6,7 @@ import { StarRating } from './StarRating';
 import { FeedbackService } from '../services/FeedbackService';
 import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
 import { NotificationBadge } from './NotificationBadge';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 interface SettingsContainerProps {
   children: React.ReactNode;
@@ -654,6 +655,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
   useEffect(() => {
     const markResponsesAsRead = async () => {
       try {
+        const AnalyticsService = ServiceFactory.getAnalyticsService();
         const sessionInfo = AnalyticsService.getSessionInfo();
         const deviceId = sessionInfo.userId || 'anonymous';
         
@@ -673,6 +675,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
     try {
       setIsLoading(true);
       // Get device ID for this user
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       const deviceId = sessionInfo.userId || 'anonymous';
       const feedbacks = await FeedbackService.getUserFeedback(deviceId, sparkId);
@@ -689,6 +692,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
       console.log('🚀 SettingsFeedbackSection: Starting feedback submission...');
       
       // Ensure analytics is initialized
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       if (!sessionInfo.isInitialized || !sessionInfo.userId) {
         console.log('⚠️ Analytics not initialized, attempting to initialize...');
@@ -745,6 +749,7 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
       console.log('🚀 SettingsFeedbackSection: Starting rating submission...');
       
       // Ensure analytics is initialized
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       if (!sessionInfo.isInitialized || !sessionInfo.userId) {
         console.log('⚠️ Analytics not initialized, attempting to initialize...');
