@@ -303,6 +303,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
         onClose={() => setShowQuickSwitch(false)}
         recentSparks={recentSparks.filter(id => id !== sparkId)}
         onSelectSpark={handleSelectSpark}
+        navigation={navigation}
       />
     </SafeAreaView>
   );

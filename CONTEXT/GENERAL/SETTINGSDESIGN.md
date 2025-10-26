@@ -9,10 +9,23 @@ This document establishes consistent design patterns, UX principles, and visual 
 ```
 Header (Icon + Title + Subtitle)
    ↓
+Feedback & Rating Section (ALWAYS FIRST)
+   ↓
 Settings Sections (grouped logically)
    ↓
 Action Buttons (Save/Cancel at bottom)
 ```
+
+### Feedback & Rating Section (Required)
+Every settings page MUST include a feedback section as the first content after the header:
+- **Position**: Immediately after SettingsHeader, before any other sections
+- **Component**: Use `SettingsFeedbackSection` from SettingsComponents.tsx
+- **Content**: 
+  - Star rating system (1-5 stars)
+  - "Share Feedback" button for text feedback
+  - Display of user's previous feedback submissions
+  - **Admin responses**: Any feedback with an admin response will automatically display the response below the user's feedback
+- **Functionality**: Pull-to-refresh support for updating feedback data
 
 ### Header Standards
 - **Icon**: Relevant emoji that matches the spark's theme
@@ -133,8 +146,9 @@ Use **red background** for destructive actions:
 ### Reusable Components
 Use standardized components from `SettingsComponents.tsx`:
 - `SettingsContainer` - Base page container
-- `SettingsScrollView` - Scrollable content area
+- `SettingsScrollView` - Scrollable content area with pull-to-refresh support
 - `SettingsHeader` - Consistent header with icon/title/subtitle
+- `SettingsFeedbackSection` - **REQUIRED** feedback and rating section (must be first after header)
 - `SettingsSection` - Grouped settings with title
 - `SettingsInput` - Standardized text inputs
 - `SettingsButton` - Buttons with variant support
@@ -210,6 +224,8 @@ When creating custom patterns:
 
 Before shipping any settings page, verify:
 - [ ] Uses consistent header format with icon/title/subtitle
+- [ ] **Includes SettingsFeedbackSection as the first section after header**
+- [ ] **Admin responses display correctly below user feedback**
 - [ ] Follows button color and placement standards
 - [ ] Implements proper save/cancel functionality
 - [ ] Provides clear feedback for user actions

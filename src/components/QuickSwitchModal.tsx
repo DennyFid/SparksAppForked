@@ -19,6 +19,7 @@ interface QuickSwitchModalProps {
   onClose: () => void;
   recentSparks: string[];
   onSelectSpark: (sparkId: string) => void;
+  navigation?: any; // Navigation prop for navigating to My Sparks
 }
 
 const { height } = Dimensions.get('window');
@@ -28,6 +29,7 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
   onClose,
   recentSparks,
   onSelectSpark,
+  navigation,
 }) => {
   const { colors } = useTheme();
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -64,6 +66,14 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
     onClose();
   };
 
+  const handleMySparks = () => {
+    HapticFeedback.light();
+    onClose();
+    if (navigation) {
+      navigation.navigate('SparkSelection');
+    }
+  };
+
   const styles = StyleSheet.create({
     modalOverlay: {
       flex: 1,
@@ -74,7 +84,8 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
       backgroundColor: colors.surface,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
-      maxHeight: height * 0.6,
+      maxHeight: height * 0.75, // Increased from 0.6 to 0.75 for more space
+      minHeight: height * 0.4, // Added minimum height
       paddingBottom: 20,
     },
     handle: {
@@ -144,6 +155,35 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
       color: colors.textSecondary,
       textAlign: 'center',
     },
+    mySparksItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      marginTop: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    mySparksIcon: {
+      fontSize: 24,
+      marginRight: 12,
+    },
+    mySparksTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.primary,
+      marginBottom: 2,
+    },
+    mySparksDescription: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    mySparksArrow: {
+      fontSize: 18,
+      color: colors.primary,
+      marginLeft: 'auto',
+    },
   });
 
   const availableSparks = recentSparks
@@ -202,12 +242,42 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
                   )}
                 </TouchableOpacity>
               ))}
+              
+              {/* My Sparks Link */}
+              <TouchableOpacity
+                style={styles.mySparksItem}
+                onPress={handleMySparks}
+              >
+                <Text style={styles.mySparksIcon}>⚡️</Text>
+                <View style={styles.sparkInfo}>
+                  <Text style={styles.mySparksTitle}>My Sparks</Text>
+                  <Text style={styles.mySparksDescription}>
+                    Browse all available sparks
+                  </Text>
+                </View>
+                <Text style={styles.mySparksArrow}>→</Text>
+              </TouchableOpacity>
             </ScrollView>
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>
                 No recent sparks to switch to
               </Text>
+              
+              {/* My Sparks Link for empty state */}
+              <TouchableOpacity
+                style={styles.mySparksItem}
+                onPress={handleMySparks}
+              >
+                <Text style={styles.mySparksIcon}>⚡️</Text>
+                <View style={styles.sparkInfo}>
+                  <Text style={styles.mySparksTitle}>My Sparks</Text>
+                  <Text style={styles.mySparksDescription}>
+                    Browse all available sparks
+                  </Text>
+                </View>
+                <Text style={styles.mySparksArrow}>→</Text>
+              </TouchableOpacity>
             </View>
           )}
         </Animated.View>

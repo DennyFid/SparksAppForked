@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, User, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getAuth, signInAnonymously, User } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc } from 'firebase/firestore';
 import { 
   User as AnalyticsUser, 
@@ -47,24 +47,33 @@ export class WebFirebaseService {
 
       // Try to initialize Auth (optional)
       try {
-        if (Platform.OS !== 'web') {
-          // Use React Native persistence for mobile
-          this.auth = initializeAuth(app, {
-            persistence: getReactNativePersistence(AsyncStorage)
-          });
-        } else {
-          // Use default persistence for web
-          this.auth = getAuth(app);
-        }
+        // Use default auth for all platforms (Web SDK works in React Native)
+        this.auth = getAuth(app);
         
-        // Try anonymous sign-in, but don't fail if it doesn't work
-        try {
-          const userCredential = await signInAnonymously(this.auth);
-          this.currentUser = userCredential.user;
-          console.log('✅ Firebase Auth initialized');
-        } catch (signInError: any) {
-          console.log('⚠️ Anonymous sign-in failed, continuing without auth:', signInError.message);
-          // Continue without auth - Firestore will still work
+        // Try anonymous sign-in with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            console.log(`🔄 Attempting anonymous sign-in (attempt ${retryCount + 1})`);
+            const userCredential = await signInAnonymously(this.auth);
+            this.currentUser = userCredential.user;
+            console.log('✅ Firebase Auth initialized with user:', this.currentUser.uid);
+            console.log('✅ Auth token available:', !!this.currentUser.accessToken);
+            break; // Success, exit retry loop
+          } catch (signInError: any) {
+            retryCount++;
+            console.log(`⚠️ Anonymous sign-in attempt ${retryCount} failed:`, signInError.message);
+            
+            if (retryCount >= maxRetries) {
+              console.log('❌ All anonymous sign-in attempts failed, continuing without auth');
+              // Continue without auth - Firestore will still work
+            } else {
+              // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
         }
       } catch (authError: any) {
         console.log('⚠️ Firebase Auth not available, continuing without auth:', authError.message);
@@ -79,7 +88,7 @@ export class WebFirebaseService {
     }
   }
 
-  static async isInitialized(): Promise<boolean> {
+  static isInitialized(): boolean {
     return WebFirebaseService.isInitialized;
   }
 
@@ -463,18 +472,35 @@ export class WebFirebaseService {
 
   // Additional methods needed for compatibility
   static async updateFeedbackResponse(feedbackId: string, response: { adminId: string; text: string }): Promise<void> {
-    return this.addFeedbackResponse(feedbackId, response);
-  }
-
-  static async addFeedbackResponse(feedbackId: string, response: { adminId: string; text: string }): Promise<string> {
     if (!this.isInitialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
-    const docRef = await addDoc(collection(this.db, 'feedback', feedbackId, 'responses'), {
-      ...response,
-      createdAt: new Date(),
-    });
-    return docRef.id;
+    
+    try {
+      // Debug authentication status
+      console.log('🔍 Auth status:', this.auth?.currentUser);
+      console.log('🔍 Auth UID:', this.auth?.currentUser?.uid);
+      console.log('🔍 Auth token:', this.auth?.currentUser?.accessToken);
+      
+      // Update only the main feedback document with the response
+      const feedbackRef = doc(this.db, 'feedback', feedbackId);
+      await updateDoc(feedbackRef, {
+        response: response.text,
+        adminId: response.adminId,
+        respondedAt: new Date()
+      });
+      
+      console.log('✅ Feedback response updated successfully');
+    } catch (error) {
+      console.error('Error updating feedback response:', error);
+      throw error;
+    }
+  }
+
+  // Legacy method - not used anymore since we store response directly in feedback document
+  static async addFeedbackResponse(feedbackId: string, response: { adminId: string; text: string }): Promise<string> {
+    // This method is no longer used - responses are stored directly in the feedback document
+    throw new Error('addFeedbackResponse is deprecated - use updateFeedbackResponse instead');
   }
 
   static async getFeedbackResponses(feedbackId: string): Promise<any[]> {
@@ -484,6 +510,48 @@ export class WebFirebaseService {
     const q = query(collection(this.db, 'feedback', feedbackId, 'responses'), orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+
+  /**
+   * Get all feedback responses for a specific user and spark
+   * Since responses are stored directly in feedback documents, we return feedback with responses
+   */
+  static async getUserFeedbackResponses(userId: string, sparkId: string): Promise<any[]> {
+    if (!this.isInitialized || !this.db) {
+      throw new Error('Firebase not initialized');
+    }
+    
+    try {
+      // Get all feedback for this user and spark that have responses
+      const feedbackQuery = query(
+        collection(this.db, 'feedback'),
+        where('userId', '==', userId),
+        where('sparkId', '==', sparkId)
+      );
+      const feedbackSnapshot = await getDocs(feedbackQuery);
+      
+      const responsesWithFeedback: any[] = [];
+      
+      // Return feedback items that have responses
+      feedbackSnapshot.docs.forEach(feedbackDoc => {
+        const feedbackData = feedbackDoc.data();
+        if (feedbackData.response) {
+          responsesWithFeedback.push({
+            id: feedbackDoc.id,
+            feedbackId: feedbackDoc.id,
+            response: feedbackData.response,
+            adminId: feedbackData.adminId,
+            respondedAt: feedbackData.respondedAt,
+            isRead: feedbackData.isRead || false
+          });
+        }
+      });
+      
+      return responsesWithFeedback;
+    } catch (error) {
+      console.error('Error getting user feedback responses:', error);
+      return [];
+    }
   }
 
   static async getFeedbackById(feedbackId: string): Promise<SparkFeedback | null> {

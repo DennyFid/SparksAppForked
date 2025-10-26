@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { NotificationService } from '../utils/notifications';
-import { SettingsFeedbackSection } from '../components/SettingsComponents';
+import { SettingsFeedbackSection, SettingsScrollView } from '../components/SettingsComponents';
 import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
 import { AdminResponseService } from '../services/AdminResponseService';
 import { ServiceFactory } from '../services/ServiceFactory';
@@ -28,15 +29,19 @@ export const SettingsScreen: React.FC = () => {
     setPreferences
   } = useAppStore();
 
-  // Privacy controls state
-  const [allowsAnalytics, setAllowsAnalytics] = useState(true);
-  const [allowsFeedback, setAllowsFeedback] = useState(true);
+  // Admin and initialization state
   const [isInitialized, setIsInitialized] = useState(false);
   const [showAdminManager, setShowAdminManager] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   
   // Spark management state
   const [isReordering, setIsReordering] = useState(false);
+  
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Debug state
+  const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
 
   // Initialize analytics service
   useEffect(() => {
@@ -58,6 +63,26 @@ export const SettingsScreen: React.FC = () => {
         const adminStatus = await AdminResponseService.isAdmin();
         setIsAdmin(adminStatus);
         console.log('🔑 Admin status:', adminStatus);
+        
+        // Debug: Show current device ID
+        const sessionInfo = AnalyticsService.getSessionInfo();
+        console.log('🔍 Current device ID:', sessionInfo.userId);
+        console.log('🔍 Session ID:', sessionInfo.sessionId);
+        console.log('🔍 Analytics initialized:', sessionInfo.isInitialized);
+        console.log('🔍 Analytics service type:', AnalyticsService.constructor.name);
+        
+        // Fallback: Get device ID directly from AsyncStorage
+        let deviceId = sessionInfo.userId || sessionInfo.sessionId;
+        if (!deviceId || deviceId === 'unknown') {
+          try {
+            deviceId = await AsyncStorage.getItem('analytics_device_id');
+            console.log('🔍 Device ID from AsyncStorage:', deviceId);
+          } catch (error) {
+            console.error('❌ Error getting device ID from AsyncStorage:', error);
+          }
+        }
+        
+        setCurrentDeviceId(deviceId || 'Unknown');
       } catch (error) {
         console.error('❌ SettingsScreen: Error initializing analytics:', error);
         setIsInitialized(false);
@@ -67,86 +92,9 @@ export const SettingsScreen: React.FC = () => {
     initializeAnalytics();
   }, []);
 
-  // Handle analytics toggle
-  const handleAnalyticsToggle = async (enabled: boolean) => {
-    setAllowsAnalytics(enabled);
-    HapticFeedback.light();
-    
-    if (!enabled) {
-      Alert.alert(
-        'Analytics Disabled',
-        'Analytics help us improve the app. You can re-enable this anytime in settings.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
 
-  // Handle feedback toggle
-  const handleFeedbackToggle = async (enabled: boolean) => {
-    setAllowsFeedback(enabled);
-    HapticFeedback.light();
-    
-    if (!enabled) {
-      Alert.alert(
-        'Feedback Disabled',
-        'Feedback helps us improve the app. You can re-enable this anytime in settings.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
 
-  // Test analytics functionality
-  const handleTestAnalytics = async () => {
-    try {
-      console.log('🧪 Starting analytics test...');
-      await ServiceFactory.ensureAnalyticsInitialized();
-      await ServiceFactory.ensureFirebaseInitialized();
-      
-      const AnalyticsService = ServiceFactory.getAnalyticsService();
-      console.log('🧪 AnalyticsService available:', !!AnalyticsService);
-      console.log('🧪 AnalyticsService.trackFeatureUsage available:', !!AnalyticsService.trackFeatureUsage);
-      
-      await AnalyticsService.trackFeatureUsage('test_analytics', 'settings', 'Settings Screen', {
-        testData: 'Analytics test from settings',
-        timestamp: new Date().toISOString()
-      });
-      
-      // Force flush events immediately
-      console.log('🧪 Forcing event flush...');
-      await AnalyticsService.flushEvents();
-      
-      Alert.alert('Success', 'Test analytics event sent! Check console logs and Firebase Console → Analytics → Events.');
-    } catch (error) {
-      console.error('❌ Analytics test error:', error);
-      Alert.alert('Error', 'Failed to send test analytics event: ' + error.message);
-    }
-  };
 
-  // Handle data deletion
-  const handleDeleteAnalyticsData = () => {
-    Alert.alert(
-      'Delete Analytics Data',
-      'This will permanently delete all your analytics and feedback data. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // TODO: Get actual user ID
-              const userId = 'anonymous-user';
-              await FeedbackService.clearUserFeedback(userId);
-              Alert.alert('Success', 'Your analytics data has been deleted.');
-            } catch (error) {
-              console.error('Error deleting analytics data:', error);
-              Alert.alert('Error', 'Failed to delete analytics data. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   // Handle daily notification toggle
   const handleNotificationToggle = async (enabled: boolean) => {
@@ -192,23 +140,6 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  const handleExportData = () => {
-    const exportData = {
-      sparkData,
-      sparkProgress,
-      userSparkIds,
-      favoriteSparkIds,
-      settings: preferences,
-      exportedAt: new Date().toISOString(),
-      version: "1.0.0"
-    };
-
-    Alert.alert(
-      "Data Export",
-      `Your data has been prepared for export. In a full app, this would be saved to your device or shared.\n\nData size: ${JSON.stringify(exportData).length} characters`,
-      [{ text: "OK" }]
-    );
-  };
 
   // Spark management functions
   const handleMoveUp = (index: number) => {
@@ -243,6 +174,31 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  // Pull-to-refresh handler
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      console.log('🔄 SettingsScreen: Starting refresh...');
+      
+      // Refresh analytics initialization
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
+      await AnalyticsService.initialize();
+      
+      // Refresh admin status
+      const adminStatus = await AdminResponseService.isAdmin();
+      setIsAdmin(adminStatus);
+      
+      // Refresh feedback data (this will be handled by SettingsFeedbackSection)
+      console.log('✅ SettingsScreen: Refresh completed');
+      
+      HapticFeedback.light();
+    } catch (error) {
+      console.error('❌ SettingsScreen: Refresh failed:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const getDataStats = () => {
     const totalSparks = userSparkIds.length;
     const totalProgress = Object.keys(sparkProgress).length;
@@ -252,12 +208,12 @@ export const SettingsScreen: React.FC = () => {
     return { totalSparks, totalProgress, totalFavorites, totalSessions };
   };
 
-  const stats = getDataStats();
 
   const styles = createStyles(colors);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <View style={styles.container}>
+      <SettingsScrollView onRefresh={handleRefresh} refreshing={refreshing}>
       <View style={styles.header}>
         <Text style={styles.title}>⚙️ Settings</Text>
         <Text style={styles.subtitle}>Customize your Sparks experience</Text>
@@ -265,6 +221,39 @@ export const SettingsScreen: React.FC = () => {
 
       <View style={styles.feedbackSection}>
         <SettingsFeedbackSection sparkName="Sparks App" />
+      </View>
+
+      {/* Debug Section - Remove after testing */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>🔍 Debug Info</Text>
+        <Text style={styles.debugText}>Admin Status: {isAdmin ? '✅ Admin' : '❌ Not Admin'}</Text>
+        <Text style={styles.debugText}>Device ID: {currentDeviceId || 'Loading...'}</Text>
+        <Text style={styles.debugText}>Analytics Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</Text>
+        <Text style={styles.debugText}>Expected Device ID: device_1761186342237_3wfem84rw</Text>
+        
+        {currentDeviceId && !isAdmin && (
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={() => {
+              Alert.alert(
+                'Add Device to Admin List',
+                `Add this device ID to the admin list?\n\n${currentDeviceId}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Add', 
+                    onPress: () => {
+                      // This would need to be added to the ADMIN_DEVICE_IDS array in FeedbackNotificationService.ts
+                      Alert.alert('Manual Step Required', `Add this device ID to ADMIN_DEVICE_IDS in FeedbackNotificationService.ts:\n\n'${currentDeviceId}'`);
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <Text style={styles.debugButtonText}>Add This Device to Admin List</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Admin Section */}
@@ -399,92 +388,6 @@ export const SettingsScreen: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy & Analytics</Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Analytics</Text>
-            <Text style={styles.settingDescription}>Help improve the app with usage data</Text>
-          </View>
-          <Switch
-            value={allowsAnalytics}
-            onValueChange={handleAnalyticsToggle}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={allowsAnalytics ? '#fff' : '#f4f3f4'}
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Feedback Collection</Text>
-            <Text style={styles.settingDescription}>Allow feedback prompts and rating requests</Text>
-          </View>
-          <Switch
-            value={allowsFeedback}
-            onValueChange={handleFeedbackToggle}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={allowsFeedback ? '#fff' : '#f4f3f4'}
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: colors.warning || '#FF9500' }]} 
-          onPress={handleDeleteAnalyticsData}
-        >
-          <Text style={styles.actionButtonText}>🗑️ Delete Analytics Data</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: colors.primary }]} 
-          onPress={handleTestAnalytics}
-        >
-          <Text style={styles.actionButtonText}>📊 Test Analytics</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.privacyNote}>
-          Your data is stored securely and never shared with third parties. 
-          You can delete your analytics data at any time.
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Data</Text>
-        
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.totalSparks}</Text>
-            <Text style={styles.statLabel}>My Sparks</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.totalSessions}</Text>
-            <Text style={styles.statLabel}>Total Sessions</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.totalFavorites}</Text>
-            <Text style={styles.statLabel}>Favorites</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{stats.totalProgress}</Text>
-            <Text style={styles.statLabel}>With Progress</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.actionButton} onPress={handleExportData}>
-          <Text style={styles.actionButtonText}>📤 Export Data</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: colors.warning || '#FF9500' }]} 
-          onPress={async () => {
-            await NotificationService.sendTestNotification();
-            Alert.alert('Test Sent', 'Check for the test notification in a few seconds!');
-          }}
-        >
-          <Text style={styles.actionButtonText}>🔔 Test Notification</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Danger Zone</Text>
         
         <TouchableOpacity 
@@ -499,31 +402,13 @@ export const SettingsScreen: React.FC = () => {
         </Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        
-        <View style={styles.aboutItem}>
-          <Text style={styles.aboutLabel}>Version</Text>
-          <Text style={styles.aboutValue}>1.0.0</Text>
-        </View>
-        
-        <View style={styles.aboutItem}>
-          <Text style={styles.aboutLabel}>Built with</Text>
-          <Text style={styles.aboutValue}>React Native & Expo</Text>
-        </View>
-        
-        <View style={styles.aboutItem}>
-          <Text style={styles.aboutLabel}>Storage</Text>
-          <Text style={styles.aboutValue}>AsyncStorage (Local)</Text>
-        </View>
-      </View>
-
       {/* Admin Feedback Manager Modal */}
       <AdminFeedbackManager
         visible={showAdminManager}
         onClose={() => setShowAdminManager(false)}
       />
-    </ScrollView>
+      </SettingsScrollView>
+    </View>
   );
 };
 
@@ -531,9 +416,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  contentContainer: {
-    padding: 20,
   },
   header: {
     alignItems: 'center',
@@ -593,25 +475,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
   actionButton: {
     backgroundColor: colors.primary,
     paddingVertical: 12,
@@ -637,30 +500,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
-  },
-  aboutItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  aboutLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  aboutValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  privacyNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic',
-    lineHeight: 16,
   },
   
   // Spark management styles
@@ -736,5 +575,23 @@ const createStyles = (colors: any) => StyleSheet.create({
   removeButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  debugText: {
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  debugButton: {
+    backgroundColor: colors.primary,
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  debugButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

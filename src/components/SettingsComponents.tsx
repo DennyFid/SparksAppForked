@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking, Modal } from 'react-native';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking, Modal, RefreshControl } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { StarRating } from './StarRating';
@@ -27,17 +27,37 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({ children }
 
 interface SettingsScrollViewProps {
   children: React.ReactNode;
+  onRefresh?: () => Promise<void>;
+  refreshing?: boolean;
 }
 
-export const SettingsScrollView: React.FC<SettingsScrollViewProps> = ({ children }) => {
+export const SettingsScrollView: React.FC<SettingsScrollViewProps> = ({ children, onRefresh, refreshing = false }) => {
+  const { colors } = useTheme();
+  
   const styles = StyleSheet.create({
     scrollContainer: {
       padding: 20,
     },
   });
 
+  const refreshControl = onRefresh ? (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={colors.primary}
+      colors={[colors.primary]}
+      progressBackgroundColor={colors.surface}
+      title={refreshing ? "Refreshing..." : "Pull to refresh"}
+      titleColor={colors.textSecondary}
+    />
+  ) : undefined;
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      contentContainerStyle={styles.scrollContainer} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
+    >
       {children}
     </ScrollView>
   );
@@ -648,16 +668,26 @@ interface SettingsFeedbackSectionProps {
   sparkId?: string;
 }
 
-export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = ({ sparkName, sparkId = 'app' }) => {
-  const { colors } = useTheme();
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export interface SettingsFeedbackSectionRef {
+  refresh: () => Promise<void>;
+}
 
-  // Load user feedback on mount
-  useEffect(() => {
-    loadUserFeedback();
-  }, []);
+export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, SettingsFeedbackSectionProps>(
+  ({ sparkName, sparkId = 'app' }, ref) => {
+    const { colors } = useTheme();
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Load user feedback on mount
+    useEffect(() => {
+      loadUserFeedback();
+    }, []);
+
+    // Expose refresh function to parent
+    useImperativeHandle(ref, () => ({
+      refresh: loadUserFeedback,
+    }), []);
 
   // Mark responses as read when feedback is loaded
   useEffect(() => {
@@ -946,4 +976,4 @@ export const SettingsFeedbackSection: React.FC<SettingsFeedbackSectionProps> = (
       />
     </SettingsSection>
   );
-};
+});

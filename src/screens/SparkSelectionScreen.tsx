@@ -6,6 +6,7 @@ import { getAllSparks, getSparkById } from '../components/SparkRegistry';
 import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
+import { PendingResponseNotification } from '../components/PendingResponseNotification';
 
 type SparkSelectionNavigationProp = StackNavigationProp<MySparkStackParamList, 'MySparksList'>;
 
@@ -168,6 +169,13 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={styles.sparkCardContent}>
                     <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                     <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
+                    <PendingResponseNotification 
+                      sparkId={spark.metadata.id}
+                      onPress={() => {
+                        // Navigate to settings page for this spark
+                        navigation.navigate('Spark', { sparkId: spark.metadata.id });
+                      }}
+                    />
                   </View>
                 </TouchableOpacity>
               );

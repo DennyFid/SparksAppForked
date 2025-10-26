@@ -2257,6 +2257,8 @@ const GolfTrackerSettings: React.FC<{
           icon="🏌️‍♂️"
         />
 
+        <SettingsFeedbackSection sparkName="Golf Brain" sparkId="golf-tracker" />
+
         <SettingsSection title="Handicap">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
             <SettingsText variant="body">
@@ -2488,8 +2490,6 @@ const GolfTrackerSettings: React.FC<{
             )}
           </View>
         </SettingsSection>
-
-        <SettingsFeedbackSection sparkName="Golf Brain" sparkId="golf-tracker" />
 
         <SettingsSection title="About">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>

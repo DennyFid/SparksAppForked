@@ -270,6 +270,8 @@ const ToviewSettings: React.FC<{
           icon="📺"
         />
 
+        <SettingsFeedbackSection sparkName="Toview" sparkId="toview" />
+
         <SettingsSection title="Streaming Providers">
           <SettingsText>
             Manage which streaming services appear in the provider dropdown.
@@ -307,8 +309,6 @@ const ToviewSettings: React.FC<{
             ))}
           </View>
         </SettingsSection>
-
-        <SettingsFeedbackSection sparkName="Toview" sparkId="toview" />
       </SettingsScrollView>
       
       <SaveCancelButtons

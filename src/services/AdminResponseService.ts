@@ -12,10 +12,13 @@ export class AdminResponseService {
   ): Promise<void> {
     try {
       // Update the feedback document with the response
-      await FirebaseService.updateFeedbackResponse(feedbackId, response);
+      await (FirebaseService as any).updateFeedbackResponse(feedbackId, {
+        adminId: adminDeviceId,
+        text: response
+      });
       
       // Get the feedback details to send notification
-      const feedback = await FirebaseService.getFeedbackById(feedbackId);
+      const feedback = await (FirebaseService as any).getFeedbackById(feedbackId);
       if (feedback) {
         // Send notification to the user who submitted the feedback
         await FeedbackNotificationService.addPendingResponse(
@@ -38,7 +41,7 @@ export class AdminResponseService {
    */
   static async getAllFeedback(): Promise<any[]> {
     try {
-      return await FirebaseService.getAllFeedback();
+      return await (FirebaseService as any).getAllFeedback();
     } catch (error) {
       console.error('Error getting all feedback:', error);
       return [];
@@ -50,7 +53,7 @@ export class AdminResponseService {
    */
   static async getFeedbackBySpark(sparkId: string): Promise<any[]> {
     try {
-      return await FirebaseService.getFeedbackBySpark(sparkId);
+      return await (FirebaseService as any).getFeedbackBySpark(sparkId);
     } catch (error) {
       console.error('Error getting feedback by spark:', error);
       return [];
@@ -65,7 +68,11 @@ export class AdminResponseService {
       const { ServiceFactory } = await import('./ServiceFactory');
       const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
-      return FeedbackNotificationService.isAdminDevice(sessionInfo.userId || '');
+      const deviceId = sessionInfo.userId || sessionInfo.sessionId || '';
+      console.log('🔍 AdminResponseService.isAdmin - deviceId:', deviceId);
+      console.log('🔍 AdminResponseService.isAdmin - userId:', sessionInfo.userId);
+      console.log('🔍 AdminResponseService.isAdmin - sessionId:', sessionInfo.sessionId);
+      return FeedbackNotificationService.isAdminDevice(deviceId);
     } catch (error) {
       console.error('Error checking admin status:', error);
       return false;

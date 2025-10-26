@@ -11,7 +11,7 @@ try {
   isNotificationsAvailable = true;
   console.log('✅ Expo Notifications available');
 } catch (error) {
-  console.log('⚠️ Expo Notifications not available:', error.message);
+  console.log('⚠️ Expo Notifications not available:', (error as Error).message);
   isNotificationsAvailable = false;
 }
 
@@ -38,7 +38,8 @@ export class FeedbackNotificationService {
   private static readonly ADMIN_DEVICE_IDS = [
     'device_1761188124738_43laovhht', // Replace with your actual device ID
     'device_1761108969148_hwegb6ecb', // Add more if needed
-    'device_1761438183470_ss39iv0t6'
+    'device_1761438183470_ss39iv0t6',
+    'device_1761186342237_3wfem84rw' // Added current simulator device ID
   ];
 
   /**
@@ -278,6 +279,36 @@ export class FeedbackNotificationService {
       await this.updateBadgeCount(deviceId);
     } catch (error) {
       console.error('Error clearing pending responses:', error);
+    }
+  }
+
+  /**
+   * Check if user has unread responses for a specific spark
+   */
+  static async hasUnreadResponse(userId: string, sparkId: string): Promise<boolean> {
+    try {
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const FirebaseService = ServiceFactory.getFirebaseService();
+      
+      // Check if Firebase is initialized with proper error handling
+      try {
+        if (!(FirebaseService as any).isInitialized()) {
+          console.log('Firebase not initialized, returning false for unread check');
+          return false;
+        }
+      } catch (initError) {
+        console.log('Firebase initialization check failed, returning false for unread check');
+        return false;
+      }
+
+      const responses = await (FirebaseService as any).getUserFeedbackResponses(userId, sparkId);
+      const unreadResponses = responses.filter((response: any) => !response.isRead);
+      
+      console.log(`📩 Checking unread responses for ${sparkId}: ${unreadResponses.length} unread`);
+      return unreadResponses.length > 0;
+    } catch (error) {
+      console.error('Error checking unread responses:', error);
+      return false;
     }
   }
 }
