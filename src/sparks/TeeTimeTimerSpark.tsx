@@ -1277,7 +1277,13 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
           {!showTimePicker && (
             <TouchableOpacity
               style={styles.setTeeTimeButton}
-              onPress={() => setShowTimePicker(true)}
+              onPress={() => {
+                // Set default time to current time + total duration
+                const now = new Date();
+                const defaultTime = new Date(now.getTime() + totalDuration * 60 * 1000);
+                setSelectedTime(defaultTime);
+                setShowTimePicker(true);
+              }}
             >
               <Text style={styles.primaryButtonText}>Set Tee Time</Text>
             </TouchableOpacity>

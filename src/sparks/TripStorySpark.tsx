@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -121,6 +122,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [editActivityTime, setEditActivityTime] = useState('');
   const [editActivityDescription, setEditActivityDescription] = useState('');
   const [editActivityLocation, setEditActivityLocation] = useState('');
+  const [editActivityLat, setEditActivityLat] = useState('');
+  const [editActivityLng, setEditActivityLng] = useState('');
+  const [editActivityGeoStatus, setEditActivityGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
   const [showEditTrip, setShowEditTrip] = useState(false);
   const [editTripTitle, setEditTripTitle] = useState('');
   const [editTripStartDate, setEditTripStartDate] = useState('');
@@ -144,6 +148,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [photoName, setPhotoName] = useState('');
   const [photoDate, setPhotoDate] = useState('');
   const [photoActivityId, setPhotoActivityId] = useState<string | null>(null);
+  const [photoLocation, setPhotoLocation] = useState('');
+  const [photoLat, setPhotoLat] = useState('');
+  const [photoLng, setPhotoLng] = useState('');
+  const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
 
   useEffect(() => {
     loadTrips();
@@ -448,17 +456,38 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setPhotoName(photo.caption || '');
     setPhotoDate(new Date(photo.timestamp).toISOString().split('T')[0]);
     setPhotoActivityId(photo.activityId || null);
+    setPhotoLocation(photo.location?.address || '');
+    setPhotoLat(photo.location?.latitude?.toString() || '');
+    setPhotoLng(photo.location?.longitude?.toString() || '');
+    setPhotoGeoStatus('idle');
     setShowPhotoDetail(true);
   };
 
   const updatePhotoDetails = async () => {
     if (!selectedPhoto || !currentTrip) return;
 
+    // Build location object if we have address or coordinates
+    let location: { latitude: number; longitude: number; address?: string } | undefined = undefined;
+    if (photoLat && photoLng) {
+      // Only add location if we have valid coordinates
+      const loc: { latitude: number; longitude: number; address?: string } = {
+        latitude: parseFloat(photoLat),
+        longitude: parseFloat(photoLng),
+      };
+      
+      if (photoLocation) {
+        loc.address = photoLocation;
+      }
+      
+      location = loc;
+    }
+
     const updatedPhoto: TripPhoto = {
       ...selectedPhoto,
       caption: photoName,
       timestamp: new Date(photoDate + 'T00:00:00').toISOString(),
       activityId: photoActivityId || undefined,
+      location,
     };
 
     const updatedTrips = trips.map(trip => 
@@ -517,18 +546,37 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setEditActivityTime(activity.time);
     setEditActivityDescription(activity.description || '');
     setEditActivityLocation(activity.location?.address || '');
+    setEditActivityLat(activity.location?.latitude?.toString() || '');
+    setEditActivityLng(activity.location?.longitude?.toString() || '');
+    setEditActivityGeoStatus('idle');
     setShowEditActivity(true);
   };
 
   const updateActivity = async () => {
     if (!editingActivity || !currentTrip) return;
 
+    // Build location object if we have address or coordinates
+    let location = undefined;
+    if (editActivityLocation || editActivityLat || editActivityLng) {
+      const loc: { address?: string; latitude?: number; longitude?: number } = {
+        address: editActivityLocation || undefined,
+      };
+      
+      // Add coordinates if provided
+      if (editActivityLat && editActivityLng) {
+        loc.latitude = parseFloat(editActivityLat);
+        loc.longitude = parseFloat(editActivityLng);
+      }
+      
+      location = loc;
+    }
+
     const updatedActivity: Activity = {
       ...editingActivity,
       name: editActivityName,
       time: editActivityTime,
       description: editActivityDescription,
-      location: editActivityLocation ? { address: editActivityLocation } : undefined,
+      location,
     };
 
     const updatedTrips = trips.map(trip => 
@@ -580,6 +628,35 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         }
       ]
     );
+  };
+
+  const geocodeLocation = async (locationText: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      setEditActivityGeoStatus('geocoding');
+      // Use OpenStreetMap Nominatim API (free, no key required)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationText)}&format=json&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'SparksApp/1.0' // Required by Nominatim
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0 && data[0].lat && data[0].lon) {
+        setEditActivityGeoStatus('success');
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      } else {
+        setEditActivityGeoStatus('failed');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Geocoding error:', error);
+      setEditActivityGeoStatus('failed');
+      return null;
+    }
   };
 
   const openEditTrip = () => {
@@ -690,7 +767,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             <div class="dates">${formatDate(currentTrip.startDate || '')} - ${formatDate(currentTrip.endDate || '')}</div>
           </div>
           ${tripDates.map((date, index) => {
-            const dayActivities = currentTrip.activities.filter(activity => activity.startDate === date);
+            const dayActivities = currentTrip.activities
+              .filter(activity => activity.startDate === date)
+              .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
             const dayPhotos = currentTrip.photos.filter(photo => {
               const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
               return photoDate === date;
@@ -698,7 +777,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             
             return `
               <div class="day">
-                <div class="day-title">Day ${index + 1} - ${formatDate(date)}</div>
+                <div class="day-title">${formatDateWithDayNumber(date, index + 1, tripDates.length)}</div>
                 ${dayActivities.map(activity => `
                   <div class="activity">
                     <div class="activity-name">${activity.name || 'Untitled Activity'}</div>
@@ -728,33 +807,27 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         </html>
       `;
 
-      // Check if expo-print is available
-      let Print: any = null;
+      // Generate PDF using expo-print
       try {
-        const printModule = require('expo-print');
-        Print = printModule.default;
-      } catch (error) {
-        console.log('⚠️ Expo Print not available:', (error as Error).message);
+        const { uri } = await Print.printToFileAsync({ html });
+        
+        // Share the PDF
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${currentTrip.title} Trip Story`,
+        });
+
+        HapticFeedback.success();
+      } catch (printError) {
+        console.error('❌ Print error:', printError);
         Alert.alert(
-          'PDF Generation Not Available',
-          'PDF generation is not available in this environment. Please use a development build or standalone app for full functionality.',
+          'PDF Generation Error',
+          'Failed to generate PDF. Please try again.',
           [{ text: 'OK' }]
         );
-        return;
       }
-
-      // Generate PDF
-      const { uri } = await Print.printToFileAsync({ html });
-      
-      // Share the PDF
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Share ${currentTrip.title} Trip Story`,
-      });
-
-      HapticFeedback.success();
     } catch (error) {
-      console.error('Error generating trip story:', error);
+      console.error('❌ Error generating trip story:', error);
       Alert.alert('Error', 'Failed to generate trip story. Please try again.');
     }
   };
@@ -771,15 +844,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 📍 ${currentTrip.origin || 'Unknown'} → ${currentTrip.destination || 'Unknown'}
 
 ${tripDates.map((date, index) => {
-  const dayActivities = currentTrip.activities.filter(activity => activity.startDate === date);
+  const dayActivities = currentTrip.activities
+    .filter(activity => activity.startDate === date)
+    .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
   const dayPhotos = currentTrip.photos.filter(photo => {
     const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
     return photoDate === date;
   });
   
-  return `Day ${index + 1} - ${formatDate(date)}
-${dayActivities.map(activity => `• ${activity.name} at ${activity.time}`).join('\n')}
-📸 ${dayPhotos.length} photos`;
+  return `${formatDateWithDayNumber(date, index + 1, tripDates.length)}
+${dayActivities.map(activity => `• ${activity.name} at ${activity.time}`).join('\n')}`;
 }).join('\n\n')}
 
 Created with TripStory ✈️
@@ -804,13 +878,33 @@ Created with TripStory ✈️
       if (isNaN(date.getTime())) {
         return dateString; // Return original if parsing fails
       }
-      return date.toLocaleDateString('en-US', { 
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const monthDayYear = date.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
         year: 'numeric' 
       });
+      return `${dayOfWeek} ${monthDayYear}`;
     } catch (error) {
       return dateString; // Return original if parsing fails
+    }
+  };
+
+  const formatDateWithDayNumber = (dateString: string, dayNumber: number, totalDays: number) => {
+    try {
+      const date = new Date(dateString + 'T00:00:00');
+      if (isNaN(date.getTime())) {
+        return `${dateString} (Day ${dayNumber}/${totalDays})`;
+      }
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const monthDayYear = date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+      return `${dayOfWeek} ${monthDayYear} (Day ${dayNumber}/${totalDays})`;
+    } catch (error) {
+      return `${dateString} (Day ${dayNumber}/${totalDays})`;
     }
   };
 
@@ -858,25 +952,37 @@ Created with TripStory ✈️
 
   const getSortedTrips = () => {
     const now = new Date();
+    
+    // Filter and sort trips by status
     const plannedTrips = trips.filter(trip => {
       const startDate = new Date(trip.startDate + 'T00:00:00');
-      return startDate > now;
+      return startDate > now; // Planned
     }).sort((a, b) => {
       const dateA = new Date(a.startDate + 'T00:00:00');
       const dateB = new Date(b.startDate + 'T00:00:00');
       return dateA.getTime() - dateB.getTime(); // Next planned to furthest
     });
 
-    const pastTrips = trips.filter(trip => {
+    const activeTrips = trips.filter(trip => {
+      const startDate = new Date(trip.startDate + 'T00:00:00');
       const endDate = new Date(trip.endDate + 'T00:00:00');
-      return endDate <= now;
+      return startDate <= now && endDate > now; // Active
+    }).sort((a, b) => {
+      const dateA = new Date(a.startDate + 'T00:00:00');
+      const dateB = new Date(b.startDate + 'T00:00:00');
+      return dateA.getTime() - dateB.getTime(); // Earliest to latest
+    });
+
+    const completedTrips = trips.filter(trip => {
+      const endDate = new Date(trip.endDate + 'T00:00:00');
+      return endDate <= now; // Completed
     }).sort((a, b) => {
       const dateA = new Date(a.endDate + 'T00:00:00');
       const dateB = new Date(b.endDate + 'T00:00:00');
       return dateB.getTime() - dateA.getTime(); // Most recent to oldest
     });
 
-    return [...plannedTrips, ...pastTrips];
+    return [...plannedTrips, ...activeTrips, ...completedTrips];
   };
 
   const renderTripCard = (trip: Trip) => {
@@ -1195,16 +1301,85 @@ Created with TripStory ✈️
             </View>
 
 
-            {/* Location Info */}
-            {selectedPhoto.location && (
+            {/* Location Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Location (Optional)</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput
+                  style={[{ flex: 1 }, styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={photoLocation}
+                  onChangeText={setPhotoLocation}
+                  placeholder="Enter location address"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <TouchableOpacity
+                  style={[styles.geocodeButton, { backgroundColor: colors.primary }]}
+                  onPress={async () => {
+                    if (!photoLocation.trim()) {
+                      Alert.alert('Missing Location', 'Please enter a location address first.');
+                      return;
+                    }
+                    
+                    setPhotoGeoStatus('geocoding');
+                    const coords = await geocodeLocation(photoLocation);
+                    if (coords) {
+                      setPhotoLat(coords.lat.toString());
+                      setPhotoLng(coords.lng.toString());
+                      setPhotoGeoStatus('success');
+                      Alert.alert('Success', 'Coordinates updated!');
+                    } else {
+                      setPhotoGeoStatus('failed');
+                      Alert.alert('Geocoding Failed', 'Could not find coordinates for this location. You can enter them manually.');
+                    }
+                  }}
+                >
+                  <Text style={[styles.geocodeButtonText, { color: colors.background }]}>
+                    {photoGeoStatus === 'geocoding' ? '...' : '📍'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Coordinates Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Coordinates (Optional)</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.coordInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={photoLat}
+                  onChangeText={setPhotoLat}
+                  placeholder="Latitude"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={[styles.coordInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                  value={photoLng}
+                  onChangeText={setPhotoLng}
+                  placeholder="Longitude"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* View in Maps Link */}
+            {(selectedPhoto.location || (photoLat && photoLng)) && (
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Location</Text>
                 <TouchableOpacity 
                   style={[styles.locationContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  onPress={openInMaps}
+                  onPress={() => {
+                    const lat = selectedPhoto.location?.latitude || parseFloat(photoLat);
+                    const lng = selectedPhoto.location?.longitude || parseFloat(photoLng);
+                    const url = `https://maps.google.com/maps?q=${lat},${lng}`;
+                    Linking.openURL(url).catch(err => {
+                      console.error('Error opening maps:', err);
+                      Alert.alert('Error', 'Could not open maps application');
+                    });
+                  }}
                 >
                   <Text style={[styles.locationText, { color: colors.text }]}>
-                    📍 {selectedPhoto.location.latitude.toFixed(6)}, {selectedPhoto.location.longitude.toFixed(6)}
+                    📍 {selectedPhoto.location?.latitude?.toFixed(6) || photoLat}, {selectedPhoto.location?.longitude?.toFixed(6) || photoLng}
                   </Text>
                   <Text style={[styles.locationSubtext, { color: colors.textSecondary }]}>
                     Tap to open in maps
@@ -1363,13 +1538,59 @@ Created with TripStory ✈️
 
           <View style={styles.inputGroup}>
             <Text style={[styles.inputLabel, { color: colors.text }]}>Location (Optional)</Text>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-              value={editActivityLocation}
-              onChangeText={setEditActivityLocation}
-              placeholder="Enter location address"
-              placeholderTextColor={colors.textSecondary}
-            />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={[{ flex: 1 }, styles.textInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={editActivityLocation}
+                onChangeText={setEditActivityLocation}
+                placeholder="Enter location address"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <TouchableOpacity
+                style={[styles.geocodeButton, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  if (!editActivityLocation.trim()) {
+                    Alert.alert('Missing Location', 'Please enter a location address first.');
+                    return;
+                  }
+                  
+                  const coords = await geocodeLocation(editActivityLocation);
+                  if (coords) {
+                    setEditActivityLat(coords.lat.toString());
+                    setEditActivityLng(coords.lng.toString());
+                    Alert.alert('Success', 'Coordinates updated!');
+                  } else {
+                    Alert.alert('Geocoding Failed', 'Could not find coordinates for this location. You can enter them manually.');
+                  }
+                }}
+              >
+                <Text style={[styles.geocodeButtonText, { color: colors.background }]}>
+                  {editActivityGeoStatus === 'geocoding' ? '...' : '📍'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Coordinates (Optional)</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.coordInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={editActivityLat}
+                onChangeText={setEditActivityLat}
+                placeholder="Latitude"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+              <TextInput
+                style={[styles.coordInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={editActivityLng}
+                onChangeText={setEditActivityLng}
+                placeholder="Longitude"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+            </View>
           </View>
         </ScrollView>
 
@@ -1697,7 +1918,9 @@ Created with TripStory ✈️
 
         <ScrollView style={styles.tripDetailContent}>
           {tripDates.map((date, index) => {
-            const dayActivities = currentTrip.activities.filter(activity => activity.startDate === date);
+            const dayActivities = currentTrip.activities
+              .filter(activity => activity.startDate === date)
+              .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
             const dayPhotos = currentTrip.photos.filter(photo => {
               const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
               return photoDate === date;
@@ -1707,7 +1930,7 @@ Created with TripStory ✈️
               <View key={date} style={[styles.dayContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.dayHeader}>
                   <Text style={[styles.dayTitle, { color: colors.text }]}>
-                    Day {index + 1} - {formatDate(date)}
+                    {formatDateWithDayNumber(date, index + 1, tripDates.length)}
                   </Text>
                 </View>
 
@@ -1826,21 +2049,23 @@ Created with TripStory ✈️
                 ))}
 
                 {/* Day photos (not associated with activities) */}
-                <View style={styles.dayPhotos}>
-                  <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
-                    Day Photos ({dayPhotos.filter(photo => !photo.activityId).length})
-                  </Text>
-                  <View style={styles.dayPhotosGrid}>
-                    {dayPhotos
-                      .filter(photo => !photo.activityId)
-                      .map((photo) => (
-                        <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
-                          <Image source={{ uri: photo.uri }} style={styles.dayPhoto} />
-                        </TouchableOpacity>
-                      ))
-                    }
+                {dayPhotos.filter(photo => !photo.activityId).length > 0 && (
+                  <View style={styles.dayPhotos}>
+                    <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
+                      Day Photos ({dayPhotos.filter(photo => !photo.activityId).length})
+                    </Text>
+                    <View style={styles.dayPhotosGrid}>
+                      {dayPhotos
+                        .filter(photo => !photo.activityId)
+                        .map((photo) => (
+                          <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
+                            <Image source={{ uri: photo.uri }} style={styles.dayPhoto} />
+                          </TouchableOpacity>
+                        ))
+                      }
+                    </View>
                   </View>
-                </View>
+                )}
               </View>
             );
           })}
@@ -2135,6 +2360,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    minHeight: 48,
+    textAlignVertical: 'center',
+  },
+  geocodeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
+  },
+  geocodeButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  coordInput: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,

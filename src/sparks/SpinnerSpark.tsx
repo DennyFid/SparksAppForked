@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert, Modal } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
@@ -28,6 +28,13 @@ interface SpinnerOption {
   weight: number;
 }
 
+interface DecisionSet {
+  id: string;
+  name: string;
+  active: boolean;
+  options: SpinnerOption[];
+}
+
 const defaultOptions: SpinnerOption[] = [
   { label: 'Pizza', color: '#FF6B6B', weight: 1 },
   { label: 'Sushi', color: '#4ECDC4', weight: 1 },
@@ -37,10 +44,268 @@ const defaultOptions: SpinnerOption[] = [
   { label: 'Salad', color: '#FF9FF3', weight: 1 },
 ];
 
+const vacationOptions: SpinnerOption[] = [
+  { label: 'La Paz Mexico', color: '#FF6B6B', weight: 1 },
+  { label: 'Barcelona', color: '#4ECDC4', weight: 1 },
+  { label: 'London', color: '#45B7D1', weight: 1 },
+];
+
+// Initialize default decision sets
+const getInitialDecisionSets = (): DecisionSet[] => {
+  return [
+    {
+      id: 'dinner',
+      name: 'What should we get for dinner?',
+      active: true,
+      options: defaultOptions,
+    },
+    {
+      id: 'vacation',
+      name: 'Where should we go for our summer vacation?',
+      active: false,
+      options: vacationOptions,
+    },
+  ];
+};
+
 const colorOptions = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3',
   '#A8E6CF', '#FFB3BA', '#BFBFFF', '#B19CD9', '#FFB347', '#87CEEB',
 ];
+
+interface DecisionSetManagerProps {
+  decisionSets: DecisionSet[];
+  onUpdate: (decisionSets: DecisionSet[]) => void;
+  onClose: () => void;
+}
+
+// New component for managing multiple decision sets
+const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, onUpdate, onClose }) => {
+  const { colors } = useTheme();
+  const [editingSet, setEditingSet] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const handleActivate = (setId: string) => {
+    const updated = decisionSets.map(set => ({
+      ...set,
+      active: set.id === setId
+    }));
+    onUpdate(updated);
+    HapticFeedback.medium();
+  };
+
+  const handleEdit = (setId: string) => {
+    setEditingSet(setId);
+    setShowEditModal(true);
+  };
+
+  const handleDelete = (setId: string) => {
+    Alert.alert(
+      'Delete Decision Set',
+      'Are you sure you want to delete this decision set?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updated = decisionSets.filter(set => set.id !== setId);
+            // If we deleted the active set, activate the first one
+            if (decisionSets.find(s => s.id === setId)?.active && updated.length > 0) {
+              updated[0].active = true;
+            }
+            onUpdate(updated);
+            HapticFeedback.medium();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAddNewSpinner = () => {
+    const newId = `spinner_${Date.now()}`;
+    const newSpinner: DecisionSet = {
+      id: newId,
+      name: `New Spinner ${decisionSets.length + 1}`,
+      active: false,
+      options: defaultOptions,
+    };
+    onUpdate([...decisionSets, newSpinner]);
+    HapticFeedback.success();
+    // Automatically open the edit modal for the new spinner
+    setEditingSet(newId);
+    setShowEditModal(true);
+  };
+
+  const styles = StyleSheet.create({
+    setCard: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    activeCard: {
+      borderColor: colors.primary,
+      borderWidth: 3,
+    },
+    setName: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    setInfo: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 12,
+    },
+    activeBadge: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      alignSelf: 'flex-start',
+      marginBottom: 8,
+    },
+    activeBadgeText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    actionButton: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    actionButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    primaryButtonText: {
+      color: '#fff',
+    },
+    dangerButton: {
+      backgroundColor: '#FF3B30',
+      borderColor: '#FF3B30',
+    },
+    dangerButtonText: {
+      color: '#fff',
+    },
+  });
+
+  const setBeingEdited = editingSet ? decisionSets.find(s => s.id === editingSet) : null;
+
+  return (
+    <>
+      <SettingsContainer>
+        <SettingsScrollView>
+          <SettingsHeader
+              icon="🎡"
+              title="Decision Set Manager"
+              subtitle="Manage your decision wheels"
+            />
+
+          <SettingsFeedbackSection sparkName="Spinner" sparkId="spinner" />
+
+          <SettingsSection title="Your Spinners">
+            {decisionSets.map((set) => (
+              <View key={set.id} style={[styles.setCard, set.active && styles.activeCard]}>
+                {set.active && (
+                  <View style={styles.activeBadge}>
+                    <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                  </View>
+                )}
+                <Text style={styles.setName}>{set.name}</Text>
+                <Text style={styles.setInfo}>{set.options.length} options</Text>
+                
+                <View style={styles.buttonRow}>
+                  {!set.active && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.primaryButton]}
+                      onPress={() => handleActivate(set.id)}
+                    >
+                      <Text style={[styles.actionButtonText, styles.primaryButtonText]}>Activate</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleEdit(set.id)}
+                  >
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.dangerButton]}
+                    onPress={() => handleDelete(set.id)}
+                  >
+                    <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </SettingsSection>
+
+          <SettingsButton
+            title="Add Spinner"
+            onPress={handleAddNewSpinner}
+            variant="primary"
+          />
+
+          <SettingsButton
+            title="Close"
+            onPress={onClose}
+            variant="primary"
+          />
+        </SettingsScrollView>
+      </SettingsContainer>
+
+      {/* Edit Modal */}
+      {showEditModal && setBeingEdited && (
+        <Modal
+          visible={showEditModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            setShowEditModal(false);
+            setEditingSet(null);
+          }}
+        >
+          <SpinnerSettings
+            options={setBeingEdited.options}
+            onSave={(newOptions) => {
+              const updated = decisionSets.map(set =>
+                set.id === editingSet ? { ...set, options: newOptions } : set
+              );
+              onUpdate(updated);
+              setShowEditModal(false);
+              setEditingSet(null);
+            }}
+            onClose={() => {
+              setShowEditModal(false);
+              setEditingSet(null);
+            }}
+          />
+        </Modal>
+      )}
+    </>
+  );
+};
 
 interface SpinnerSettingsProps {
   options: SpinnerOption[];
@@ -156,8 +421,6 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
           subtitle="Customize your wheel options and weights"
         />
 
-        <SettingsFeedbackSection sparkName="Spinner" sparkId="spinner" />
-
         <SettingsSection title="Options">
           {editingOptions.map((option, index) => (
             <View key={index} style={{ marginBottom: 20 }}>
@@ -250,18 +513,28 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
   onComplete 
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
-  const [options, setOptions] = useState<SpinnerOption[]>(defaultOptions);
+  const [decisionSets, setDecisionSets] = useState<DecisionSet[]>(getInitialDecisionSets());
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const spinValue = useRef(new Animated.Value(0)).current;
 
-  // Load saved options on mount
+  // Get the active decision set
+  const activeSet = decisionSets.find(set => set.active);
+  const options = activeSet?.options || defaultOptions;
+  const currentQuestion = activeSet?.name || 'Decision Spinner';
+
+  // Load saved decision sets on mount
   useEffect(() => {
     const savedData = getSparkData('spinner');
-    if (savedData.options) {
-      setOptions(savedData.options);
+    if (savedData.decisionSets && savedData.decisionSets.length > 0) {
+      setDecisionSets(savedData.decisionSets);
     }
   }, [getSparkData]);
+
+  // Save decision sets whenever they change
+  useEffect(() => {
+    setSparkData('spinner', { decisionSets });
+  }, [decisionSets, setSparkData]);
 
   const spin = () => {
     if (isSpinning) return;
@@ -321,9 +594,10 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
     return options[0];
   };
 
-  const saveOptions = (newOptions: SpinnerOption[]) => {
-    setOptions(newOptions);
-    setSparkData('spinner', { options: newOptions });
+  const updateActiveSetOptions = (newOptions: SpinnerOption[]) => {
+    setDecisionSets(prev => prev.map(set => 
+      set.active ? { ...set, options: newOptions } : set
+    ));
   };
 
   const createWheelSegments = () => {
@@ -397,10 +671,10 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
 
   if (showSettings) {
     return (
-      <SpinnerSettings
-        options={options}
-        onSave={saveOptions}
-        onClose={onCloseSettings}
+      <DecisionSetManager
+        decisionSets={decisionSets}
+        onUpdate={setDecisionSets}
+        onClose={onCloseSettings || (() => {})}
       />
     );
   }
@@ -409,6 +683,7 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
     <ScrollView contentContainerStyle={styles.scrollContainer} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>🎡 Decision Spinner</Text>
+        <Text style={styles.question}>{currentQuestion}</Text>
       </View>
 
       <View style={styles.wheelContainer}>
@@ -510,6 +785,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  question: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 10,
+    paddingHorizontal: 20,
   },
   wheelContainer: {
     position: 'relative',
