@@ -19,6 +19,7 @@ import SpanishReaderSpark from '../sparks/SpanishReaderSpark';
 import TripStorySpark from '../sparks/TripStorySpark';
 import ShortSaverSpark from '../sparks/ShortSaverSpark';
 import SparkSpark from '../sparks/SparkSpark';
+import { MinuteMinderSpark } from '../sparks/MinuteMinderSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -282,6 +283,21 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           rating: 4.5,
         },
         component: SparkSpark,
+      },
+      'minute-minder': {
+        metadata: {
+          id: 'minute-minder',
+          title: 'Minute Minder',
+          description: 'Track your daily activities with start times and countdown timers',
+          icon: '⏳',
+          category: 'utility',
+          difficulty: 'easy',
+          estimatedTime: 5,
+          available: true,
+          createdAt: '2024-01-17T00:00:00.000Z',
+          rating: 4.0,
+        },
+        component: MinuteMinderSpark,
       },
 };
 
