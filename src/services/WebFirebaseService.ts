@@ -25,7 +25,7 @@ const firebaseConfig = {
 };
 
 export class WebFirebaseService {
-  private static isInitialized: boolean = false;
+  private static _initialized: boolean = false;
   private static auth: any = null;
   private static db: any = null;
   private static currentUser: User | null = null;
@@ -80,7 +80,7 @@ export class WebFirebaseService {
         // Continue without auth - Firestore will still work
       }
       
-      this.isInitialized = true;
+      this._initialized = true;
       console.log('✅ Web Firebase initialized with user:', this.currentUser?.uid);
     } catch (error) {
       console.error('❌ Failed to initialize Web Firebase:', error);
@@ -89,11 +89,11 @@ export class WebFirebaseService {
   }
 
   static isInitialized(): boolean {
-    return WebFirebaseService.isInitialized;
+    return WebFirebaseService._initialized;
   }
 
   static async getCurrentUser(): Promise<AnalyticsUser | null> {
-    if (!this.isInitialized || !this.currentUser) {
+    if (!this._initialized || !this.currentUser) {
       return null;
     }
 
@@ -111,7 +111,7 @@ export class WebFirebaseService {
   }
 
   static async submitFeedback(feedback: Omit<SparkFeedback, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -132,7 +132,7 @@ export class WebFirebaseService {
   }
 
   static async getFeedback(sparkId: string, userId?: string): Promise<SparkFeedback[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -180,7 +180,7 @@ export class WebFirebaseService {
   }
 
   static async getUserFeedback(userId: string, sparkId: string): Promise<SparkFeedback[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       console.log('⚠️ Firebase not initialized, returning empty feedback array');
       return [];
     }
@@ -220,7 +220,7 @@ export class WebFirebaseService {
   }
 
   static async updateFeedback(feedbackId: string, updates: Partial<SparkFeedback>): Promise<void> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -239,7 +239,7 @@ export class WebFirebaseService {
   }
 
   static async logAnalyticsEvent(event: AnalyticsEvent): Promise<void> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -258,7 +258,7 @@ export class WebFirebaseService {
   }
 
   static async getAnalyticsData(sparkId: string, startDate: Date, endDate: Date): Promise<AnalyticsData> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -313,7 +313,7 @@ export class WebFirebaseService {
   }
 
   static async getAggregatedRatings(sparkId: string): Promise<AggregatedRating[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -355,7 +355,7 @@ export class WebFirebaseService {
   }
 
   static async createFeatureFlag(flag: Omit<FeatureFlag, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -376,7 +376,7 @@ export class WebFirebaseService {
   }
 
   static async getFeatureFlag(flagId: string): Promise<FeatureFlag | null> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -405,7 +405,7 @@ export class WebFirebaseService {
   }
 
   static async updateFeatureFlag(flagId: string, updates: Partial<FeatureFlag>): Promise<void> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -424,7 +424,7 @@ export class WebFirebaseService {
   }
 
   static async getSessionData(userId: string, startDate: Date, endDate: Date): Promise<SessionData[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
 
@@ -472,7 +472,7 @@ export class WebFirebaseService {
 
   // Additional methods needed for compatibility
   static async updateFeedbackResponse(feedbackId: string, response: { adminId: string; text: string }): Promise<void> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     
@@ -504,7 +504,7 @@ export class WebFirebaseService {
   }
 
   static async getFeedbackResponses(feedbackId: string): Promise<any[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     const q = query(collection(this.db, 'feedback', feedbackId, 'responses'), orderBy('createdAt', 'asc'));
@@ -517,7 +517,7 @@ export class WebFirebaseService {
    * Since responses are stored directly in feedback documents, we return feedback with responses
    */
   static async getUserFeedbackResponses(userId: string, sparkId: string): Promise<any[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     
@@ -555,7 +555,7 @@ export class WebFirebaseService {
   }
 
   static async getFeedbackById(feedbackId: string): Promise<SparkFeedback | null> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     try {
@@ -572,7 +572,7 @@ export class WebFirebaseService {
   }
 
   static async getAllFeedback(): Promise<SparkFeedback[]> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     const q = query(collection(this.db, 'feedback'), orderBy('createdAt', 'desc'));
@@ -589,7 +589,7 @@ export class WebFirebaseService {
   }
 
   static async deleteUserData(userId: string): Promise<void> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     // This is a placeholder - in a real implementation, you'd delete all user data
@@ -597,7 +597,7 @@ export class WebFirebaseService {
   }
 
   static async createUser(userData: any): Promise<string> {
-    if (!this.isInitialized || !this.db) {
+    if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
     // This is a placeholder - user creation is handled by Firebase Auth

@@ -197,6 +197,9 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [seenCards, setSeenCards] = useState<Set<number>>(new Set()); // Track which cards we've already shown
   const [audioSessionSet, setAudioSessionSet] = useState(false);
   const [showAddPhraseModal, setShowAddPhraseModal] = useState(false);
+  const [autoPlayActive, setAutoPlayActive] = useState(false);
+  const [autoPlayPhase, setAutoPlayPhase] = useState<'english' | 'spanish1' | 'spanish2' | null>(null);
+  const [autoPlayProgress, setAutoPlayProgress] = useState(0); // 0-1 for current phase progress
 
   // Animation values
   const celebrationAnimation = useRef(new Animated.Value(0)).current;
@@ -204,6 +207,9 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const cardFlipAnimation = useRef(new Animated.Value(0)).current;
 
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoPlayActiveRef = useRef(false);
+  const progressIntervalsRef = useRef<NodeJS.Timeout[]>([]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -230,6 +236,26 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setupAudioSession();
   }, []);
 
+  // Sync ref with autoPlayActive state
+  useEffect(() => {
+    autoPlayActiveRef.current = autoPlayActive;
+  }, [autoPlayActive]);
+
+  // Cleanup timers on unmount or when autoplay stops
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      if (autoPlayTimerRef.current) {
+        clearTimeout(autoPlayTimerRef.current);
+      }
+      // Clear all progress intervals
+      progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+      progressIntervalsRef.current = [];
+    };
+  }, []);
+
   // Setup audio session for iOS silent mode compatibility
   const setupAudioSession = async () => {
     try {
@@ -242,38 +268,66 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     }
   };
 
-  // Text-to-speech function
-  const speakSpanish = async (text: string) => {
-    try {
-      // Ensure audio session is set up
-      if (!audioSessionSet) {
-        await setupAudioSession();
-      }
+  // Text-to-speech function - returns a promise that resolves when speech is done
+  const speakSpanish = (text: string, language: string = 'es-ES'): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Ensure audio session is set up
+        if (!audioSessionSet) {
+          await setupAudioSession();
+        }
 
-      // Stop any current speech first
-      const isSpeaking = await Speech.isSpeakingAsync();
-      if (isSpeaking) {
-        Speech.stop();
-      }
+        // Stop any current speech first and wait for it to fully stop
+        const isSpeaking = await Speech.isSpeakingAsync();
+        if (isSpeaking) {
+          Speech.stop();
+          // Wait 500ms for speech to fully stop before starting new speech
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          // Even if not speaking, give a brief delay to ensure system is ready
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
 
-      Speech.speak(text, {
-        language: 'es-ES', // Use Spain Spanish for more authentic accent
-        rate: 0.7,
-        pitch: 1.1,
-        volume: 1.0,
-        onStart: () => {
-          HapticFeedback.light();
-        },
-        onDone: () => {
-          HapticFeedback.light();
-        },
-        onError: (error) => {
-          console.error('Speech error:', error);
-        },
-      });
-    } catch (error) {
-      console.error('Error in speakSpanish:', error);
-    }
+        let speechStarted = false;
+        let speechResolved = false;
+
+        Speech.speak(text, {
+          language: language, // Default to Spanish, but can be changed
+          rate: 0.7,
+          pitch: 1.1,
+          volume: 1.0,
+          onStart: () => {
+            speechStarted = true;
+            HapticFeedback.light();
+          },
+          onDone: () => {
+            HapticFeedback.light();
+            speechResolved = true;
+            // Wait an additional 800ms after speech completes to ensure it's fully finished
+            setTimeout(() => {
+              resolve();
+            }, 800);
+          },
+          onError: (error) => {
+            console.error('Speech error:', error);
+            if (!speechResolved) {
+              reject(error);
+            }
+          },
+        });
+
+        // Fallback timeout in case onStart/onDone don't fire
+        setTimeout(() => {
+          if (!speechStarted) {
+            console.warn('Speech did not start within timeout, resolving anyway');
+            resolve();
+          }
+        }, 5000);
+      } catch (error) {
+        console.error('Error in speakSpanish:', error);
+        reject(error);
+      }
+    });
   };
 
   // Fisher-Yates shuffle algorithm
@@ -554,12 +608,273 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setSeenCards(new Set());
     setTotalAsked(0);
     setSessionActive(false);
+    setAutoPlayActive(false);
+    autoPlayActiveRef.current = false;
+    setAutoPlayPhase(null);
+    setAutoPlayProgress(0);
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
     }
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+    }
+    // Clear all progress intervals
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
     // Reset animations
     cardSlideAnimation.setValue(0);
     cardFlipAnimation.setValue(0);
+  };
+
+  const stopAutoPlay = () => {
+    setAutoPlayActive(false);
+    autoPlayActiveRef.current = false;
+    setAutoPlayPhase(null);
+    setAutoPlayProgress(0);
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    // Clear all progress intervals
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
+  };
+
+  const startAutoPlay = () => {
+    // Initialize session same as regular mode
+    if (cards.length === 0) {
+      return;
+    }
+
+    const shuffledCards = shuffleArray(cards);
+
+    // Clear any existing timers
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+    }
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+    }
+    // Clear all progress intervals
+    progressIntervalsRef.current.forEach(interval => clearInterval(interval));
+    progressIntervalsRef.current = [];
+
+    // Reset all session state
+    setSessionQueue(shuffledCards);
+    setAnsweredCorrectly(new Set());
+    setSeenCards(new Set());
+    setTotalAsked(0);
+    setIsCompleted(false);
+    setShowCelebration(false);
+    setCurrentCard(null);
+    setShowAnswer(false);
+    setIsCountingDown(false);
+    setSessionActive(true);
+    setAutoPlayActive(true);
+    autoPlayActiveRef.current = true;
+
+    // Start with first card - set card immediately to avoid loading state
+    if (shuffledCards.length > 0) {
+      const firstCard = shuffledCards[0];
+      setCurrentCard(firstCard);
+      setShowAnswer(false);
+      setSessionQueue(shuffledCards.slice(1));
+      
+      // Then start processing after a brief delay
+      setTimeout(() => {
+        processAutoPlayCard(firstCard, shuffledCards.slice(1));
+      }, 100);
+    }
+  };
+
+  const processAutoPlayCard = async (card: TranslationCard, remainingQueue: TranslationCard[]) => {
+    // Set current card immediately to avoid loading state
+    setCurrentCard(card);
+    setShowAnswer(false);
+    setSessionQueue(remainingQueue);
+    setAutoPlayPhase('english');
+    setAutoPlayProgress(0);
+
+    // Track if this is a new card
+    if (!seenCards.has(card.id)) {
+      setTotalAsked(prev => prev + 1);
+      setSeenCards(prev => new Set([...prev, card.id]));
+    }
+
+    // Slide in the card
+    slideInCard();
+
+    try {
+      // Phase 1: Speak English and wait
+      if (!autoPlayActiveRef.current) return;
+      
+      // Start progress animation for phase 1 (red)
+      const phase1Duration = 8000; // 8 seconds - increased to give more time
+      const phase1Start = Date.now();
+      const progressInterval = setInterval(() => {
+        if (!autoPlayActiveRef.current) {
+          clearInterval(progressInterval);
+          return;
+        }
+        const elapsed = Date.now() - phase1Start;
+        const progress = Math.min(elapsed / phase1Duration, 1);
+        setAutoPlayProgress(progress);
+      }, 100);
+      progressIntervalsRef.current.push(progressInterval);
+      
+      await speakSpanish(card.english, 'en-US');
+      
+      // Wait remaining time if speech finished early - ensure minimum duration
+      const elapsed = Date.now() - phase1Start;
+      if (elapsed < phase1Duration) {
+        await new Promise(resolve => setTimeout(resolve, phase1Duration - elapsed));
+      }
+      
+      clearInterval(progressInterval);
+      progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval);
+      setAutoPlayProgress(1);
+
+      // Phase 2: Show Spanish and speak first time
+      if (!autoPlayActiveRef.current) return;
+      
+      setShowAnswer(true);
+      flipCard();
+      setAutoPlayPhase('spanish1');
+      setAutoPlayProgress(0);
+      
+      const phase2Duration = 8000; // 8 seconds - increased to give more time
+      const phase2Start = Date.now();
+      const progressInterval2 = setInterval(() => {
+        if (!autoPlayActiveRef.current) {
+          clearInterval(progressInterval2);
+          return;
+        }
+        const elapsed = Date.now() - phase2Start;
+        const progress = Math.min(elapsed / phase2Duration, 1);
+        setAutoPlayProgress(progress);
+      }, 100);
+      progressIntervalsRef.current.push(progressInterval2);
+      
+      await speakSpanish(card.spanish);
+      
+      // Wait remaining time if speech finished early - ensure minimum duration
+      const elapsed2 = Date.now() - phase2Start;
+      if (elapsed2 < phase2Duration) {
+        await new Promise(resolve => setTimeout(resolve, phase2Duration - elapsed2));
+      }
+      
+      clearInterval(progressInterval2);
+      progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval2);
+      setAutoPlayProgress(1);
+
+      // Phase 3: Repeat Spanish
+      if (!autoPlayActiveRef.current) return;
+      
+      setAutoPlayPhase('spanish2');
+      setAutoPlayProgress(0);
+      
+      const phase3Duration = 5000; // 5 seconds - increased to give more time for repeat
+      const phase3Start = Date.now();
+      const progressInterval3 = setInterval(() => {
+        if (!autoPlayActiveRef.current) {
+          clearInterval(progressInterval3);
+          return;
+        }
+        const elapsed = Date.now() - phase3Start;
+        const progress = Math.min(elapsed / phase3Duration, 1);
+        setAutoPlayProgress(progress);
+      }, 100);
+      progressIntervalsRef.current.push(progressInterval3);
+      
+      await speakSpanish(card.spanish);
+      
+      // Wait remaining time if speech finished early - ensure minimum duration
+      const elapsed3 = Date.now() - phase3Start;
+      if (elapsed3 < phase3Duration) {
+        await new Promise(resolve => setTimeout(resolve, phase3Duration - elapsed3));
+      }
+      
+      clearInterval(progressInterval3);
+      progressIntervalsRef.current = progressIntervalsRef.current.filter(i => i !== progressInterval3);
+      setAutoPlayProgress(1);
+
+      // Mark as answered correctly and advance
+      if (!autoPlayActiveRef.current) return;
+      
+      setAnsweredCorrectly(prev => {
+        const newAnsweredCorrectly = new Set([...prev, card.id]);
+        
+        // Update card statistics
+        const updatedCards = cards.map(c => {
+          if (c.id === card.id) {
+            return {
+              ...c,
+              correctCount: c.correctCount + 1,
+              lastAsked: new Date(),
+            };
+          }
+          return c;
+        });
+        setCards(updatedCards);
+
+        // Check if completed
+        if (newAnsweredCorrectly.size === cards.length) {
+          setIsCompleted(true);
+          setShowCelebration(true);
+          setSessionActive(false);
+          setAutoPlayActive(false);
+          autoPlayActiveRef.current = false;
+          setAutoPlayPhase(null);
+          triggerCelebration();
+          onComplete?.({
+            totalCards: cards.length,
+            correctAnswers: newAnsweredCorrectly.size,
+            accuracy: totalAsked > 0 ? (newAnsweredCorrectly.size / totalAsked) * 100 : 0
+          });
+        } else {
+          // For autoplay, we can transition immediately without waiting for slide animation
+          // Slide out current card and continue
+          slideOutCard();
+          setAutoPlayPhase(null);
+          setAutoPlayProgress(0);
+          
+          // Immediately set next card to avoid loading state
+          if (remainingQueue.length > 0) {
+            const nextCard = remainingQueue[0];
+            // Set card immediately, then process after brief delay for animation
+            setCurrentCard(nextCard);
+            setShowAnswer(false);
+            setSessionQueue(remainingQueue.slice(1));
+            
+            setTimeout(() => {
+              processAutoPlayCard(nextCard, remainingQueue.slice(1));
+            }, 300); // Brief delay for slide animation
+          } else {
+            // Queue is empty but not all answered correctly - reshuffle remaining cards
+            const incorrectlyAnswered = updatedCards.filter(c => !newAnsweredCorrectly.has(c.id));
+            if (incorrectlyAnswered.length > 0) {
+              const reshuffled = shuffleArray(incorrectlyAnswered);
+              const nextCard = reshuffled[0];
+              // Set card immediately
+              setCurrentCard(nextCard);
+              setShowAnswer(false);
+              setSessionQueue(reshuffled.slice(1));
+              
+              setTimeout(() => {
+                processAutoPlayCard(nextCard, reshuffled.slice(1));
+              }, 300);
+            }
+          }
+        }
+        
+        return newAnsweredCorrectly;
+      });
+    } catch (error) {
+      console.error('Error in processAutoPlayCard:', error);
+      // Continue anyway
+      setAutoPlayPhase(null);
+      setAutoPlayProgress(0);
+    }
   };
 
   const saveCustomCards = (newCards: TranslationCard[]) => {
@@ -770,6 +1085,18 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       fontSize: 18,
       fontWeight: '600',
     },
+    autoLearnButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 15,
+      paddingHorizontal: 30,
+      borderRadius: 25,
+      marginBottom: 20,
+    },
+    autoLearnButtonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+    },
     statsText: {
       fontSize: 16,
       color: colors.textSecondary,
@@ -795,12 +1122,20 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     resetButton: {
       backgroundColor: colors.textSecondary,
     },
+    stopAutoPlayButton: {
+      backgroundColor: colors.error,
+    },
     bottomButtonText: {
       color: colors.text,
       fontSize: 16,
       fontWeight: '600',
     },
     resetButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    stopAutoPlayButtonText: {
       color: '#fff',
       fontSize: 16,
       fontWeight: '600',
@@ -850,6 +1185,52 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       color: '#fff',
       fontSize: 16,
       fontWeight: '600',
+    },
+    autoplayProgressContainer: {
+      marginVertical: 15,
+      marginHorizontal: 20,
+      position: 'relative',
+      height: 8,
+    },
+    autoplayProgressBar: {
+      flexDirection: 'row',
+      height: 8,
+      borderRadius: 4,
+      overflow: 'hidden',
+      backgroundColor: colors.border,
+    },
+    autoplayProgressSection: {
+      flex: 1,
+      opacity: 0.3,
+    },
+    autoplayProgressRed: {
+      backgroundColor: '#FF4444',
+    },
+    autoplayProgressYellow: {
+      backgroundColor: '#FFD700',
+    },
+    autoplayProgressBlue: {
+      backgroundColor: '#4444FF',
+    },
+    autoplayProgressIndicator: {
+      position: 'absolute',
+      top: -4,
+      width: 16,
+      height: 16,
+      marginLeft: -8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    autoplayProgressBall: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#000',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 4,
     },
   });
 
@@ -908,6 +1289,9 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
           <TouchableOpacity style={styles.startButton} onPress={startNewSession}>
             <Text style={styles.startButtonText}>Start Learning</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.autoLearnButton} onPress={startAutoPlay}>
+            <Text style={styles.autoLearnButtonText}>🚗 Auto Learn</Text>
+          </TouchableOpacity>
         </View>
       ) : sessionActive && currentCard ? (
         <View>
@@ -952,6 +1336,41 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
             )}
           </View>
 
+          {/* Autoplay Progress Bar */}
+          {autoPlayActive && autoPlayPhase && (
+            <View style={styles.autoplayProgressContainer}>
+              <View style={styles.autoplayProgressBar}>
+                {/* Red section - English */}
+                <View style={[
+                  styles.autoplayProgressSection,
+                  styles.autoplayProgressRed,
+                  autoPlayPhase === 'english' && { opacity: 1 }
+                ]} />
+                {/* Yellow section - Spanish 1 */}
+                <View style={[
+                  styles.autoplayProgressSection,
+                  styles.autoplayProgressYellow,
+                  autoPlayPhase === 'spanish1' && { opacity: 1 }
+                ]} />
+                {/* Blue section - Spanish 2 */}
+                <View style={[
+                  styles.autoplayProgressSection,
+                  styles.autoplayProgressBlue,
+                  autoPlayPhase === 'spanish2' && { opacity: 1 }
+                ]} />
+              </View>
+              {/* Progress indicator (ball/arrow) */}
+              <View style={[
+                styles.autoplayProgressIndicator,
+                {
+                  left: `${((autoPlayPhase === 'english' ? 0 : autoPlayPhase === 'spanish1' ? 1 : 2) + autoPlayProgress) * (100 / 3)}%`
+                }
+              ]}>
+                <View style={styles.autoplayProgressBall} />
+              </View>
+            </View>
+          )}
+
           {showAnswer && (
             <View style={styles.answerButtons}>
               <TouchableOpacity
@@ -979,6 +1398,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       ) : null}
 
       <View style={styles.bottomButtons}>
+        {autoPlayActive && (
+          <TouchableOpacity 
+            style={[styles.bottomButton, styles.stopAutoPlayButton]} 
+            onPress={stopAutoPlay}
+          >
+            <Text style={styles.stopAutoPlayButtonText} numberOfLines={1}>Stop Auto Play</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           style={[styles.bottomButton, styles.resetButton]} 
           onPress={resetSession}
