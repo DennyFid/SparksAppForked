@@ -1232,6 +1232,22 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       shadowRadius: 3,
       elevation: 4,
     },
+    startAutoLearnContainer: {
+      marginTop: 15,
+      marginBottom: 10,
+      alignItems: 'center',
+    },
+    startAutoLearnButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 20,
+    },
+    startAutoLearnButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
   if (showSettings) {
@@ -1371,7 +1387,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
             </View>
           )}
 
-          {showAnswer && (
+          {showAnswer && !autoPlayActive && (
             <View style={styles.answerButtons}>
               <TouchableOpacity
                 style={[styles.answerButton, styles.incorrectButton]}
@@ -1385,6 +1401,15 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
                 onPress={() => handleAnswer(true)}
               >
                 <Text style={styles.answerButtonText}>✅ Correct</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Start Auto Learn button - visible when session is active but autoplay is not */}
+          {sessionActive && !autoPlayActive && (
+            <View style={styles.startAutoLearnContainer}>
+              <TouchableOpacity style={styles.startAutoLearnButton} onPress={startAutoPlay}>
+                <Text style={styles.startAutoLearnButtonText}>🚗 Start Auto Learn</Text>
               </TouchableOpacity>
             </View>
           )}

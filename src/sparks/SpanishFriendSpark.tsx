@@ -504,6 +504,20 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
       fontSize: 18,
       fontWeight: '600',
     },
+    modalCloseButton: {
+      backgroundColor: 'transparent',
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 12,
+      width: '100%',
+      alignItems: 'center',
+      borderWidth: 1,
+      marginTop: 12,
+    },
+    modalCloseText: {
+      fontSize: 16,
+      fontWeight: '500',
+    },
   });
 
   if (showSettings) {
@@ -576,6 +590,17 @@ export const SpanishFriendSpark: React.FC<SpanishFriendSparkProps> = ({
               <TouchableOpacity style={styles.modalSubmitButton} onPress={handleNameSubmit}>
                 <Text style={styles.modalSubmitText}>Comenzar</Text>
               </TouchableOpacity>
+              {onCloseSettings && (
+                <TouchableOpacity 
+                  style={[styles.modalCloseButton, { borderColor: colors.border }]} 
+                  onPress={() => {
+                    HapticFeedback.light();
+                    onCloseSettings();
+                  }}
+                >
+                  <Text style={[styles.modalCloseText, { color: colors.text }]}>Close Spark</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

@@ -47,7 +47,7 @@ keytool -genkey -v -keystore upload-key.keystore -alias upload -keyalg RSA -keys
 
 ### Development Build (for testing)
 ```bash
-eas build --platform android --profile development
+npx eas build --platform android --profile development
 ```
 
 ### Production Build (for Play Store)

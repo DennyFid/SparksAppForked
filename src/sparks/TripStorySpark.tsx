@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   FlatList,
   Linking,
   Share,
+  Animated,
 } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -152,6 +153,19 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [photoLat, setPhotoLat] = useState('');
   const [photoLng, setPhotoLng] = useState('');
   const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
+  
+  // Active state tracking (only one can be active at a time)
+  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
+  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  
+  // Sticky header state
+  const [stickyDayDate, setStickyDayDate] = useState<string | null>(null);
+  const [stickyActivityId, setStickyActivityId] = useState<string | null>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const dayPositions = useRef<Map<string, number>>(new Map());
+  const activityPositions = useRef<Map<string, number>>(new Map());
+  const scrollViewRef = useRef<any>(null);
 
   useEffect(() => {
     loadTrips();
@@ -168,11 +182,164 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   }, [trips, currentTrip, selectedDate, selectedActivity, onStateChange]);
 
+  const savePhotoPermanently = async (photoUri: string, tripId: string, photoId: string): Promise<string> => {
+    try {
+      // Get document directory
+      const documentDir = (FileSystem as any).documentDirectory;
+      if (!documentDir) {
+        console.error('❌ Document directory not available');
+        throw new Error('Document directory not available');
+      }
+      
+      // Create trips directory if it doesn't exist
+      const tripsDir = `${documentDir}trips/`;
+      const tripDir = `${tripsDir}${tripId}/`;
+      
+      // Ensure directories exist
+      const tripsDirInfo = await FileSystem.getInfoAsync(tripsDir);
+      if (!tripsDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(tripsDir, { intermediates: true });
+      }
+      const tripDirInfo = await FileSystem.getInfoAsync(tripDir);
+      if (!tripDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(tripDir, { intermediates: true });
+      }
+      
+      // Copy image to permanent location
+      const permanentUri = `${tripDir}${photoId}.jpg`;
+      
+      console.log('📸 Attempting to save photo:', { photoUri, permanentUri });
+      
+      // Try different methods based on URI type
+      if (photoUri.startsWith('content://')) {
+        // Android content URI - use downloadAsync
+        try {
+          const downloadResult = await FileSystem.downloadAsync(photoUri, permanentUri);
+          if (downloadResult.status === 200) {
+            console.log('✅ Photo saved permanently (from content URI):', permanentUri);
+            return permanentUri;
+          } else {
+            throw new Error(`Download failed with status ${downloadResult.status}`);
+          }
+        } catch (downloadError) {
+          console.error('❌ Download failed, trying copyAsync:', downloadError);
+          // Fall through to try copyAsync
+        }
+      }
+      
+      // Try copyAsync (works for file:// and most other URIs)
+      try {
+        await FileSystem.copyAsync({
+          from: photoUri,
+          to: permanentUri,
+        });
+        console.log('✅ Photo saved permanently (via copyAsync):', permanentUri);
+        return permanentUri;
+      } catch (copyError) {
+        console.error('❌ copyAsync failed:', copyError);
+        // Try reading as base64 and writing
+        try {
+          const base64 = await FileSystem.readAsStringAsync(photoUri, {
+            encoding: 'base64' as any,
+          });
+          await FileSystem.writeAsStringAsync(permanentUri, base64, {
+            encoding: 'base64' as any,
+          });
+          console.log('✅ Photo saved permanently (via base64):', permanentUri);
+          return permanentUri;
+        } catch (base64Error) {
+          console.error('❌ All save methods failed:', base64Error);
+          throw base64Error;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error saving photo permanently:', error, 'Original URI:', photoUri);
+      // Return original URI as fallback
+      return photoUri;
+    }
+  };
+
+  const migratePhoto = async (photo: TripPhoto, tripId: string): Promise<string> => {
+    try {
+      // Get document directory
+      const documentDir = (FileSystem as any).documentDirectory;
+      if (!documentDir) {
+        console.warn('⚠️ Cannot migrate photo - document directory not available');
+        return photo.uri; // Can't migrate without document directory
+      }
+      
+      // Check if photo URI is already in permanent location
+      if (photo.uri && photo.uri.startsWith(documentDir)) {
+        // Already migrated
+        return photo.uri;
+      }
+      
+      // Check if permanent file already exists
+      const permanentUri = `${documentDir}trips/${tripId}/${photo.id}.jpg`;
+      const fileInfo = await FileSystem.getInfoAsync(permanentUri);
+      if (fileInfo.exists) {
+        console.log('✅ Photo already migrated:', permanentUri);
+        return permanentUri;
+      }
+      
+      console.log('🔄 Migrating photo:', photo.uri, 'to', permanentUri);
+      // Try to copy from original URI using the same robust save method
+      return await savePhotoPermanently(photo.uri, tripId, photo.id);
+    } catch (error) {
+      console.error('❌ Error migrating photo:', error, 'Photo URI:', photo.uri);
+      // Return original URI as fallback
+      return photo.uri;
+    }
+  };
+
+  const migrateAllPhotos = async (tripsToMigrate: Trip[]): Promise<Trip[]> => {
+    try {
+      const migratedTrips = await Promise.all(
+        tripsToMigrate.map(async (trip) => {
+          const migratedPhotos = await Promise.all(
+            trip.photos.map(async (photo) => {
+              const newUri = await migratePhoto(photo, trip.id);
+              return { ...photo, uri: newUri };
+            })
+          );
+          return { ...trip, photos: migratedPhotos };
+        })
+      );
+      
+      // Save migrated trips (preserve existing data)
+      const currentData = await getSparkData('trip-story');
+      if (JSON.stringify(migratedTrips) !== JSON.stringify(tripsToMigrate)) {
+        await setSparkData('trip-story', {
+          ...currentData,
+          trips: migratedTrips,
+        });
+        console.log('✅ Photos migrated successfully');
+      }
+      
+      return migratedTrips;
+    } catch (error) {
+      console.error('❌ Error migrating photos:', error);
+      return tripsToMigrate;
+    }
+  };
+
   const loadTrips = async () => {
     try {
       const data = await getSparkData('trip-story');
       if (data?.trips) {
-        setTrips(data.trips);
+        // Migrate photos to permanent storage
+        const migratedTrips = await migrateAllPhotos(data.trips);
+        setTrips(migratedTrips);
+      }
+      // Load active state
+      if (data?.activeDayDate !== undefined) {
+        setActiveDayDate(data.activeDayDate);
+      }
+      if (data?.activeActivityId !== undefined) {
+        setActiveActivityId(data.activeActivityId);
+      }
+      if (data?.activeTripId !== undefined) {
+        setActiveTripId(data.activeTripId);
       }
     } catch (error) {
       console.error('Error loading trips:', error);
@@ -181,10 +348,64 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const saveTrips = async (updatedTrips: Trip[]) => {
     try {
-      await setSparkData('trip-story', { trips: updatedTrips });
+      await setSparkData('trip-story', { 
+        trips: updatedTrips,
+        activeDayDate: activeDayDate,
+        activeActivityId: activeActivityId,
+        activeTripId: activeTripId,
+      });
       setTrips(updatedTrips);
     } catch (error) {
       console.error('Error saving trips:', error);
+    }
+  };
+
+  // Save active state whenever it changes
+  useEffect(() => {
+    const saveActiveState = async () => {
+      if (currentTrip) {
+        try {
+          const currentData = await getSparkData('trip-story');
+          await setSparkData('trip-story', {
+            ...currentData,
+            trips: trips || currentData.trips || [],
+            activeDayDate: activeDayDate,
+            activeActivityId: activeActivityId,
+            activeTripId: activeTripId,
+          });
+        } catch (error) {
+          console.error('Error saving active state:', error);
+        }
+      }
+    };
+    saveActiveState();
+  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips]);
+
+  const activateDay = (date: string) => {
+    if (!currentTrip) return;
+    // Deactivate any active activity
+    setActiveActivityId(null);
+    // Toggle day activation (if already active, deactivate it)
+    if (activeDayDate === date && activeTripId === currentTrip.id) {
+      setActiveDayDate(null);
+      setActiveTripId(null);
+    } else {
+      setActiveDayDate(date);
+      setActiveTripId(currentTrip.id);
+    }
+  };
+
+  const activateActivity = (activityId: string) => {
+    if (!currentTrip) return;
+    // Deactivate any active day
+    setActiveDayDate(null);
+    // Toggle activity activation (if already active, deactivate it)
+    if (activeActivityId === activityId && activeTripId === currentTrip.id) {
+      setActiveActivityId(null);
+      setActiveTripId(null);
+    } else {
+      setActiveActivityId(activityId);
+      setActiveTripId(currentTrip.id);
     }
   };
 
@@ -256,6 +477,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     setSelectedDate('');
     setShowAddActivity(false);
     
+    // Scroll to the newly added activity
+    setTimeout(() => {
+      scrollToActivity(newActivity.id);
+    }, 300);
+    
     HapticFeedback.success();
   };
 
@@ -322,11 +548,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         const dateToUse = (activity?.startDate || selectedDate) || new Date().toISOString().split('T')[0];
         const photoDate = new Date(dateToUse + 'T12:00:00').toISOString();
         
+        // Save photo permanently
+        const photoId = Date.now().toString();
+        const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
+        
         const newPhoto: TripPhoto = {
-          id: Date.now().toString(),
+          id: photoId,
           tripId: currentTrip!.id,
           activityId: (activity || selectedActivity)?.id,
-          uri: asset.uri,
+          uri: permanentUri,
           timestamp: photoDate,
           location: location || undefined,
           caption: '',
@@ -348,6 +578,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         setCurrentTrip(updatedTrip);
         
         setShowPhotoCapture(false);
+        
+        // Scroll to the photo location after layout updates
+        setTimeout(() => {
+          if (newPhoto.activityId) {
+            scrollToActivity(newPhoto.activityId);
+          } else if (dateToUse) {
+            scrollToDay(dateToUse);
+          }
+        }, 500);
+        
         setSelectedActivity(null);
         setSelectedDate('');
         HapticFeedback.success();
@@ -409,11 +649,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         const dateToUse = (activity?.startDate || selectedDate) || new Date().toISOString().split('T')[0];
         const photoDate = new Date(dateToUse + 'T12:00:00').toISOString();
         
+        // Save photo permanently
+        const photoId = Date.now().toString();
+        const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
+        
         const newPhoto: TripPhoto = {
-          id: Date.now().toString(),
+          id: photoId,
           tripId: currentTrip!.id,
           activityId: (activity || selectedActivity)?.id,
-          uri: asset.uri,
+          uri: permanentUri,
           timestamp: photoDate,
           location: location || undefined,
           caption: '',
@@ -441,6 +685,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         console.log('Updated trip photos:', updatedTrip?.photos.map(p => ({ id: p.id, activityId: p.activityId })));
         
         setShowPhotoCapture(false);
+        
+        // Scroll to the photo location after layout updates
+        setTimeout(() => {
+          if (newPhoto.activityId) {
+            scrollToActivity(newPhoto.activityId);
+          } else if (dateToUse) {
+            scrollToDay(dateToUse);
+          }
+        }, 500);
+        
         setSelectedActivity(null);
         setSelectedDate('');
         HapticFeedback.success();
@@ -982,7 +1236,8 @@ Created with TripStory ✈️
       return dateB.getTime() - dateA.getTime(); // Most recent to oldest
     });
 
-    return [...plannedTrips, ...activeTrips, ...completedTrips];
+    // Order: Active trips first, then pending (planned) trips, then completed trips
+    return [...activeTrips, ...plannedTrips, ...completedTrips];
   };
 
   const renderTripCard = (trip: Trip) => {
@@ -1389,25 +1644,88 @@ Created with TripStory ✈️
             )}
 
             {/* Current Activity Info */}
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Currently Associated With</Text>
-              <TouchableOpacity 
-                style={[styles.currentActivityContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => setShowActivitySelector(true)}
-              >
-                <Text style={[styles.currentActivityText, { color: colors.text }]}>
-                  {associatedActivity ? associatedActivity.name : 'No Activity'}
-                </Text>
-                {associatedActivity && (
-                  <Text style={[styles.currentActivitySubtext, { color: colors.textSecondary }]}>
-                    {formatDate(associatedActivity.startDate)} at {associatedActivity.time}
+            {!showActivitySelector ? (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Currently Associated With</Text>
+                <TouchableOpacity 
+                  style={[styles.currentActivityContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => setShowActivitySelector(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.currentActivityText, { color: colors.text }]}>
+                    {associatedActivity ? associatedActivity.name : 'No Activity'}
                   </Text>
-                )}
-                <Text style={[styles.tapToChangeText, { color: colors.textSecondary }]}>
-                  Tap to change
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  {associatedActivity && (
+                    <Text style={[styles.currentActivitySubtext, { color: colors.textSecondary }]}>
+                      {formatDate(associatedActivity.startDate)} at {associatedActivity.time}
+                    </Text>
+                  )}
+                  <Text style={[styles.tapToChangeText, { color: colors.textSecondary }]}>
+                    Tap to change
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.inputGroup}>
+                <View style={styles.activitySelectorHeader}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Select Activity</Text>
+                  <TouchableOpacity onPress={() => setShowActivitySelector(false)}>
+                    <Text style={[styles.tapToChangeText, { color: colors.primary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.activitySelectorList}>
+                  <TouchableOpacity
+                    style={[
+                      styles.activityOption,
+                      { 
+                        backgroundColor: photoActivityId === null ? colors.primary : colors.surface,
+                        borderColor: colors.border 
+                      }
+                    ]}
+                    onPress={() => {
+                      setPhotoActivityId(null);
+                      setShowActivitySelector(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.activityOptionText,
+                      { color: photoActivityId === null ? colors.background : colors.text }
+                    ]}>
+                      No Activity
+                    </Text>
+                  </TouchableOpacity>
+                  {currentTrip?.activities.map((activity) => (
+                    <TouchableOpacity
+                      key={activity.id}
+                      style={[
+                        styles.activityOption,
+                        { 
+                          backgroundColor: photoActivityId === activity.id ? colors.primary : colors.surface,
+                          borderColor: colors.border 
+                        }
+                      ]}
+                      onPress={() => {
+                        setPhotoActivityId(activity.id);
+                        setShowActivitySelector(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.activityOptionText,
+                        { color: photoActivityId === activity.id ? colors.background : colors.text }
+                      ]}>
+                        {activity.name}
+                      </Text>
+                      <Text style={[
+                        styles.activityOptionSubtext,
+                        { color: photoActivityId === activity.id ? colors.background : colors.textSecondary }
+                      ]}>
+                        {formatDate(activity.startDate)} at {activity.time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -1886,6 +2204,90 @@ Created with TripStory ✈️
     );
   };
 
+  const handleScroll = (event: any) => {
+    if (!currentTrip) return;
+    const scrollOffset = event.nativeEvent.contentOffset.y;
+    const tripDates = getTripDates();
+    
+    // Find which day should be sticky
+    let currentStickyDay: string | null = null;
+    let currentStickyActivity: string | null = null;
+    
+    // Find the current day we're viewing
+    for (let i = 0; i < tripDates.length; i++) {
+      const date = tripDates[i];
+      const dayY = dayPositions.current.get(date);
+      const nextDay = tripDates[i + 1];
+      const nextDayY = nextDay ? dayPositions.current.get(nextDay) : undefined;
+      
+      if (dayY !== undefined && scrollOffset >= dayY) {
+        // Check if we've scrolled past this day
+        if (nextDayY !== undefined && scrollOffset >= nextDayY) {
+          // We've scrolled past this day, continue to next day
+          continue;
+        }
+        
+        // This is the current day
+        currentStickyDay = date;
+        
+        // Find which activity should be sticky for this day
+        const dayActivities = currentTrip.activities
+          .filter(activity => activity.startDate === date)
+          .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+        
+        // Find the current activity we're viewing
+        let foundCurrentActivity = false;
+        for (let j = 0; j < dayActivities.length; j++) {
+          const activity = dayActivities[j];
+          const activityY = activityPositions.current.get(activity.id);
+          const nextActivity = dayActivities[j + 1];
+          const nextActivityY = nextActivity ? activityPositions.current.get(nextActivity.id) : undefined;
+          
+          if (activityY !== undefined && scrollOffset >= activityY) {
+            // Check if we've scrolled past this activity
+            if (nextActivityY !== undefined && scrollOffset >= nextActivityY) {
+              // We've scrolled past this activity, continue to next activity
+              continue;
+            }
+            
+            // This is the current activity we're viewing
+            currentStickyActivity = activity.id;
+            foundCurrentActivity = true;
+            break; // Found the current activity, stop searching
+          } else {
+            // Haven't reached this activity yet, no activity should be sticky
+            break;
+          }
+        }
+        
+        // If we've scrolled past all activities or past the day, clear activity
+        if (!foundCurrentActivity || (nextDayY !== undefined && scrollOffset >= nextDayY)) {
+          currentStickyActivity = null;
+        }
+        
+        // If we found the day but no activity, that's fine - activity stays null
+        break; // Found the current day, stop searching
+      }
+    }
+    
+    setStickyDayDate(currentStickyDay);
+    setStickyActivityId(currentStickyActivity);
+  };
+
+  const scrollToDay = (date: string) => {
+    const dayY = dayPositions.current.get(date);
+    if (dayY !== undefined && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: dayY - 160, animated: true }); // 160 is paddingTop
+    }
+  };
+
+  const scrollToActivity = (activityId: string) => {
+    const activityY = activityPositions.current.get(activityId);
+    if (activityY !== undefined && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: activityY - 160, animated: true });
+    }
+  };
+
   const renderTripDetailView = () => {
     if (!currentTrip) return null;
 
@@ -1904,7 +2306,8 @@ Created with TripStory ✈️
             <Text style={[styles.backButtonText, { color: colors.primary }]}>← Back</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.tripTitleContainer}>
+        {/* Sticky Trip Title - Always visible at top */}
+        <View style={[styles.stickyTripTitleContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.tripTitleRow}>
             <Text style={[styles.tripDetailTitle, { color: colors.text }]}>{currentTrip.title}</Text>
             <TouchableOpacity 
@@ -1916,7 +2319,36 @@ Created with TripStory ✈️
           </View>
         </View>
 
-        <ScrollView style={styles.tripDetailContent}>
+        {/* Sticky Headers - Date and Activity */}
+        <View style={[styles.stickyHeaderContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          {stickyDayDate && (
+            <TouchableOpacity onPress={() => scrollToDay(stickyDayDate)}>
+              <Text style={[styles.stickyDayTitle, { color: colors.text }]}>
+                {formatDateWithDayNumber(stickyDayDate, tripDates.indexOf(stickyDayDate) + 1, tripDates.length)}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {stickyActivityId && (() => {
+            const activity = currentTrip.activities.find(a => a.id === stickyActivityId);
+            return activity ? (
+              <TouchableOpacity onPress={() => scrollToActivity(stickyActivityId)}>
+                <Text style={[styles.stickyActivityTitle, { color: colors.text }]}>
+                  {activity.name}
+                </Text>
+              </TouchableOpacity>
+            ) : null;
+          })()}
+        </View>
+
+        <Animated.ScrollView 
+          ref={scrollViewRef}
+          style={styles.tripDetailContent}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false, listener: handleScroll }
+          )}
+          scrollEventThrottle={16}
+        >
           {tripDates.map((date, index) => {
             const dayActivities = currentTrip.activities
               .filter(activity => activity.startDate === date)
@@ -1927,14 +2359,28 @@ Created with TripStory ✈️
             });
 
             return (
-              <View key={date} style={[styles.dayContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View 
+                key={date} 
+                style={[styles.dayContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onLayout={(event) => {
+                  const { y } = event.nativeEvent.layout;
+                  dayPositions.current.set(date, y);
+                }}
+              >
                 <View style={styles.dayHeader}>
                   <Text style={[styles.dayTitle, { color: colors.text }]}>
                     {formatDateWithDayNumber(date, index + 1, tripDates.length)}
                   </Text>
+                  <TouchableOpacity
+                    style={[styles.plusButton, { backgroundColor: (activeDayDate === date && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
+                    onPress={() => activateDay(date)}
+                  >
+                    <Text style={[styles.plusButtonText, { color: (activeDayDate === date && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Day-level buttons */}
+                {/* Day-level buttons - only show when day is active and matches current trip */}
+                {activeDayDate === date && activeTripId === currentTrip.id && (
                 <View style={[styles.dayButtons, { flexDirection: 'row', gap: 8 }]}>
                   <TouchableOpacity
                     style={[
@@ -1982,73 +2428,9 @@ Created with TripStory ✈️
                     <Text style={[styles.dayButtonText, { color: colors.primary, fontSize: 14 }]}>+ Add Picture</Text>
                   </TouchableOpacity>
                 </View>
+                )}
 
-                {/* Activities for this day */}
-                {dayActivities.map((activity) => (
-                  <View key={activity.id} style={[styles.activityContainer, { borderColor: colors.border }]}>
-                    <View style={styles.activityHeader}>
-                      <View style={styles.activityTitleContainer}>
-                        <Text style={[styles.activityName, { color: colors.text }]}>{activity.name}</Text>
-                        <TouchableOpacity 
-                          style={styles.editButton}
-                          onPress={() => openEditActivity(activity)}
-                        >
-                          <Text style={styles.editButtonText}>✏️</Text>
-                        </TouchableOpacity>
-                      </View>
-                      {activity.time && (
-                        <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
-                      )}
-                    </View>
-                    {activity.description && (
-                      <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
-                        {activity.description}
-                      </Text>
-                    )}
-                    
-                    {/* Activity photos */}
-                    {dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
-                      <View style={styles.activityPhotos}>
-                        {dayPhotos
-                          .filter(photo => photo.activityId === activity.id)
-                          .map((photo) => (
-                            <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
-                              <Image source={{ uri: photo.uri }} style={styles.activityPhoto} />
-                            </TouchableOpacity>
-                          ))
-                        }
-                      </View>
-                    )}
-
-                    {/* Activity-level photo buttons */}
-                    <View style={styles.activityPhotoButtons}>
-                      <TouchableOpacity
-                        style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                        onPress={() => {
-                          console.log('📸 Snap button pressed for activity:', activity.id, activity.name);
-                          setSelectedActivity(activity);
-                          setSelectedDate(activity.startDate);
-                          capturePhoto(activity);
-                        }}
-                      >
-                        <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                        onPress={() => {
-                          console.log('📷 Add button pressed for activity:', activity.id, activity.name);
-                          setSelectedActivity(activity);
-                          setSelectedDate(activity.startDate);
-                          addFromGallery(activity);
-                        }}
-                      >
-                        <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-
-                {/* Day photos (not associated with activities) */}
+                {/* Day photos (not associated with activities) - show before activities */}
                 {dayPhotos.filter(photo => !photo.activityId).length > 0 && (
                   <View style={styles.dayPhotos}>
                     <Text style={[styles.dayPhotosTitle, { color: colors.text }]}>
@@ -2066,10 +2448,120 @@ Created with TripStory ✈️
                     </View>
                   </View>
                 )}
+
+                {/* Activities for this day */}
+                {dayActivities.map((activity) => (
+                  <View 
+                    key={activity.id} 
+                    style={[styles.activityContainer, { borderColor: colors.border }]}
+                    onLayout={(event) => {
+                      const { y } = event.nativeEvent.layout;
+                      activityPositions.current.set(activity.id, y);
+                    }}
+                  >
+                    <View style={styles.activityHeader}>
+                      <View style={styles.activityTitleContainer}>
+                        <Text style={[styles.activityName, { color: colors.text }]}>{activity.name}</Text>
+                        <TouchableOpacity
+                          style={[styles.plusButton, { backgroundColor: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? colors.primary : colors.border }]}
+                          onPress={() => activateActivity(activity.id)}
+                        >
+                          <Text style={[styles.plusButtonText, { color: (activeActivityId === activity.id && activeTripId === currentTrip.id) ? '#fff' : colors.text }]}>+</Text>
+                        </TouchableOpacity>
+                        {activeActivityId === activity.id && activeTripId === currentTrip.id && (
+                          <TouchableOpacity 
+                            style={styles.editButton}
+                            onPress={() => openEditActivity(activity)}
+                          >
+                            <Text style={styles.editButtonText}>✏️</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {activity.time && (
+                        <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
+                      )}
+                    </View>
+                    {activity.description && (
+                      <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
+                        {activity.description}
+                      </Text>
+                    )}
+                    
+                    {/* Activity-level photo buttons at top - only show when activity is active AND no images yet */}
+                    {activeActivityId === activity.id && activeTripId === currentTrip.id && dayPhotos.filter(photo => photo.activityId === activity.id).length === 0 && (
+                      <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
+                        <TouchableOpacity
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            console.log('📸 Snap button pressed for activity:', activity.id, activity.name);
+                            setSelectedActivity(activity);
+                            setSelectedDate(activity.startDate);
+                            capturePhoto(activity);
+                          }}
+                        >
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            console.log('📷 Add button pressed for activity:', activity.id, activity.name);
+                            setSelectedActivity(activity);
+                            setSelectedDate(activity.startDate);
+                            addFromGallery(activity);
+                          }}
+                        >
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    
+                    {/* Activity photos */}
+                    {dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
+                      <View style={styles.activityPhotos}>
+                        {dayPhotos
+                          .filter(photo => photo.activityId === activity.id)
+                          .map((photo) => (
+                            <TouchableOpacity key={photo.id} onPress={() => handlePhotoPress(photo)}>
+                              <Image source={{ uri: photo.uri }} style={styles.activityPhoto} />
+                            </TouchableOpacity>
+                          ))
+                        }
+                      </View>
+                    )}
+
+                    {/* Activity-level photo buttons at bottom - only show when activity is active AND has images */}
+                    {activeActivityId === activity.id && activeTripId === currentTrip.id && dayPhotos.filter(photo => photo.activityId === activity.id).length > 0 && (
+                      <View style={styles.activityPhotoButtons}>
+                        <TouchableOpacity
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            console.log('📸 Snap button pressed for activity:', activity.id, activity.name);
+                            setSelectedActivity(activity);
+                            setSelectedDate(activity.startDate);
+                            capturePhoto(activity);
+                          }}
+                        >
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>📸 Snap</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            console.log('📷 Add button pressed for activity:', activity.id, activity.name);
+                            setSelectedActivity(activity);
+                            setSelectedDate(activity.startDate);
+                            addFromGallery(activity);
+                          }}
+                        >
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))}
               </View>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
 
         {/* Share and Map View Buttons - Side by Side */}
         <View style={styles.bottomButtonsContainer}>
@@ -2109,7 +2601,6 @@ Created with TripStory ✈️
         {renderAddActivityModal()}
         {renderPhotoCaptureModal()}
         {renderPhotoDetailModal()}
-        {renderActivitySelectorModal()}
         {renderMapViewModal()}
         {renderEditActivityModal()}
         {renderEditTripModal()}
@@ -2282,6 +2773,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+  },
+  stickyTripTitleContainer: {
+    position: 'absolute',
+    top: 18, // Right below back button header (reduced from 50 to eliminate gap)
+    left: 0,
+    right: 0,
+    zIndex: 1001,
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    minHeight: 60,
+    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 6,
+    // Ensure background is fully opaque and covers the area
+    overflow: 'hidden',
   },
   addButtonContainer: {
     position: 'absolute',
@@ -2498,6 +3008,7 @@ const styles = StyleSheet.create({
   tripDetailContent: {
     flex: 1,
     padding: 4,
+    paddingTop: 160, // Account for back button (40px) + trip title (60px) + date/activity header (60px)
   },
   dayContainer: {
     marginBottom: 8,
@@ -2506,10 +3017,26 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
   dayTitle: {
     fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  plusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  plusButtonText: {
+    fontSize: 20,
     fontWeight: 'bold',
   },
   dayButtons: {
@@ -2566,20 +3093,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   activityPhotos: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
-    marginBottom: 2,
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   activityPhoto: {
-    width: (screenWidth - 40) / 3, // Account for padding and gaps
+    width: screenWidth - 40, // Full width minus padding
     aspectRatio: 1,
     borderRadius: 2,
+    marginBottom: 8,
   },
   activityPhotoButtons: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 4,
+  },
+  activityPhotoButtonsTop: {
+    marginBottom: 16,
   },
   snapButton: {
     flex: 1,
@@ -2626,14 +3157,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dayPhotosGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
+    flexDirection: 'column',
+    gap: 8,
+    alignItems: 'center',
   },
   dayPhoto: {
-    width: (screenWidth - 40) / 3, // Account for padding and gaps
+    width: screenWidth - 40, // Full width minus padding
     aspectRatio: 1,
     borderRadius: 2,
+    marginBottom: 8,
   },
   // Photo Detail Modal Styles
   photoPreviewContainer: {
@@ -2686,6 +3218,45 @@ const styles = StyleSheet.create({
   activityOptionSubtext: {
     fontSize: 14,
     marginTop: 2,
+  },
+  activitySelectorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  activitySelectorList: {
+    maxHeight: 300,
+    marginTop: 8,
+  },
+  stickyHeaderContainer: {
+    position: 'absolute',
+    top: 70, // Below trip title (40px back button + 60px trip title)
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    minHeight: 60,
+    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    // Ensure background is fully opaque and covers the area
+    overflow: 'hidden',
+  },
+  stickyDayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  stickyActivityTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
   },
   bottomButtonsContainer: {
     flexDirection: 'row',
