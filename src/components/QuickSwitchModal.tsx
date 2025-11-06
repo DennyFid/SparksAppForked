@@ -219,7 +219,7 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
           ]}
         >
           <View style={styles.handle} />
-          <Text style={styles.title}>⚡️ Quick Switch</Text>
+          <Text style={styles.title}>∞ Quick Switch</Text>
           
           {availableSparks.length > 0 ? (
             <ScrollView style={styles.sparkList} showsVerticalScrollIndicator={false}>

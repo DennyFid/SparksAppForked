@@ -213,36 +213,37 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
           const label = route.name === 'MySparks' ? 'My Sparks' : route.name === 'Marketplace' ? 'Discover' : 'Settings';
 
           return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
-              onPress={onPress}
-              style={styles.tab}
-            >
-              <Text style={[styles.tabIcon, { color: isFocused ? colors.primary : colors.textSecondary }]}>
-                {icon}
-              </Text>
-              <Text style={[styles.tabLabel, { color: isFocused ? colors.primary : colors.textSecondary }]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
+            <React.Fragment key={route.key}>
+              {/* Quick Switch Button - show before Settings tab if there are recent sparks */}
+              {route.name === 'Settings' && recentSparks.length >= 1 && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={handleQuickSwitch}
+                  style={styles.quickSwitchButton}
+                >
+                  <Text style={styles.quickSwitchIcon}>∞</Text>
+                  <Text style={styles.quickSwitchLabel}>Switch</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityLabel={options.tabBarAccessibilityLabel}
+                testID={options.tabBarTestID}
+                onPress={onPress}
+                style={styles.tab}
+              >
+                <Text style={[styles.tabIcon, { color: isFocused ? colors.primary : colors.textSecondary }]}>
+                  {icon}
+                </Text>
+                <Text style={[styles.tabLabel, { color: isFocused ? colors.primary : colors.textSecondary }]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            </React.Fragment>
           );
         })}
-        
-        {/* Quick Switch Button - only show if there are recent sparks */}
-        {recentSparks.length >= 1 && (
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={handleQuickSwitch}
-            style={styles.quickSwitchButton}
-          >
-            <Text style={styles.quickSwitchIcon}>🔄</Text>
-            <Text style={styles.quickSwitchLabel}>Switch</Text>
-          </TouchableOpacity>
-        )}
       </View>
       
       <QuickSwitchModal

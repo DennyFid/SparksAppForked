@@ -273,7 +273,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionButton} 
             onPress={handleQuickSwitch}
           >
-            <Text style={[styles.buttonIcon, styles.quickSwitchIcon]}>⚡️</Text>
+            <Text style={[styles.buttonIcon, styles.quickSwitchIcon]}>∞</Text>
             <Text style={[styles.buttonLabel, styles.quickSwitchLabel]}>Switch</Text>
           </TouchableOpacity>
           
