@@ -1292,7 +1292,7 @@ const RoundSummaryScreen: React.FC<{
       <View style={styles.topActionButtons}>
         {onReturnToRound && (
           <TouchableOpacity style={styles.returnToRoundButton} onPress={onReturnToRound}>
-            <Text style={styles.returnToRoundButtonText}>Return to Round</Text>
+            <Text style={styles.returnToRoundButtonText}>Continue Round</Text>
           </TouchableOpacity>
         )}
         {onEndRound && (
@@ -1748,7 +1748,7 @@ const RoundSummaryScreen: React.FC<{
       <View style={styles.bottomActionButtons}>
         {onReturnToRound && (
           <TouchableOpacity style={styles.returnToRoundButton} onPress={onReturnToRound}>
-            <Text style={styles.returnToRoundButtonText}>Return to Round</Text>
+            <Text style={styles.returnToRoundButtonText}>Continue Round</Text>
           </TouchableOpacity>
         )}
         {onEndRound && (
@@ -2553,7 +2553,7 @@ const GolfTrackerSettings: React.FC<{
         </SettingsSection>
 
         <SettingsSection title="Recent Rounds">
-          <View style={{ padding: 16, backgroundColor: 'transparent' }}>
+          <View style={{ padding: 6, backgroundColor: 'transparent' }}>
             {data.currentRound && (
               <View style={styles.activeRoundNote}>
                 <SettingsText variant="body">
@@ -2762,134 +2762,7 @@ const GolfTrackerSettings: React.FC<{
           )}
         </SettingsSection>
 
-        <SettingsSection title="About">
-          <View style={{ padding: 16, backgroundColor: 'transparent' }}>
-            {data.currentRound && (
-              <View style={styles.activeRoundNote}>
-                <SettingsText variant="body">
-                  Editing a round is disabled until you end the current round
-                </SettingsText>
-                <TouchableOpacity
-                  style={styles.returnToRoundButton}
-                  onPress={onNavigateToRound}
-                >
-                  <Text style={styles.returnToRoundButtonText}>Return to Current Round</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            
-            {sortedRounds.length === 0 ? (
-              <SettingsText variant="body">
-                No rounds recorded yet
-              </SettingsText>
-            ) : (
-              <>
-                {displayedRounds.map((round, index) => {
-                  const course = courses.find(c => c.id === round.courseId);
-                  const holesPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).length;
-                  const totalParPlayed = (round.holeScores || []).filter(hs => hs.shots.length > 0).reduce((sum, hs) => sum + hs.par, 0);
-                  const netScore = round.totalScore - totalParPlayed;
-                  const isIncomplete = !round.isComplete;
-                  const isActiveRound = data.currentRound?.id === round.id;
-                  const canEdit = !data.currentRound || isActiveRound;
-                  
-                  return (
-                    <View key={round.id} style={styles.roundItem}>
-                      <View style={styles.roundInfo}>
-                        <Text style={styles.roundCourse}>
-                          {course?.name || 'Unknown Course'}
-                        </Text>
-                        <Text style={styles.roundId}>
-                          Round #{round.id.slice(-6)}
-                        </Text>
-                        <Text style={styles.roundDate}>
-                          {formatDate(round.completedAt || round.startedAt)}
-                        </Text>
-                        <Text style={[
-                          styles.roundScore,
-                          { color: isIncomplete ? colors.primary : getScoreColor(round.totalScore, round.totalPar) }
-                        ]}>
-                          {isIncomplete ? 'Incomplete' : `${round.totalScore} (${netScore > 0 ? `+${netScore}` : netScore === 0 ? 'E' : netScore})`}
-                        </Text>
-                        {isIncomplete && (
-                          <Text style={styles.incompleteText}>
-                            Through {round.holeScores?.length || 0} holes
-                          </Text>
-                        )}
-                        {isActiveRound && (
-                          <Text style={styles.activeRoundLabel}>
-                            Currently Active
-                          </Text>
-                        )}
-                      </View>
-                      
-                      <View style={[styles.roundActions, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }]}>
-                        <TouchableOpacity
-                          style={[
-                            styles.actionButton,
-                            styles.editButton,
-                            { flex: 1, marginRight: 8 },
-                            !canEdit && styles.disabledButton
-                          ]}
-                          onPress={() => {
-                            if (isActiveRound && onViewRound) {
-                              onViewRound(round);
-                            } else if (canEdit && onEditRound) {
-                              onEditRound(round);
-                            }
-                          }}
-                          disabled={!canEdit}
-                        >
-                          <Text style={[
-                            styles.actionButtonText, 
-                            styles.editButtonText,
-                            !canEdit && styles.disabledButtonText
-                          ]}>
-                            {isActiveRound ? 'View' : 'Edit'}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.actionButton,
-                            styles.deleteButton,
-                            { flex: 1, marginLeft: 8 },
-                            isActiveRound && styles.disabledButton
-                          ]}
-                          onPress={() => {
-                            console.log('Delete button pressed for round:', { id: round.id, courseName: round.courseName, isActiveRound });
-                            if (!isActiveRound && onDeleteRound && round.id) {
-                              onDeleteRound(round.id);
-                            }
-                          }}
-                          disabled={isActiveRound}
-                        >
-                          <Text style={[
-                            styles.actionButtonText, 
-                            styles.deleteButtonText,
-                            isActiveRound && styles.disabledButtonText
-                          ]}>
-                            Delete
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })}
-                
-                {sortedRounds.length > displayedRounds.length && (
-                  <TouchableOpacity
-                    style={styles.showMoreButton}
-                    onPress={handleShowMoreRounds}
-                  >
-                    <Text style={styles.showMoreText}>
-                      Show {Math.min(50, sortedRounds.length - displayedRounds.length)} more rounds
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-          </View>
-        </SettingsSection>
+    
 
         <SettingsSection title="About">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
@@ -3595,7 +3468,7 @@ const CourseSelectionScreen: React.FC<{
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Select Course</Text>
+        <Text style={styles.title}>Start New Round</Text>
         <Text style={styles.subtitle}>Choose a course to start your round</Text>
       </View>
 
@@ -3624,7 +3497,7 @@ const CourseSelectionScreen: React.FC<{
       </ScrollView>
 
       <TouchableOpacity style={styles.createButton} onPress={onCreateCourse}>
-        <Text style={styles.createButtonText}>+ Create New Course</Text>
+        <Text style={styles.createButtonText}>+ Add New Course</Text>
       </TouchableOpacity>
     </View>
   );
@@ -4256,7 +4129,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       marginTop: 4,
     },
     scoreDisplay: {
-      backgroundColor: colors.primary,
+      backgroundColor: 'grey',
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 20,
@@ -4835,9 +4708,20 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       color: colors.text,
     },
     smallNavigationPill: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.primary,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.primary,
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      alignItems: 'center',
+      minWidth: 70,
+      maxWidth: 80,
+    },
+    smallNavigationPillPrev: {
+      backgroundColor: 'lightgrey',
+      borderWidth: 1,
+      borderColor: 'lightgrey',
       borderRadius: 12,
       paddingHorizontal: 8,
       paddingVertical: 4,
@@ -4848,7 +4732,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
     smallNavigationPillText: {
       fontSize: 11,
       fontWeight: '600',
-      color: colors.text,
+      // dyor
+      color: 'white',
       textAlign: 'center',
     },
     shotNavigationArrows: {
@@ -4903,8 +4788,8 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       minWidth: 40,
     },
     activeShotButton: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
+      backgroundColor: 'grey',
+      borderColor: 'black',
     },
     shotButtonText: {
       fontSize: 14,
@@ -4912,7 +4797,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
       color: colors.text,
     },
     activeShotButtonText: {
-      color: colors.background,
+      color: 'white',
     },
     penaltyButton: {
       backgroundColor: '#000000',
@@ -5009,7 +4894,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           <Text style={styles.todaysDistanceLabel}>
             Today's Distance: {todaysDistance || hole?.todaysDistance || 'Not set'}
           </Text>
-          <Text style={styles.editIcon}>✏️</Text>
+          <Text style={styles.editIcon}>✎</Text>
         </TouchableOpacity>
       </View>
 
@@ -5290,7 +5175,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                 <View style={{ flex: 1, alignItems: 'flex-start', justifyContent: 'center' }}>
                   {canGoPrevious && (
                     <TouchableOpacity
-                      style={styles.smallNavigationPill}
+                      style={styles.smallNavigationPillPrev}
                       onPress={goToPreviousShot}
                     >
                       <Text style={styles.smallNavigationPillText}>
@@ -5328,7 +5213,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                   </TouchableOpacity>
                 </View>
 
-                {/* Next shot */}
+                {/* Next shot dyor:make more visible */}
                 <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'center' }}>
                   {canGoNext && (
                     <TouchableOpacity
@@ -5448,7 +5333,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           <TouchableOpacity 
             style={[
               styles.button, 
-              styles.arrowButton, 
+              styles.navButton, 
               currentHole <= 1 && styles.disabledButton
             ]} 
             onPress={currentHole > 1 ? onPreviousHole : undefined}
@@ -5456,7 +5341,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
           >
             <Text style={[
               styles.buttonText, 
-              styles.arrowButtonText,
+              styles.navButtonText,
               currentHole <= 1 && styles.disabledButtonText
             ]}>← Prev Hole</Text>
           </TouchableOpacity>
@@ -5634,7 +5519,7 @@ const CreateCourseModal: React.FC<{
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Create New Course</Text>
+          <Text style={styles.modalTitle}>Add New Course</Text>
 
           <TextInput
             style={styles.input}
@@ -6295,7 +6180,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   };
 
   const handleReturnToRound = () => {
-    console.log('Return to round clicked - going back to hole detail');
+    console.log('Continue Round clicked - going back to hole detail');
     setCurrentScreen('hole-detail');
   };
 

@@ -20,6 +20,7 @@ import {
 
 const { width: screenWidth } = Dimensions.get('window');
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -106,6 +107,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [showActivitySelector, setShowActivitySelector] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [mapLoadError, setMapLoadError] = useState(false);
+  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
+  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
   const [showEditActivity, setShowEditActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editActivityName, setEditActivityName] = useState('');
@@ -160,21 +163,26 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     loadTrips();
   }, []);
 
-  // Restore scroll position when trip detail view opens with saved active state
+  // Track if we're restoring from saved state (quick switch) vs user interaction
+  const isRestoringFromState = useRef(false);
+  
+  // Restore scroll position ONLY when trip detail view opens from saved state (quick switch)
+  // NOT when user clicks + button or other interactions
   useEffect(() => {
-    if (showTripDetail && currentTrip && scrollViewRef.current) {
-      // If we have an active activity, scroll to it
+    if (showTripDetail && currentTrip && scrollViewRef.current && isRestoringFromState.current) {
+      // Only scroll if we're restoring from state (quick switch)
       if (activeActivityId && activeTripId === currentTrip.id) {
         setTimeout(() => {
           scrollToActivity(activeActivityId);
         }, 300);
       } 
-      // Otherwise if we have an active day, scroll to it
       else if (activeDayDate && activeTripId === currentTrip.id) {
         setTimeout(() => {
           scrollToDay(activeDayDate);
         }, 300);
       }
+      // Reset the flag after scrolling
+      isRestoringFromState.current = false;
     }
   }, [showTripDetail, currentTrip, activeActivityId, activeDayDate, activeTripId]);
 
@@ -385,6 +393,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             }
             setActiveTripId(data.activeTripId);
             
+            // Mark that we're restoring from state so the useEffect will scroll
+            isRestoringFromState.current = true;
             // Scroll to the active position after layout
             setTimeout(() => {
               if (data?.activeActivityId && scrollViewRef.current) {
@@ -667,26 +677,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             : trip
         );
 
-        // Capture current scroll position before state update
-        const savedScrollPosition = currentScrollPosition.current;
-        
         await saveTrips(updatedTrips);
         const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
         setCurrentTrip(updatedTrip);
         
         setShowPhotoCapture(false);
-        
-        // Restore scroll position after state update completes
-        // This prevents the ScrollView from jumping when content is added
-        setTimeout(() => {
-          if (scrollViewRef.current && savedScrollPosition > 0) {
-            scrollViewRef.current.scrollTo({ 
-              y: savedScrollPosition, 
-              animated: false 
-            });
-          }
-        }, 50);
-        
         setSelectedActivity(null);
         setSelectedDate('');
         HapticFeedback.success();
@@ -705,13 +700,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
-  const addFromGallery = async (activity?: Activity, date?: string) => {
-    console.log('📷 addFromGallery called with activity:', activity?.id, activity?.name, 'date:', date);
+  const addFromGallery = async (activity?: Activity, date?: string, allowMultiple: boolean = false) => {
+    console.log('📷 addFromGallery called with activity:', activity?.id, activity?.name, 'date:', date, 'allowMultiple:', allowMultiple);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: !allowMultiple, // Disable editing when selecting multiple
+        allowsMultipleSelection: allowMultiple,
+        aspect: allowMultiple ? undefined : [1, 1], // No aspect ratio when multiple
         quality: 0.8,
         exif: false,
       });
@@ -726,43 +722,50 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         return;
       }
 
-      if (result.assets[0]) {
-        const asset = result.assets[0];
-        
-        // Get location
-        let location = null;
-        try {
-          const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-          if (locationStatus === 'granted') {
-            const locationData = await Location.getCurrentPositionAsync({});
-            location = {
-              latitude: locationData.coords.latitude,
-              longitude: locationData.coords.longitude,
-            };
-          }
-        } catch (error) {
-          console.log('Location not available:', error);
-        }
+      // Process all selected assets
+      // Note: expo-image-picker doesn't support filtering by date in the picker UI,
+      // but we'll assign the activity's date to all selected photos
+      const assetsToProcess = result.assets;
 
-        // ALWAYS use the passed date parameter if provided (from button click)
-        // This ensures photos are associated with the day of the button, not when they were taken
-        let dateToUse: string;
-        if (date) {
-          // Explicitly use the date from the button click
-          dateToUse = date;
-        } else if (activity?.startDate) {
-          dateToUse = activity.startDate;
-        } else if (selectedDate) {
-          dateToUse = selectedDate;
-        } else {
-          dateToUse = new Date().toISOString().split('T')[0];
+      // ALWAYS use the passed date parameter if provided (from button click)
+      // This ensures photos are associated with the day of the button, not when they were taken
+      let dateToUse: string;
+      if (date) {
+        // Explicitly use the date from the button click
+        dateToUse = date;
+      } else if (activity?.startDate) {
+        dateToUse = activity.startDate;
+      } else if (selectedDate) {
+        dateToUse = selectedDate;
+      } else {
+        dateToUse = new Date().toISOString().split('T')[0];
+      }
+      // Create timestamp at noon UTC to ensure consistent date extraction regardless of timezone
+      const photoDate = new Date(dateToUse + 'T12:00:00Z').toISOString();
+      console.log('📷 addFromGallery - date parameter:', date, 'dateToUse:', dateToUse, 'photoDate (timestamp):', photoDate);
+      
+      // Get location once (will be same for all photos in bulk add)
+      let location = null;
+      try {
+        const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+        if (locationStatus === 'granted') {
+          const locationData = await Location.getCurrentPositionAsync({});
+          location = {
+            latitude: locationData.coords.latitude,
+            longitude: locationData.coords.longitude,
+          };
         }
-        // Create timestamp at noon UTC to ensure consistent date extraction regardless of timezone
-        const photoDate = new Date(dateToUse + 'T12:00:00Z').toISOString();
-        console.log('📷 addFromGallery - date parameter:', date, 'dateToUse:', dateToUse, 'photoDate (timestamp):', photoDate);
+      } catch (error) {
+        console.log('Location not available:', error);
+      }
+
+      // Process all assets and create photos
+      const newPhotos: TripPhoto[] = [];
+      for (let i = 0; i < assetsToProcess.length; i++) {
+        const asset = assetsToProcess[i];
         
-        // Save photo permanently
-        const photoId = Date.now().toString();
+        // Save photo permanently with unique ID
+        const photoId = `${Date.now()}-${i}`;
         const permanentUri = await savePhotoPermanently(asset.uri, currentTrip!.id, photoId);
         
         const newPhoto: TripPhoto = {
@@ -772,35 +775,35 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           uri: permanentUri,
           timestamp: photoDate,
           location: location || undefined,
-          // todo: can we have this auto populate the name of the place
           caption: '',
           createdAt: new Date().toISOString(),
         };
+        
+        newPhotos.push(newPhoto);
+      }
 
-        const updatedTrips = trips.map(trip => 
-          trip.id === currentTrip!.id 
-            ? { 
-                ...trip, 
-                photos: [...trip.photos, newPhoto], 
-                updatedAt: new Date().toISOString() 
-              }
-            : trip
-        );
-        
-        
-        await saveTrips(updatedTrips);
-        const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
-        setCurrentTrip(updatedTrip);
-        
-        console.log('After save - updatedTrip photos count:', updatedTrip?.photos.length);
-        console.log('Updated trip photos:', updatedTrip?.photos.map(p => ({ id: p.id, activityId: p.activityId })));
-        
-        setShowPhotoCapture(false);
-        
-        
-        setSelectedActivity(null);
-        setSelectedDate('');
-        HapticFeedback.success();
+      // Add all photos at once
+      const updatedTrips = trips.map(trip => 
+        trip.id === currentTrip!.id 
+          ? { 
+              ...trip, 
+              photos: [...trip.photos, ...newPhotos], 
+              updatedAt: new Date().toISOString() 
+            }
+          : trip
+      );
+      
+      await saveTrips(updatedTrips);
+      const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
+      setCurrentTrip(updatedTrip);
+      
+      setShowPhotoCapture(false);
+      setSelectedActivity(null);
+      setSelectedDate('');
+      HapticFeedback.success();
+      
+      if (newPhotos.length > 1) {
+        Alert.alert('Success', `Added ${newPhotos.length} photos to ${activity?.name || 'the activity'}.`);
       }
     } catch (error) {
       console.error('Error adding photo from gallery:', error);
@@ -1210,6 +1213,42 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         const { uri } = await Print.printToFileAsync({ html });
         console.log('✅ PDF generated at:', uri);
         
+        // Rename PDF to trip name
+        const sanitizedTripName = currentTrip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const documentDir = (FileSystem as any).documentDirectory;
+        if (documentDir) {
+          const newFileName = `${sanitizedTripName}_trip_story.pdf`;
+          const newUri = `${documentDir}${newFileName}`;
+          try {
+            await FileSystem.moveAsync({ from: uri, to: newUri });
+            console.log('✅ PDF renamed to:', newUri);
+            
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (!isAvailable) {
+              Alert.alert(
+                'Sharing Not Available',
+                'Sharing is not available on this device. The PDF has been generated but cannot be shared.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+            
+            // Share the renamed PDF
+            const result = await Sharing.shareAsync(newUri, {
+              mimeType: 'application/pdf',
+              dialogTitle: `Share ${currentTrip.title} Trip Story`,
+              UTI: 'com.adobe.pdf',
+            });
+            console.log('✅ PDF shared:', result);
+            HapticFeedback.success();
+            return;
+          } catch (renameError) {
+            console.warn('⚠️ Could not rename PDF, using original:', renameError);
+            // Fall through to use original URI
+          }
+        }
+        
         // Check if sharing is available
         const isAvailable = await Sharing.isAvailableAsync();
         if (!isAvailable) {
@@ -1221,15 +1260,13 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           return;
         }
         
-        // Share the PDF
+        // Share the PDF with original name
         const result = await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
           dialogTitle: `Share ${currentTrip.title} Trip Story`,
           UTI: 'com.adobe.pdf',
         });
         
-        console.log('✅ PDF shared:', result);
-        HapticFeedback.success();
       } catch (printError) {
         console.error('❌ Print/Share error:', printError);
         Alert.alert(
@@ -1894,7 +1931,7 @@ Created with TripStory ✈️
               style={[styles.photoButton, styles.addPhotoButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}
               onPress={() => addFromGallery()}
             >
-              <Text style={[styles.photoButtonText, { color: colors.primary }]}>📷 Add</Text>
+              <Text style={[styles.photoButtonText, { color: colors.primary }]}>Add 1</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2387,8 +2424,20 @@ Created with TripStory ✈️
   const renderMapViewModal = () => {
     if (!currentTrip) return null;
 
+    const tripDates = getTripDates();
+
+    // Helper function to get photo count for a specific day
+    const getPhotoCountForDay = (date: string): number => {
+      const dayPhotos = currentTrip.photos.filter(photo => {
+        if (!photo.timestamp) return false;
+        const photoDate = new Date(photo.timestamp).toISOString().split('T')[0];
+        return photoDate === date;
+      });
+      return dayPhotos.length;
+    };
+
     // Get all photos with locations (both activity photos and standalone photos)
-    const photosWithLocations = currentTrip.photos
+    let photosWithLocations = currentTrip.photos
       .filter(photo => photo.location?.latitude && photo.location?.longitude)
       .map(photo => ({
         photo,
@@ -2397,8 +2446,17 @@ Created with TripStory ✈️
         longitude: photo.location!.longitude,
       }));
 
+    // Filter by selected day if a day is selected
+    if (selectedMapDay) {
+      photosWithLocations = photosWithLocations.filter(p => {
+        if (!p.photo.timestamp) return false;
+        const photoDate = new Date(p.photo.timestamp).toISOString().split('T')[0];
+        return photoDate === selectedMapDay;
+      });
+    }
+
     // Get activities with explicit locations (but no photos yet)
-    const activitiesWithExplicitLocations = currentTrip.activities
+    let activitiesWithExplicitLocations = currentTrip.activities
       .filter(activity => {
         // Only include if activity has explicit location AND no photos with locations
         if (!activity.location?.latitude || !activity.location?.longitude) return false;
@@ -2411,6 +2469,20 @@ Created with TripStory ✈️
         latitude: activity.location!.latitude,
         longitude: activity.location!.longitude,
       }));
+
+    // Filter activities by selected day if a day is selected
+    if (selectedMapDay) {
+      activitiesWithExplicitLocations = activitiesWithExplicitLocations.filter(a => 
+        a.activity.startDate === selectedMapDay
+      );
+    }
+
+    // Get total markers count (before filtering) for dropdown display
+    const allPhotosWithLocations = currentTrip.photos.filter(photo => photo.location?.latitude && photo.location?.longitude);
+    const allActivitiesWithLocations = currentTrip.activities.filter(activity => 
+      activity.location?.latitude && activity.location?.longitude
+    );
+    const totalMarkersCount = allPhotosWithLocations.length + allActivitiesWithLocations.length;
 
     // Combine all markers: photos with locations + activities with explicit locations
     const allMarkers = [
@@ -2494,17 +2566,92 @@ Created with TripStory ✈️
       };
     };
 
+    // Helper function to format day for dropdown
+    const formatDayForDropdown = (date: string, dayNumber: number, totalDays: number) => {
+      try {
+        const dateObj = new Date(date + 'T00:00:00');
+        if (isNaN(dateObj.getTime())) return date;
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+        const dateStr = dateObj.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        });
+        const photoCount = getPhotoCountForDay(date);
+        return `${dayName}, ${dateStr} (${dayNumber}/${totalDays}) - ${photoCount} photo${photoCount !== 1 ? 's' : ''}`;
+      } catch (error) {
+        return date;
+      }
+    };
+
     return (
       <Modal visible={showMapView} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Trip Map</Text>
-            <TouchableOpacity onPress={() => setShowMapView(false)}>
+            <TouchableOpacity onPress={() => {
+              setShowMapView(false);
+              setSelectedMapDay(null);
+              setShowMapDayDropdown(false);
+            }}>
               <Text style={[styles.modalClose, { color: colors.primary }]}>Close</Text>
             </TouchableOpacity>
           </View>
           
           <ScrollView style={styles.modalContent}>
+            {/* Day Filter Dropdown */}
+            <View style={[styles.mapDayFilterContainer, { borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.mapDayFilterButton, { borderColor: colors.border }]}
+                onPress={() => setShowMapDayDropdown(!showMapDayDropdown)}
+              >
+                <Text style={[styles.mapDayFilterText, { color: colors.text }]}>
+                  {selectedMapDay 
+                    ? formatDayForDropdown(selectedMapDay, tripDates.indexOf(selectedMapDay) + 1, tripDates.length)
+                    : `All Days (${totalMarkersCount} marker${totalMarkersCount !== 1 ? 's' : ''})`}
+                </Text>
+                <Text style={[styles.mapDayFilterArrow, { color: colors.text }]}>
+                  {showMapDayDropdown ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+              
+              {showMapDayDropdown && (
+                <ScrollView 
+                  style={[styles.mapDayDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  nestedScrollEnabled={true}
+                >
+                  <TouchableOpacity
+                    style={[styles.mapDayDropdownItem, selectedMapDay === null && { backgroundColor: colors.primary + '20' }]}
+                    onPress={() => {
+                      setSelectedMapDay(null);
+                      setShowMapDayDropdown(false);
+                    }}
+                  >
+                    <Text style={[styles.mapDayDropdownText, { color: colors.text }]}>
+                      All Days ({totalMarkersCount} marker{totalMarkersCount !== 1 ? 's' : ''})
+                    </Text>
+                  </TouchableOpacity>
+                  {tripDates.map((date, index) => {
+                    const photoCount = getPhotoCountForDay(date);
+                    return (
+                      <TouchableOpacity
+                        key={date}
+                        style={[styles.mapDayDropdownItem, selectedMapDay === date && { backgroundColor: colors.primary + '20' }]}
+                        onPress={() => {
+                          setSelectedMapDay(date);
+                          setShowMapDayDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.mapDayDropdownText, { color: colors.text }]}>
+                          {formatDayForDropdown(date, index + 1, tripDates.length)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
             <View style={styles.mapContainer}>
               {allMarkers.length === 0 ? (
                 <View style={[styles.mapImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
@@ -2581,7 +2728,7 @@ Created with TripStory ✈️
 
               <View style={styles.mapActivityList}>
                 <Text style={[styles.activityListTitle, { color: colors.text }]}>
-                  Make this filterable by days ({allMarkers.length}):
+                  {selectedMapDay ? `Day ${tripDates.indexOf(selectedMapDay) + 1}/${tripDates.length}` : 'All Days'} ({allMarkers.length} markers):
                 </Text>
                 {allMarkers.map((marker, index) => (
                   <View key={`${marker.type}-${marker.id}`} style={[styles.activityListItem, { borderColor: colors.border }]}>
@@ -2994,10 +3141,20 @@ Created with TripStory ✈️
                           onPress={() => {
                             setSelectedDate(date);
                             setSelectedActivity(null);
-                            addFromGallery(undefined, date);
+                            addFromGallery(undefined, date, false);
                           }}
                         >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            setSelectedDate(date);
+                            setSelectedActivity(null);
+                            addFromGallery(undefined, date, true);
+                          }}
+                        >
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -3027,10 +3184,20 @@ Created with TripStory ✈️
                           onPress={() => {
                             setSelectedDate(date);
                             setSelectedActivity(null);
-                            addFromGallery(undefined, date);
+                            addFromGallery(undefined, date, false);
                           }}
                         >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            setSelectedDate(date);
+                            setSelectedActivity(null);
+                            addFromGallery(undefined, date, true);
+                          }}
+                        >
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -3055,10 +3222,20 @@ Created with TripStory ✈️
                       onPress={() => {
                         setSelectedDate(date);
                         setSelectedActivity(null);
-                        addFromGallery(undefined, date);
+                        addFromGallery(undefined, date, false);
                       }}
                     >
-                      <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                      <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                      onPress={() => {
+                        setSelectedDate(date);
+                        setSelectedActivity(null);
+                        addFromGallery(undefined, date, true);
+                      }}
+                    >
+                      <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -3132,10 +3309,20 @@ Created with TripStory ✈️
                               onPress={() => {
                                 setSelectedActivity(activity);
                                 setSelectedDate(activity.startDate);
-                                addFromGallery(activity);
+                                addFromGallery(activity, undefined, false);
                               }}
                             >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                              onPress={() => {
+                                setSelectedActivity(activity);
+                                setSelectedDate(activity.startDate);
+                                addFromGallery(activity, undefined, true);
+                              }}
+                            >
+                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -3165,10 +3352,20 @@ Created with TripStory ✈️
                               onPress={() => {
                                 setSelectedActivity(activity);
                                 setSelectedDate(activity.startDate);
-                                addFromGallery(activity);
+                                addFromGallery(activity, undefined, false);
                               }}
                             >
-                              <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                              onPress={() => {
+                                setSelectedActivity(activity);
+                                setSelectedDate(activity.startDate);
+                                addFromGallery(activity, undefined, true);
+                              }}
+                            >
+                              <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -3193,10 +3390,20 @@ Created with TripStory ✈️
                           onPress={() => {
                             setSelectedActivity(activity);
                             setSelectedDate(activity.startDate);
-                            addFromGallery(activity);
+                            addFromGallery(activity, undefined, false);
                           }}
                         >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>📷 Add</Text>
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          onPress={() => {
+                            setSelectedActivity(activity);
+                            setSelectedDate(activity.startDate);
+                            addFromGallery(activity, undefined, true);
+                          }}
+                        >
+                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add Many</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -4041,6 +4248,42 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   legendText: {
+    fontSize: 14,
+  },
+  mapDayFilterContainer: {
+    marginBottom: 16,
+    zIndex: 1000,
+  },
+  mapDayFilterButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  mapDayFilterText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  mapDayFilterArrow: {
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  mapDayDropdown: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    maxHeight: 300,
+    overflow: 'hidden',
+  },
+  mapDayDropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  mapDayDropdownText: {
     fontSize: 14,
   },
   mapActivityList: {
