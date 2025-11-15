@@ -16,7 +16,6 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
 
   useEffect(() => {
     if (visible) {
-      console.log('🔍 AdminReviewsManager: Modal opened, loading reviews...');
       loadReviewsAndMarkAsViewed();
     }
   }, [visible]);
@@ -34,11 +33,9 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
         const unreadIds = unreadReviews.map(item => item.id).filter(Boolean);
         if (unreadIds.length > 0 && AdminResponseService.markMultipleFeedbackAsViewed) {
           await AdminResponseService.markMultipleFeedbackAsViewed(unreadIds);
-          console.log('✅ Marked', unreadIds.length, 'reviews as viewed');
         } else if (unreadIds.length > 0) {
           // Fallback: mark individually if batch method doesn't exist
           await Promise.all(unreadIds.map(id => AdminResponseService.markFeedbackAsViewed(id)));
-          console.log('✅ Marked', unreadIds.length, 'reviews as viewed (individual)');
         }
       }
       
@@ -61,7 +58,6 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
         return dateB - dateA; // Newest first
       });
       setReviews(ratingsOnly);
-      console.log('📝 Loaded reviews:', ratingsOnly.length);
     } catch (error) {
       console.error('Error loading reviews:', error);
     } finally {

@@ -20,6 +20,14 @@ export class AdminResponseService {
       // Get the feedback details to send notification
       const feedback = await (FirebaseService as any).getFeedbackById(feedbackId);
       if (feedback) {
+        console.log('🔍 AdminResponseService.addResponse - Feedback found:', {
+          feedbackId,
+          userId: feedback.userId,
+          sparkId: feedback.sparkId,
+          sparkName: feedback.sparkName,
+          hasResponse: !!feedback.response
+        });
+        
         // Send notification to the user who submitted the feedback
         await FeedbackNotificationService.addPendingResponse(
           feedback.userId,
@@ -28,7 +36,9 @@ export class AdminResponseService {
           feedback.sparkName
         );
         
-        console.log('✅ Response added and notification sent to user');
+        console.log('✅ Response added and notification sent to user:', feedback.userId);
+      } else {
+        console.warn('⚠️ AdminResponseService.addResponse - Feedback not found for ID:', feedbackId);
       }
     } catch (error) {
       console.error('Error adding response:', error);

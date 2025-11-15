@@ -259,6 +259,84 @@ export class FirebaseService {
     }
   }
 
+  /**
+   * Get count of unread feedback responses for a user
+   * Unread = has response AND (readByUser is false/undefined)
+   */
+  static async getUnreadFeedbackCount(userId: string, sparkId?: string): Promise<number> {
+    try {
+      // Firestore doesn't support != null, so we query all feedback for this user
+      // and filter in code
+      let query = this.db.collection('feedback').where('userId', '==', userId);
+      
+      if (sparkId) {
+        query = query.where('sparkId', '==', sparkId);
+      }
+      
+      const snapshot = await query.get();
+      
+      // Filter for: has response AND not read
+      const unreadCount = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        const hasResponse = data.response && data.response.trim() !== '';
+        const isUnread = data.readByUser !== true;
+        return hasResponse && isUnread;
+      }).length;
+      
+      return unreadCount;
+    } catch (error) {
+      console.error('Error getting unread feedback count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Mark feedback as read by user
+   */
+  static async markFeedbackAsReadByUser(feedbackId: string): Promise<void> {
+    try {
+      await this.db.collection('feedback').doc(feedbackId).update({
+        readByUser: true,
+        readByUserAt: firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error marking feedback as read by user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark multiple feedback items as read by user
+   */
+  static async markMultipleFeedbackAsReadByUser(feedbackIds: string[]): Promise<void> {
+    if (!feedbackIds || feedbackIds.length === 0) {
+      console.log('⚠️ markMultipleFeedbackAsReadByUser: No feedback IDs provided');
+      return;
+    }
+
+    try {
+      console.log(`🔍 markMultipleFeedbackAsReadByUser: Marking ${feedbackIds.length} feedback items as read:`, feedbackIds);
+      const batch = this.db.batch();
+      feedbackIds.forEach(feedbackId => {
+        if (!feedbackId) {
+          console.warn('⚠️ Skipping empty feedback ID');
+          return;
+        }
+        const ref = this.db.collection('feedback').doc(feedbackId);
+        batch.update(ref, {
+          readByUser: true,
+          readByUserAt: firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`✅ Added update to batch for feedback ID: ${feedbackId}`);
+      });
+      await batch.commit();
+      console.log(`✅ Successfully marked ${feedbackIds.length} feedback items as read by user`);
+    } catch (error) {
+      console.error('❌ Error marking multiple feedback as read by user:', error);
+      throw error;
+    }
+  }
+
   static async getFeedbackById(feedbackId: string): Promise<SparkFeedback | null> {
     try {
       const doc = await this.db.collection('feedback').doc(feedbackId).get();

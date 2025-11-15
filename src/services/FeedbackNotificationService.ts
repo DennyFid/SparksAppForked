@@ -142,7 +142,7 @@ export class FeedbackNotificationService {
   }
 
   /**
-   * Get pending responses for a user
+   * Get pending responses for a user (public for debugging)
    */
   static async getPendingResponses(deviceId: string): Promise<PendingResponse[]> {
     try {
@@ -156,44 +156,53 @@ export class FeedbackNotificationService {
   }
 
   /**
-   * Mark a response as read
+   * Mark a response as read (now uses Firebase directly)
    */
   static async markResponseAsRead(deviceId: string, feedbackId: string): Promise<void> {
     try {
-      const responses = await this.getPendingResponses(deviceId);
-      const updatedResponses = responses.map(response => 
-        response.feedbackId === feedbackId 
-          ? { ...response, read: true }
-          : response
-      );
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const FirebaseService = ServiceFactory.getFirebaseService();
       
-      const key = `${this.PENDING_RESPONSES_KEY}_${deviceId}`;
-      await AsyncStorage.setItem(key, JSON.stringify(updatedResponses));
+      // Mark as read in Firebase
+      await (FirebaseService as any).markFeedbackAsReadByUser(feedbackId);
       
-      // Update badge count
-      await this.updateBadgeCount(deviceId);
+      // Update app icon badge with aggregated counts
+      await this.updateAppIconBadge();
     } catch (error) {
       console.error('Error marking response as read:', error);
     }
   }
 
   /**
-   * Mark all responses as read for a spark
+   * Mark all responses as read for a spark (now uses Firebase directly)
    */
   static async markAllResponsesAsRead(deviceId: string, sparkId: string): Promise<void> {
     try {
-      const responses = await this.getPendingResponses(deviceId);
-      const updatedResponses = responses.map(response => 
-        response.sparkId === sparkId 
-          ? { ...response, read: true }
-          : response
-      );
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const FirebaseService = ServiceFactory.getFirebaseService();
       
-      const key = `${this.PENDING_RESPONSES_KEY}_${deviceId}`;
-      await AsyncStorage.setItem(key, JSON.stringify(updatedResponses));
+      // Get all unread feedback for this spark
+      const unreadCount = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
       
-      // Update badge count
-      await this.updateBadgeCount(deviceId);
+      if (unreadCount > 0) {
+        // Get all feedback items for this user/spark
+        const { FeedbackService } = await import('./FeedbackService');
+        const allFeedback = await FeedbackService.getUserFeedback(deviceId, sparkId);
+        
+        // Find feedback items with responses that haven't been read
+        const unreadFeedbackIds = allFeedback
+          .filter(f => f.response && f.response.trim() && f.readByUser !== true)
+          .map(f => f.id)
+          .filter(Boolean) as string[];
+        
+        if (unreadFeedbackIds.length > 0) {
+          // Mark all as read in Firebase
+          await (FirebaseService as any).markMultipleFeedbackAsReadByUser(unreadFeedbackIds);
+        }
+      }
+      
+      // Update app icon badge with aggregated counts
+      await this.updateAppIconBadge();
     } catch (error) {
       console.error('Error marking all responses as read:', error);
     }
@@ -209,7 +218,16 @@ export class FeedbackNotificationService {
     sparkName: string
   ): Promise<void> {
     try {
+      console.log('🔔 FeedbackNotificationService.addPendingResponse called:', {
+        deviceId,
+        feedbackId,
+        sparkId,
+        sparkName
+      });
+      
       const responses = await this.getPendingResponses(deviceId);
+      console.log('🔔 Existing pending responses for device:', deviceId, 'count:', responses.length);
+      
       const newResponse: PendingResponse = {
         feedbackId,
         sparkId,
@@ -221,21 +239,29 @@ export class FeedbackNotificationService {
       // Check if this response already exists
       const existingIndex = responses.findIndex(r => r.feedbackId === feedbackId);
       if (existingIndex >= 0) {
+        console.log('🔔 Updating existing response at index:', existingIndex);
         responses[existingIndex] = newResponse;
       } else {
+        console.log('🔔 Adding new response to list');
         responses.push(newResponse);
       }
 
       const key = `${this.PENDING_RESPONSES_KEY}_${deviceId}`;
       await AsyncStorage.setItem(key, JSON.stringify(responses));
+      console.log('🔔 Saved pending responses to AsyncStorage:', key, 'total:', responses.length);
 
       // Send notification
       await this.sendResponseNotification(sparkName, feedbackId);
       
-      // Update badge count
+      // Update badge count (internal method for individual spark)
       await this.updateBadgeCount(deviceId);
+      
+      // Update app icon badge with aggregated counts
+      await this.updateAppIconBadge();
+      
+      console.log('✅ Pending response added successfully');
     } catch (error) {
-      console.error('Error adding pending response:', error);
+      console.error('❌ Error adding pending response:', error);
     }
   }
 
@@ -264,7 +290,7 @@ export class FeedbackNotificationService {
   }
 
   /**
-   * Update the app badge count
+   * Update the app badge count (for individual spark - used internally)
    */
   private static async updateBadgeCount(deviceId: string): Promise<void> {
     try {
@@ -283,16 +309,61 @@ export class FeedbackNotificationService {
   }
 
   /**
+   * Update app icon badge with aggregated unread counts
+   * For non-admin users: counts unread replies across all sparks
+   * For admin users: counts unread replies + unread feedback
+   */
+  static async updateAppIconBadge(): Promise<void> {
+    try {
+      if (!isNotificationsAvailable || !Notifications) {
+        console.log('⚠️ Notifications not available, skipping app icon badge update');
+        return;
+      }
+
+      const deviceId = await this.getPersistentDeviceId();
+      
+      // Get total unread replies across all sparks
+      const totalUnreadReplies = await this.getUnreadCount(deviceId);
+      
+      // Check if user is admin and get unread feedback count
+      let totalUnreadFeedback = 0;
+      try {
+        const { AdminResponseService } = await import('./AdminResponseService');
+        const isAdmin = await AdminResponseService.isAdmin();
+        if (isAdmin) {
+          totalUnreadFeedback = await AdminResponseService.getUnreadFeedbackCount();
+        }
+      } catch (error) {
+        // If admin check fails, assume not admin
+        console.log('Admin check failed, assuming not admin:', error);
+      }
+      
+      // Aggregate total unread count
+      const totalUnread = totalUnreadReplies + totalUnreadFeedback;
+      
+      // Update app icon badge
+      await Notifications.setBadgeCountAsync(totalUnread);
+      
+      console.log(`📱 App icon badge updated: ${totalUnread} (${totalUnreadReplies} replies + ${totalUnreadFeedback} feedback)`);
+    } catch (error) {
+      console.error('Error updating app icon badge:', error);
+    }
+  }
+
+  /**
    * Get unread response count for a specific spark
+   * Now uses Firebase directly - checks for feedback with response that hasn't been read
    */
   static async getUnreadCount(deviceId: string, sparkId?: string): Promise<number> {
     try {
-      const responses = await this.getPendingResponses(deviceId);
+      const { ServiceFactory } = await import('./ServiceFactory');
+      const FirebaseService = ServiceFactory.getFirebaseService();
       
-      if (sparkId) {
-        return responses.filter(r => r.sparkId === sparkId && !r.read).length;
-      }
-      return responses.filter(r => !r.read).length;
+      // Use Firebase to get unread count directly
+      const count = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
+      console.log('🔍 getUnreadCount (Firebase) - deviceId:', deviceId, 'sparkId:', sparkId, 'count:', count);
+      
+      return count;
     } catch (error) {
       console.error('Error getting unread count:', error);
       return 0;

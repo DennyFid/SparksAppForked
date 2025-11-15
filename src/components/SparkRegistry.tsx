@@ -13,7 +13,7 @@ import { FoodCamSpark } from '../sparks/FoodCamSpark';
 import { SpanishFriendSpark } from '../sparks/SpanishFriendSpark';
 import { TeeTimeTimerSpark } from '../sparks/TeeTimeTimerSpark';
 import { SoundboardSpark } from '../sparks/SoundboardSpark';
-import { GolfTrackerSpark } from '../sparks/GolfTrackerSpark';
+import { GolfBrainSpark } from '../sparks/GolfBrainSpark';
 import QuickConvertSpark from '../sparks/QuickConvertSpark';
 import SpanishReaderSpark from '../sparks/SpanishReaderSpark';
 import TripStorySpark from '../sparks/TripStorySpark';
@@ -209,7 +209,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
           createdAt: '2024-01-11T00:00:00.000Z',
           rating: 4.6,
         },
-        component: GolfTrackerSpark,
+        component: GolfBrainSpark,
       },
       'quick-convert': {
         metadata: {

@@ -75,7 +75,7 @@ interface Round {
   isComplete: boolean;
 }
 
-interface GolfTrackerData {
+interface GolfBrainData {
   courses: Course[];
   rounds: Round[];
   currentRound?: Round;
@@ -167,7 +167,7 @@ const calculateHoleHistory = (holeNumber: number, courseId: string, rounds: Roun
   };
 };
 
-interface GolfTrackerSparkProps {
+interface GolfBrainSparkProps {
   showSettings?: boolean;
   onCloseSettings?: () => void;
   onStateChange?: (state: any) => void;
@@ -1997,13 +1997,13 @@ const EditCourseModal: React.FC<{
 };
 
 // Settings Component
-const GolfTrackerSettings: React.FC<{
+const GolfBrainSettings: React.FC<{
   onClose: () => void;
   courses: Course[];
   onUpdateCourse: (courseId: string, updates: Partial<Course>) => void;
   onDeleteCourse: (courseId: string) => void;
-  data: GolfTrackerData;
-  onUpdateSettings: (settings: Partial<GolfTrackerData['settings']>) => void;
+  data: GolfBrainData;
+  onUpdateSettings: (settings: Partial<GolfBrainData['settings']>) => void;
   onEditRound?: (round: Round) => void;
   onViewRound?: (round: Round) => void;
   onDeleteRound?: (roundId: string) => void;
@@ -2017,7 +2017,7 @@ const GolfTrackerSettings: React.FC<{
   const [showAllRounds, setShowAllRounds] = useState(false);
   
   // Local state for settings changes
-  const [localSettings, setLocalSettings] = useState<GolfTrackerData['settings']>(data.settings);
+  const [localSettings, setLocalSettings] = useState<GolfBrainData['settings']>(data.settings);
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleEditCourse = (course: Course) => {
@@ -2132,7 +2132,7 @@ const GolfTrackerSettings: React.FC<{
     return '#F44336'; // Red for over par
   };
 
-  const updateLocalSetting = (key: keyof GolfTrackerData['settings'], value: any) => {
+  const updateLocalSetting = (key: keyof GolfBrainData['settings'], value: any) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
@@ -2447,7 +2447,7 @@ const GolfTrackerSettings: React.FC<{
           sparkId="golf-brain"
         />
 
-        <SettingsFeedbackSection sparkName="Golf Brain" sparkId="golf-tracker" />
+        <SettingsFeedbackSection sparkName="Golf Brain" sparkId="golf-brain" />
 
         <SettingsSection title="Default Clubs">
           <View style={{ padding: 16, backgroundColor: 'transparent' }}>
@@ -2878,7 +2878,7 @@ const GolfTrackerSettings: React.FC<{
           </View>
         </SettingsSection>
 
-        <View style={GolfTrackerSettingsStyles.saveCancelContainer}>
+        <View style={GolfBrainSettingsStyles.saveCancelContainer}>
           <SaveCancelButtons
             onSave={handleSaveSettings}
             onCancel={handleCancelSettings}
@@ -2900,8 +2900,8 @@ const GolfTrackerSettings: React.FC<{
   );
 };
 
-// GolfTrackerSettings Styles
-const GolfTrackerSettingsStyles = StyleSheet.create({
+// GolfBrainSettings Styles
+const GolfBrainSettingsStyles = StyleSheet.create({
   saveCancelContainer: {
     padding: 20,
     paddingTop: 0,
@@ -3620,7 +3620,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
   course: Course;
   currentHole: number;
   currentRound?: Round;
-  data: GolfTrackerData;
+  data: GolfBrainData;
   onNextHole: () => void;
   onPreviousHole: () => void;
   onCompleteHole: (holeScore: HoleScore) => void;
@@ -5336,16 +5336,16 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, {
                   selectedOutcome={shotInfo.shot.direction}
                   isPoorShot={shotInfo.shot.poorShot === true}
                 onSelect={(outcome) => {
-                  console.log('GolfTracker: onSelect called with outcome:', outcome);
-                  console.log('GolfTracker: Current shot poorShot before:', shotInfo.shot.poorShot);
+                  console.log('GolfBrain: onSelect called with outcome:', outcome);
+                  console.log('GolfBrain: Current shot poorShot before:', shotInfo.shot.poorShot);
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
                   // Clear poorShot flag when any cell is selected (except long press)
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', false);
-                  console.log('GolfTracker: Cleared poorShot flag');
+                  console.log('GolfBrain: Cleared poorShot flag');
                 }}
                 onPoopSelect={(outcome) => {
-                  console.log('GolfTracker: onPoopSelect called with outcome:', outcome);
-                  console.log('GolfTracker: Setting poorShot to true');
+                  console.log('GolfBrain: onPoopSelect called with outcome:', outcome);
+                  console.log('GolfBrain: Setting poorShot to true');
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'direction', outcome);
                   updateShot(shotInfo.shot.id, shotInfo.type === 'shot' ? 'shot' : 'putt', 'poorShot', true);
                   
@@ -5954,7 +5954,7 @@ const CreateCourseModal: React.FC<{
   );
 };
 
-export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
+export const GolfBrainSpark: React.FC<GolfBrainSparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
@@ -5962,7 +5962,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
 
-  const [data, setData] = useState<GolfTrackerData>({
+  const [data, setData] = useState<GolfBrainData>({
     courses: [DEFAULT_COURSE, DEFAULT_COURSE_BACK9],
     rounds: [],
     settings: {
@@ -6007,7 +6007,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
   // Load saved data on mount
   useEffect(() => {
-    const savedData = getSparkData('golf-brain') as GolfTrackerData;
+    const savedData = getSparkData('golf-brain') as GolfBrainData;
     if (savedData) {
       // Ensure default courses are always available
       const hasDefaultCourse = savedData.courses?.some((course: Course) => course.id === DEFAULT_COURSE.id);
@@ -6750,7 +6750,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
   const handleResetData = () => {
     // Reset to initial state
-    const resetData: GolfTrackerData = {
+    const resetData: GolfBrainData = {
       courses: [DEFAULT_COURSE, DEFAULT_COURSE_BACK9],
       rounds: [],
       settings: {
@@ -6812,7 +6812,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
     HapticFeedback.light();
   };
 
-  const handleUpdateSettings = (settings: Partial<GolfTrackerData['settings']>) => {
+  const handleUpdateSettings = (settings: Partial<GolfBrainData['settings']>) => {
     setData(prev => ({
       ...prev,
       settings: { ...prev.settings, ...settings },
@@ -6829,7 +6829,7 @@ export const GolfTrackerSpark: React.FC<GolfTrackerSparkProps> = ({
 
   if (showSettings) {
     return (
-      <GolfTrackerSettings
+      <GolfBrainSettings
         onClose={onCloseSettings || (() => {})}
         courses={data.courses}
         onUpdateCourse={handleUpdateCourse}

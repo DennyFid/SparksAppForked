@@ -52,6 +52,9 @@ function AppContent() {
       // Register background task for notifications
       await NotificationService.registerBackgroundTask();
       
+      // Update app icon badge with aggregated unread counts
+      await FeedbackNotificationService.updateAppIconBadge();
+      
       // If daily notifications are enabled, ensure they're scheduled
       if (preferences.dailyNotificationsEnabled) {
         const isScheduled = await NotificationService.isDailyNotificationScheduled();
@@ -91,12 +94,22 @@ function AppContent() {
     const listenerTimeout = setTimeout(startFeedbackListener, 2000);
     startFeedbackListener();
 
+    // Periodically update app icon badge (every 30 seconds)
+    const badgeUpdateInterval = setInterval(async () => {
+      try {
+        await FeedbackNotificationService.updateAppIconBadge();
+      } catch (error) {
+        console.error('Error updating app icon badge:', error);
+      }
+    }, 30000); // Update every 30 seconds
+
     return () => {
       subscription?.remove();
       if (feedbackListenerCleanup) {
         feedbackListenerCleanup();
       }
       clearTimeout(listenerTimeout);
+      clearInterval(badgeUpdateInterval);
     };
   }, [preferences.dailyNotificationsEnabled]);
   

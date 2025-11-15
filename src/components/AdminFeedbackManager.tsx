@@ -19,32 +19,25 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
 
   useEffect(() => {
     if (visible) {
-      console.log('🔍 AdminFeedbackManager: Modal opened, loading feedback...');
       loadFeedbackAndMarkAsViewed();
-    } else {
-      console.log('🔍 AdminFeedbackManager: Modal closed');
     }
   }, [visible]);
 
   const loadFeedbackAndMarkAsViewed = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 AdminFeedbackManager: Loading all feedback...');
       const allFeedback = await AdminResponseService.getAllFeedback();
-      console.log('🔍 AdminFeedbackManager: Raw feedback count:', allFeedback.length);
       
       // Mark all unread feedback as viewed when modal opens
       const unreadFeedback = allFeedback.filter(item => !item.viewedByAdmin && item.id);
       if (unreadFeedback.length > 0) {
         const unreadIds = unreadFeedback.map(item => item.id).filter(Boolean);
-        if (unreadIds.length > 0 && AdminResponseService.markMultipleFeedbackAsViewed) {
-          await AdminResponseService.markMultipleFeedbackAsViewed(unreadIds);
-          console.log('✅ Marked', unreadIds.length, 'feedback items as viewed');
-        } else if (unreadIds.length > 0) {
-          // Fallback: mark individually if batch method doesn't exist
-          await Promise.all(unreadIds.map(id => AdminResponseService.markFeedbackAsViewed(id)));
-          console.log('✅ Marked', unreadIds.length, 'feedback items as viewed (individual)');
-        }
+            if (unreadIds.length > 0 && AdminResponseService.markMultipleFeedbackAsViewed) {
+              await AdminResponseService.markMultipleFeedbackAsViewed(unreadIds);
+            } else if (unreadIds.length > 0) {
+              // Fallback: mark individually if batch method doesn't exist
+              await Promise.all(unreadIds.map(id => AdminResponseService.markFeedbackAsViewed(id)));
+            }
       }
       
       // Filter to show only feedback with comments (not just ratings) and without responses
@@ -62,9 +55,7 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Newest first
       });
-      console.log('🔍 AdminFeedbackManager: Pending feedback count:', pendingFeedback.length);
       setFeedback(pendingFeedback);
-      console.log('📝 Loaded pending feedback:', pendingFeedback.length);
     } catch (error) {
       console.error('Error loading feedback:', error);
       Alert.alert('Error', 'Failed to load feedback');
@@ -76,9 +67,7 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
   const loadFeedback = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 AdminFeedbackManager: Loading all feedback...');
       const allFeedback = await AdminResponseService.getAllFeedback();
-      console.log('🔍 AdminFeedbackManager: Raw feedback count:', allFeedback.length);
       // Filter to show only feedback with comments (not just ratings) and without responses
       const pendingFeedback = allFeedback.filter(
         item => (item.comment && item.comment.trim() !== '') && (!item.response || item.response.trim() === '')
@@ -94,9 +83,7 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Newest first
       });
-      console.log('🔍 AdminFeedbackManager: Pending feedback count:', pendingFeedback.length);
       setFeedback(pendingFeedback);
-      console.log('📝 Loaded pending feedback:', pendingFeedback.length);
     } catch (error) {
       console.error('Error loading feedback:', error);
       Alert.alert('Error', 'Failed to load feedback');
@@ -388,8 +375,6 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
 
   if (!visible) return null;
 
-  console.log('🔍 AdminFeedbackManager: Rendering modal with', feedback.length, 'feedback items');
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -461,12 +446,12 @@ export const AdminFeedbackManager: React.FC<AdminFeedbackManagerProps> = ({ visi
                   </TouchableOpacity>
                 </View>
 
-                {item.response && (
-                  <View style={styles.existingResponse}>
-                    <Text style={styles.responseLabel}>Your Response:</Text>
-                    <Text style={styles.responseText}>{item.response}</Text>
-                  </View>
-                )}
+                    {item.response && (
+                      <View style={styles.existingResponse}>
+                        <Text style={styles.responseLabel}>Your Response:</Text>
+                        <Text style={styles.responseText}>{item.response}</Text>
+                      </View>
+                    )}
               </View>
 
               {/* Response input appears immediately below the feedback item */}

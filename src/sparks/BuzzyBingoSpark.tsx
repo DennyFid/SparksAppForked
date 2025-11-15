@@ -685,14 +685,14 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
               />
               {data.wordSets.map((wordSet) => (
                 <SettingsItem key={wordSet.id}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <View style={{ flex: 1 }}>
+                  <View style={{ width: '100%' }}>
+                    <View style={{ marginBottom: 8 }}>
                       <SettingsText>{wordSet.name}</SettingsText>
                       <SettingsText style={{ fontSize: 12, opacity: 0.7 }}>
                         {wordSet.words.length} words {wordSet.isActive ? '• Active' : ''}
                       </SettingsText>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                       {!wordSet.isActive && (
                         <TouchableOpacity
                           onPress={() => handleActivateWordSet(wordSet.id)}

@@ -77,6 +77,12 @@ export class MockAnalyticsService {
     console.log('📊 Mock Analytics: Settings accessed');
   }
 
+  static async trackFeedbackSubmitted(sparkId: string, sparkName?: string, hasRating?: boolean, hasText?: boolean): Promise<void> {
+    if (!this.isInitialized || !this.userId) return;
+
+    console.log('📊 Mock Analytics: Feedback submitted', { sparkId, sparkName, hasRating, hasText });
+  }
+
   static async trackSparkAdded(sparkId: string, sparkName: string): Promise<void> {
     if (!this.isInitialized || !this.userId) return;
 

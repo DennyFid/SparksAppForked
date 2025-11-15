@@ -586,12 +586,16 @@ interface FeedbackItemProps {
   createdAt: string;
 }
 
-const FeedbackItem: React.FC<FeedbackItemProps> = ({ rating, comment, response, createdAt }) => {
+interface FeedbackItemProps {
+  rating: number;
+  comment?: string;
+  response?: string;
+  createdAt: string;
+  feedbackId?: string; // Add feedbackId for debugging
+}
+
+const FeedbackItem: React.FC<FeedbackItemProps> = ({ rating, comment, response, createdAt, feedbackId }) => {
   const { colors } = useTheme();
-  
-  // Debug logging
-  console.log('🔍 FeedbackItem received:', { rating, comment, response, createdAt });
-  console.log('🔍 Response value:', response, 'Type:', typeof response, 'Length:', response?.length);
 
   const styles = StyleSheet.create({
     item: {
@@ -687,11 +691,30 @@ export interface SettingsFeedbackSectionRef {
 }
 
 export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, SettingsFeedbackSectionProps>(
-  ({ sparkName, sparkId = 'app' }, ref) => {
+  function SettingsFeedbackSection({ sparkName, sparkId = 'app' }, ref) {
     const { colors } = useTheme();
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [userFeedbacks, setUserFeedbacks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const loadUserFeedback = async () => {
+      try {
+        setIsLoading(true);
+        // Use persistent device ID to ensure consistency
+        const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
+        
+        // Ensure Firebase is initialized before trying to get feedback
+        await ServiceFactory.ensureFirebaseInitialized();
+        
+        const feedbacks = await FeedbackService.getUserFeedback(deviceId, sparkId);
+        setUserFeedbacks(feedbacks || []);
+      } catch (error) {
+        console.error('Error loading feedback:', error);
+        setUserFeedbacks([]); // Set empty array on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
     // Load user feedback on mount
     useEffect(() => {
@@ -701,62 +724,66 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
     // Expose refresh function to parent
     useImperativeHandle(ref, () => ({
       refresh: loadUserFeedback,
-    }), []);
+    }), [sparkId]);
 
-  // Mark responses as read when feedback with responses is viewed
-  useEffect(() => {
-    const markResponsesAsRead = async () => {
-      try {
-        // Use persistent device ID to ensure consistency
-        const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-        
-        // Find all feedback items that have responses
-        const feedbacksWithResponses = userFeedbacks.filter(item => item.response && item.response.trim());
-        
-        if (feedbacksWithResponses.length > 0) {
-          // Mark all responses as read for this spark when user views them
-          // This will update the badge count immediately
-          await FeedbackNotificationService.markAllResponsesAsRead(deviceId, sparkId);
-          console.log('✅ Marked', feedbacksWithResponses.length, 'response(s) as read for spark:', sparkId);
+    // Mark responses as read when settings page is viewed
+    // This runs on mount and whenever feedback is loaded
+    useEffect(() => {
+      const markResponsesAsRead = async () => {
+        try {
+          // Use persistent device ID to ensure consistency
+          const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
           
-          // Also mark individual feedback items as read if they have IDs
-          for (const feedback of feedbacksWithResponses) {
-            if (feedback.id) {
-              await FeedbackNotificationService.markResponseAsRead(deviceId, feedback.id);
+          // Get Firebase service
+          const { ServiceFactory } = await import('../services/ServiceFactory');
+          const FirebaseService = ServiceFactory.getFirebaseService();
+          
+          // Check Firebase directly for unread feedback with responses
+          // This ensures we catch all unread responses, even if feedback list hasn't loaded yet
+          const unreadCount = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
+          
+          if (unreadCount > 0) {
+            // Get all feedback for this user/spark to find which ones need to be marked as read
+            const { FeedbackService } = await import('../services/FeedbackService');
+            const allFeedback = await FeedbackService.getUserFeedback(deviceId, sparkId);
+            
+            // Find feedback items with responses that haven't been read
+            const unreadFeedbackIds = allFeedback
+              .filter((f: any) => f.response && f.response.trim() && f.readByUser !== true)
+              .map((f: any) => f.id)
+              .filter(Boolean) as string[];
+            
+            if (unreadFeedbackIds.length > 0) {
+              console.log(`🔍 SettingsFeedbackSection: Marking ${unreadFeedbackIds.length} feedback items as read:`, unreadFeedbackIds);
+              
+              // Mark all as read in Firebase
+              await (FirebaseService as any).markMultipleFeedbackAsReadByUser(unreadFeedbackIds);
+              
+              // Small delay to ensure Firebase has committed the update
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Verify the update worked by checking unread count again
+              const verifyCount = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
+              console.log(`🔍 SettingsFeedbackSection: Unread count after marking as read: ${verifyCount}`);
+              
+              // Update app icon badge
+              await FeedbackNotificationService.updateAppIconBadge();
+              
+              // Refresh feedback to get updated readByUser status
+              await loadUserFeedback();
+            } else {
+              console.log('🔍 SettingsFeedbackSection: No unread feedback IDs to mark as read');
             }
           }
+        } catch (error) {
+          console.error('Error marking responses as read:', error);
         }
-      } catch (error) {
-        console.error('Error marking responses as read:', error);
-      }
-    };
+      };
 
-    if (userFeedbacks.length > 0) {
+      // Run immediately when component mounts (settings page viewed)
+      // Also run when feedback is loaded
       markResponsesAsRead();
-    }
-  }, [userFeedbacks, sparkId]);
-
-  const loadUserFeedback = async () => {
-    try {
-      setIsLoading(true);
-      // Use persistent device ID to ensure consistency
-      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-      console.log('🔍 Loading feedback for deviceId:', deviceId, 'sparkId:', sparkId);
-      
-      // Ensure Firebase is initialized before trying to get feedback
-      await ServiceFactory.ensureFirebaseInitialized();
-      
-      const feedbacks = await FeedbackService.getUserFeedback(deviceId, sparkId);
-      console.log('🔍 Raw feedbacks from service:', feedbacks);
-      
-      setUserFeedbacks(feedbacks || []);
-    } catch (error) {
-      console.error('Error loading feedback:', error);
-      setUserFeedbacks([]); // Set empty array on error
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    }, [sparkId]); // Run on mount and when sparkId changes
 
   const handleSubmitFeedback = async (rating: number, feedback: string) => {
     try {
@@ -781,12 +808,11 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
         }
       }
       
-      // Use persistent device ID to ensure consistency
-      const FeedbackNotificationService = (await import('../services/FeedbackNotificationService')).FeedbackNotificationService;
-      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-      console.log('📝 Submitting feedback for user:', deviceId);
-      
-      // Submit feedback only (rating is handled separately)
+            // Use persistent device ID to ensure consistency
+            const FeedbackNotificationService = (await import('../services/FeedbackNotificationService')).FeedbackNotificationService;
+            const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
+            
+            // Submit feedback only (rating is handled separately)
       const feedbackData: any = {
         userId: deviceId,
         sparkId,
@@ -844,7 +870,6 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
       console.log('⭐ Submitting rating for user:', deviceId);
       
       // Submit rating only
-      const AnalyticsService = ServiceFactory.getAnalyticsService();
       const sessionInfo = AnalyticsService.getSessionInfo();
       await FeedbackService.submitFeedback({
         userId: deviceId,
@@ -961,13 +986,6 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
         <View style={styles.feedbackList}>
           <Text style={styles.sectionTitle}>Your Feedback</Text>
           {userFeedbacks.map((item, index) => {
-            console.log('🔍 Mapping feedback item:', item);
-            console.log('🔍 Available fields:', Object.keys(item));
-            console.log('🔍 Response fields:', {
-              response: item.response,
-              adminResponse: item.adminResponse,
-              reply: item.reply
-            });
             return (
               <FeedbackItem
                 key={index}
@@ -975,6 +993,7 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
                 comment={item.comment || item.text || ''}
                 response={item.response || ''}
                 createdAt={item.createdAt}
+                feedbackId={item.id}
               />
             );
           })}

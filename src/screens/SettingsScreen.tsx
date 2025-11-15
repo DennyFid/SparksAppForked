@@ -10,6 +10,7 @@ import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
 import { AdminReviewsManager } from '../components/AdminReviewsManager';
 import { NotificationBadge } from '../components/NotificationBadge';
 import { AdminResponseService } from '../services/AdminResponseService';
+import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
 import { ServiceFactory } from '../services/ServiceFactory';
 import { FeedbackService } from '../services/FeedbackService';
 import { getSparkById } from '../components/SparkRegistry';
@@ -47,6 +48,9 @@ export const SettingsScreen: React.FC = () => {
         const count = await AdminResponseService.getUnreadFeedbackCount();
         console.log('🔔 Unread feedback count:', count);
         setUnreadFeedbackCount(count);
+        
+        // Update app icon badge when admin feedback count changes
+        await FeedbackNotificationService.updateAppIconBadge();
       } catch (error) {
         console.error('Error refreshing unread feedback count:', error);
       }
@@ -105,7 +109,7 @@ export const SettingsScreen: React.FC = () => {
         console.log('🔍 Analytics service type:', AnalyticsService.constructor.name);
         
         // Fallback: Get device ID directly from AsyncStorage
-        let deviceId = sessionInfo.userId || sessionInfo.sessionId;
+        let deviceId: string | null = sessionInfo.userId || sessionInfo.sessionId;
         if (!deviceId || deviceId === 'unknown') {
           try {
             deviceId = await AsyncStorage.getItem('analytics_device_id');
@@ -311,7 +315,7 @@ export const SettingsScreen: React.FC = () => {
             }}
           >
             <View style={styles.actionButtonContent}>
-              <Text style={styles.actionButtonText}>📝 Manage Feedback & Responses</Text>
+              <Text style={styles.actionButtonText}>📢 Manage Feedback</Text>
               {unreadFeedbackCount > 0 && (
                 <View style={styles.adminBadge}>
                   <Text style={styles.adminBadgeText}>

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, User } from 'firebase/auth';
-import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { 
   User as AnalyticsUser, 
   SparkFeedback, 
@@ -501,17 +501,118 @@ export class WebFirebaseService {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
-    
+
     try {
       const feedbackRef = doc(this.db, 'feedback', feedbackId);
       await updateDoc(feedbackRef, {
         viewedByAdmin: true,
         viewedByAdminAt: new Date()
       });
-      
+
       console.log('✅ Feedback marked as viewed by admin');
     } catch (error) {
       console.error('Error marking feedback as viewed by admin:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get count of unread feedback responses for a user
+   * Unread = has response AND (readByUser is false/undefined)
+   */
+  static async getUnreadFeedbackCount(userId: string, sparkId?: string): Promise<number> {
+    if (!this._initialized || !this.db) {
+      return 0;
+    }
+
+    try {
+      // Firestore doesn't support != null, so we query all feedback for this user
+      // and filter in code
+      const constraints = [where('userId', '==', userId)];
+      
+      if (sparkId) {
+        constraints.push(where('sparkId', '==', sparkId));
+      }
+      
+      const q = query(
+        collection(this.db, 'feedback'),
+        ...constraints
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      // Filter for: has response AND not read
+      let unreadCount = 0;
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const hasResponse = data.response && data.response.trim() !== '';
+        const isUnread = data.readByUser !== true;
+        if (hasResponse && isUnread) {
+          unreadCount++;
+        }
+      });
+      
+      return unreadCount;
+    } catch (error) {
+      console.error('Error getting unread feedback count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Mark feedback as read by user
+   */
+  static async markFeedbackAsReadByUser(feedbackId: string): Promise<void> {
+    if (!this._initialized || !this.db) {
+      throw new Error('Firebase not initialized');
+    }
+
+    try {
+      const feedbackRef = doc(this.db, 'feedback', feedbackId);
+      await updateDoc(feedbackRef, {
+        readByUser: true,
+        readByUserAt: new Date()
+      });
+
+      console.log('✅ Feedback marked as read by user');
+    } catch (error) {
+      console.error('Error marking feedback as read by user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark multiple feedback items as read by user
+   */
+  static async markMultipleFeedbackAsReadByUser(feedbackIds: string[]): Promise<void> {
+    if (!this._initialized || !this.db) {
+      throw new Error('Firebase not initialized');
+    }
+
+    if (!feedbackIds || feedbackIds.length === 0) {
+      console.log('⚠️ markMultipleFeedbackAsReadByUser: No feedback IDs provided');
+      return;
+    }
+
+    try {
+      console.log(`🔍 markMultipleFeedbackAsReadByUser: Marking ${feedbackIds.length} feedback items as read:`, feedbackIds);
+      const batch = writeBatch(this.db);
+      feedbackIds.forEach(feedbackId => {
+        if (!feedbackId) {
+          console.warn('⚠️ Skipping empty feedback ID');
+          return;
+        }
+        const ref = doc(this.db, 'feedback', feedbackId);
+        batch.update(ref, {
+          readByUser: true,
+          readByUserAt: new Date()
+        });
+        console.log(`✅ Added update to batch for feedback ID: ${feedbackId}`);
+      });
+      await batch.commit();
+      console.log(`✅ Successfully marked ${feedbackIds.length} feedback items as read by user`);
+    } catch (error) {
+      console.error('❌ Error marking multiple feedback as read by user:', error);
       throw error;
     }
   }
