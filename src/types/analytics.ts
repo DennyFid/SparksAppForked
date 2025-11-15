@@ -27,6 +27,8 @@ export interface SparkFeedback {
   rating: 1 | 2 | 3 | 4 | 5;
   comment?: string;
   response?: string; // Response from developer/admin
+  viewedByAdmin?: boolean; // Whether admin has viewed this feedback
+  viewedByAdminAt?: string | Date; // When admin viewed this feedback
   sessionDuration: number; // in seconds
   completedActions: string[]; // list of actions completed
   feedbackType: 'rating' | 'quick' | 'detailed';

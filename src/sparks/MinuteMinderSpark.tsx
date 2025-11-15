@@ -571,6 +571,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
             title="Minute Minder Settings"
             subtitle="Make every minute matter"
             icon="⏳"
+            sparkId="minute-minder"
           />
           <SettingsFeedbackSection sparkName="Minute Minder" sparkId="minute-minder" />
           <SettingsButton

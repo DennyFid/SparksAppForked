@@ -23,9 +23,7 @@ try {
   require('firebase/auth');
   require('firebase/firestore');
   isFirebaseAvailable = true;
-  console.log('✅ Firebase Web SDK is available - using real Firebase service');
 } catch (error) {
-  console.log('⚠️ Firebase Web SDK not available, using mock service:', error.message);
   isFirebaseAvailable = false;
 }
 
@@ -35,28 +33,16 @@ export class ServiceFactory {
   private static analyticsServiceInitialized = false;
 
   static getFirebaseService() {
-    console.log('🏭 ServiceFactory.getFirebaseService called');
-    console.log('🏭 Firebase available:', isFirebaseAvailable);
-    
     if (isFirebaseAvailable) {
-      console.log('✅ Returning Web Firebase service');
       return WebFirebaseService;
     }
-    
-    console.log('⚠️ Returning mock Firebase service');
     return MockFirebaseService;
   }
 
   static getAnalyticsService() {
-    console.log('🏭 ServiceFactory.getAnalyticsService called');
-    console.log('🏭 Firebase available:', isFirebaseAvailable);
-    
     if (isFirebaseAvailable) {
-      console.log('✅ Returning Simple Analytics service');
       return SimpleAnalyticsService;
     }
-    
-    console.log('⚠️ Returning mock Analytics service');
     return MockAnalyticsService;
   }
 
@@ -65,7 +51,6 @@ export class ServiceFactory {
       try {
         await WebFirebaseService.initialize();
         this.firebaseServiceInitialized = true;
-        console.log('✅ Firebase service initialized via ServiceFactory');
         
         // Wait a bit to ensure Firebase is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -105,7 +90,6 @@ export class ServiceFactory {
         const db = getFirestore(app);
         await SimpleAnalyticsService.initialize(db);
         this.analyticsServiceInitialized = true;
-        console.log('✅ Simple Analytics service initialized via ServiceFactory');
       } catch (error) {
         console.error('❌ Failed to initialize Analytics service:', error);
       }

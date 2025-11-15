@@ -61,6 +61,56 @@ export class AdminResponseService {
   }
 
   /**
+   * Mark feedback as viewed by admin
+   */
+  static async markFeedbackAsViewed(feedbackId: string): Promise<void> {
+    try {
+      await (FirebaseService as any).markFeedbackAsViewedByAdmin(feedbackId);
+    } catch (error) {
+      console.error('Error marking feedback as viewed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark multiple feedback items as viewed by admin
+   */
+  static async markMultipleFeedbackAsViewed(feedbackIds: string[]): Promise<void> {
+    try {
+      await Promise.all(feedbackIds.map(id => this.markFeedbackAsViewed(id)));
+    } catch (error) {
+      console.error('Error marking multiple feedback as viewed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get unread feedback count for admin
+   */
+  static async getUnreadFeedbackCount(): Promise<number> {
+    try {
+      const allFeedback = await this.getAllFeedback();
+      console.log('🔍 getUnreadFeedbackCount - Total feedback:', allFeedback.length);
+      
+      const unreadFeedback = allFeedback.filter(
+        item => item.viewedByAdmin === undefined || item.viewedByAdmin === false
+      );
+      
+      console.log('🔍 getUnreadFeedbackCount - Unread feedback:', unreadFeedback.length);
+      console.log('🔍 Sample unread items:', unreadFeedback.slice(0, 3).map(item => ({
+        id: item.id,
+        viewedByAdmin: item.viewedByAdmin,
+        sparkName: item.sparkName
+      })));
+      
+      return unreadFeedback.length;
+    } catch (error) {
+      console.error('Error getting unread feedback count:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Check if current device is admin
    */
   static async isAdmin(): Promise<boolean> {

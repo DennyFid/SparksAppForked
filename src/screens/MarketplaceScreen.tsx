@@ -4,6 +4,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MarketplaceStackParamList } from '../types/navigation';
 import { getAllSparks } from '../components/SparkRegistry';
 import { useTheme } from '../contexts/ThemeContext';
+import { NotificationBadge } from '../components/NotificationBadge';
 
 type MarketplaceNavigationProp = StackNavigationProp<MarketplaceStackParamList, 'MarketplaceList'>;
 
@@ -119,16 +120,21 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       justifyContent: 'center',
       alignItems: 'center',
       padding: 12,
+      position: 'relative',
     },
     sparkCardContentWithRating: {
       flex: 1,
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: 12,
+      position: 'relative',
+    },
+    sparkIconContainer: {
+      position: 'relative',
+      marginBottom: 4,
     },
     sparkIcon: {
       fontSize: 32,
-      marginBottom: 4,
     },
     sparkTitle: {
       fontSize: 12,
@@ -246,7 +252,10 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContent}>
-                  <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                  <View style={styles.sparkIconContainer}>
+                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                  </View>
                   <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                 </View>
               </TouchableOpacity>
@@ -270,7 +279,10 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContentWithRating}>
-                  <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                  <View style={styles.sparkIconContainer}>
+                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                  </View>
                   <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                   <View style={styles.ratingContainer}>
                     <View style={styles.starsContainer}>

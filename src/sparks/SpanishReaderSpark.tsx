@@ -318,6 +318,7 @@ const SpanishReaderSpark: React.FC<SpanishReaderSparkProps> = ({
           title="Spanish Reader Settings"
           subtitle="Customize your reading experience"
           icon="📖"
+          sparkId="spanish-reader"
         />
         
         <SettingsFeedbackSection sparkName="Spanish Reader" sparkId="spanish-reader" />

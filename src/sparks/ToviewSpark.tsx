@@ -10,7 +10,10 @@ import {
   SettingsSection,
   SettingsFeedbackSection,
   SettingsText,
+  SettingsInput,
   SettingsButton,
+  SettingsItem,
+  SettingsRemoveButton,
   SaveCancelButtons
 } from '../components/SettingsComponents';
 
@@ -268,6 +271,7 @@ const ToviewSettings: React.FC<{
           title="Toview Settings"
           subtitle="Manage your viewing preferences"
           icon="📺"
+          sparkId="toview"
         />
 
         <SettingsFeedbackSection sparkName="Toview" sparkId="toview" />
@@ -277,45 +281,41 @@ const ToviewSettings: React.FC<{
             Manage which streaming services appear in the provider dropdown.
           </SettingsText>
           
-          <View style={styles.providerInputContainer}>
-            <TextInput
-              style={[styles.providerInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-              placeholder="Add new provider"
-              placeholderTextColor={colors.textSecondary}
-              value={newProvider}
-              onChangeText={setNewProvider}
-              onSubmitEditing={addProvider}
-              returnKeyType="done"
-            />
-            <TouchableOpacity
-              style={[styles.addProviderButton, { backgroundColor: colors.primary }]}
-              onPress={addProvider}
-            >
-              <Text style={styles.addProviderButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          {settings.providers.length > 0 && (
+            <>
+              {settings.providers.map((provider) => (
+                <SettingsItem key={provider}>
+                  <SettingsText>{provider}</SettingsText>
+                  <SettingsRemoveButton onPress={() => removeProvider(provider)} />
+                </SettingsItem>
+              ))}
+            </>
+          )}
 
-          <View style={styles.providersList}>
-            {settings.providers.map((provider, index) => (
-              <View key={provider} style={[styles.providerItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.providerText, { color: colors.text }]}>{provider}</Text>
-                <TouchableOpacity
-                  style={[styles.removeProviderButton, { backgroundColor: colors.error || '#FF3B30' }]}
-                  onPress={() => removeProvider(provider)}
-                >
-                  <Text style={styles.removeProviderButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+          <View style={styles.addProviderContainer}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <SettingsInput
+                placeholder="Add new provider"
+                value={newProvider}
+                onChangeText={setNewProvider}
+              />
+            </View>
+            <SettingsButton
+              title="Add"
+              onPress={addProvider}
+              variant="primary"
+            />
           </View>
         </SettingsSection>
+
+        <View style={styles.saveCancelContainer}>
+          <SaveCancelButtons
+            onSave={handleSave}
+            onCancel={handleCancel}
+            saveDisabled={!hasUnsavedChanges}
+          />
+        </View>
       </SettingsScrollView>
-      
-      <SaveCancelButtons
-        onSave={handleSave}
-        onCancel={handleCancel}
-        hasUnsavedChanges={hasUnsavedChanges}
-      />
     </SettingsContainer>
   );
 };
@@ -1459,58 +1459,14 @@ const styles = StyleSheet.create({
   modalDropdownText: {
     fontSize: 16,
   },
-  providerInputContainer: {
+  addProviderContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    marginTop: 12,
   },
-  providerInput: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    marginRight: 12,
-  },
-  addProviderButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addProviderButtonText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  providersList: {
-    gap: 8,
-  },
-  providerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  providerText: {
-    fontSize: 16,
-    flex: 1,
-  },
-  removeProviderButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeProviderButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  saveCancelContainer: {
+    padding: 20,
+    paddingTop: 0,
   },
 });
 

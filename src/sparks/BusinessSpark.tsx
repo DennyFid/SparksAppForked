@@ -150,6 +150,7 @@ const BusinessSimulatorSettings: React.FC<{
           title="Business Simulator Settings"
           subtitle="Manage your business simulation experience"
           icon="💼"
+          sparkId="business-sim"
         />
 
         <SettingsFeedbackSection sparkName="Business Simulator" sparkId="business" />

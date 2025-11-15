@@ -7,6 +7,7 @@ import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { PendingResponseNotification } from '../components/PendingResponseNotification';
+import { NotificationBadge } from '../components/NotificationBadge';
 
 type SparkSelectionNavigationProp = StackNavigationProp<MySparkStackParamList, 'MySparksList'>;
 
@@ -71,10 +72,14 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
       justifyContent: 'center',
       alignItems: 'center',
       padding: 16,
+      position: 'relative',
+    },
+    sparkIconContainer: {
+      position: 'relative',
+      marginBottom: 6,
     },
     sparkIcon: {
       fontSize: 36,
-      marginBottom: 6,
     },
     sparkTitle: {
       fontSize: 12,
@@ -167,7 +172,10 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
                   }}
                 >
                   <View style={styles.sparkCardContent}>
-                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    <View style={styles.sparkIconContainer}>
+                      <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                      <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                    </View>
                     <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                     <PendingResponseNotification 
                       sparkId={spark.metadata.id}

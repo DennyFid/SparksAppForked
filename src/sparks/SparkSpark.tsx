@@ -859,6 +859,7 @@ export default function SparkSpark({ showSettings = false, onCloseSettings }: Sp
             title="Spark Spark Settings"
             subtitle="Manage your Spark ideas and submissions"
             icon="✨"
+            sparkId="spark-spark"
           />
 
           <SettingsFeedbackSection sparkName="Spark Spark" sparkId="spark-spark" />

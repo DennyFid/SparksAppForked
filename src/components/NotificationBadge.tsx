@@ -21,13 +21,13 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
-        const AnalyticsService = ServiceFactory.getAnalyticsService();
-        const sessionInfo = AnalyticsService.getSessionInfo();
-        const deviceId = sessionInfo.userId || 'anonymous';
+        // Use persistent device ID from AsyncStorage - this ensures consistency
+        const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
         const count = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
         setUnreadCount(count);
       } catch (error) {
         console.error('Error loading unread count:', error);
+        setUnreadCount(0);
       }
     };
 

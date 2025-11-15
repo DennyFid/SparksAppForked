@@ -247,6 +247,18 @@ export class FirebaseService {
     }
   }
 
+  static async markFeedbackAsViewedByAdmin(feedbackId: string): Promise<void> {
+    try {
+      await this.db.collection('feedback').doc(feedbackId).update({
+        viewedByAdmin: true,
+        viewedByAdminAt: firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error marking feedback as viewed by admin:', error);
+      throw error;
+    }
+  }
+
   static async getFeedbackById(feedbackId: string): Promise<SparkFeedback | null> {
     try {
       const doc = await this.db.collection('feedback').doc(feedbackId).get();

@@ -9,6 +9,7 @@ import { useSparkStore, useAppStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { QuickSwitchModal } from '../components/QuickSwitchModal';
+import { NotificationBadge } from '../components/NotificationBadge';
 
 type SparkScreenNavigationProp = 
   | StackNavigationProp<MySparkStackParamList, 'Spark'>
@@ -291,7 +292,10 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
             style={styles.actionButton} 
             onPress={handleSettings}
           >
-            <Text style={[styles.buttonIcon, styles.settingsIcon]}>⚙️</Text>
+            <View style={{ position: 'relative' }}>
+              <Text style={[styles.buttonIcon, styles.settingsIcon]}>⚙️</Text>
+              <NotificationBadge sparkId={sparkId} size="small" />
+            </View>
             <Text style={[styles.buttonLabel, styles.settingsLabel]}>Settings</Text>
           </TouchableOpacity>
         </View>

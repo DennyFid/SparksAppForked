@@ -22,10 +22,8 @@ export const PendingResponseNotification: React.FC<PendingResponseNotificationPr
 
   const checkPendingResponse = async () => {
     try {
-      const AnalyticsService = ServiceFactory.getAnalyticsService();
-      const sessionInfo = AnalyticsService.getSessionInfo();
-      const deviceId = sessionInfo.userId || sessionInfo.sessionId || '';
-      
+      // Use persistent device ID to ensure consistency
+      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
       const hasUnread = await FeedbackNotificationService.hasUnreadResponse(deviceId, sparkId);
       setHasPendingResponse(hasUnread);
     } catch (error) {

@@ -121,6 +121,7 @@ const QuickConvertSettings: React.FC<{
           title="Quick Convert Settings"
           subtitle="Configure exchange rate and currency options"
           icon="💱"
+          sparkId="quick-convert"
         />
 
         <SettingsSection title="Exchange Rate">

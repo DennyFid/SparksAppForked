@@ -48,6 +48,7 @@ const TodoSettings: React.FC<{
           title="Todo List Settings"
           subtitle="Manage your task organization preferences"
           icon="📝"
+          sparkId="todo"
         />
 
         <SettingsFeedbackSection sparkName="Todo List" sparkId="todo" />

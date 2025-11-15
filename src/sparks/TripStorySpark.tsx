@@ -4199,6 +4199,7 @@ Created with TripStory ✈️
             title="TripStory Settings"
             subtitle="Manage your trip documentation preferences"
             icon="✈️"
+            sparkId="trip-story"
           />
           
           <SettingsFeedbackSection sparkName="TripStory" sparkId="trip-story" />

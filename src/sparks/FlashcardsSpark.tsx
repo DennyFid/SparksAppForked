@@ -134,6 +134,7 @@ const FlashcardSettings: React.FC<{
           title="Flashcard Settings"
           subtitle="Manage your English-Spanish phrases"
           icon="⚙️"
+          sparkId="flashcards"
         />
 
         <SettingsFeedbackSection sparkName="Flashcards" sparkId="flashcards" />

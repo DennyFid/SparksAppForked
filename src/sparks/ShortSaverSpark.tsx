@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -59,22 +59,16 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editUrl, setEditUrl] = useState('');
-  
+  const isInitializing = useRef(true);
 
-  // Save videos to storage
-  const saveVideos = (newVideos: ShortVideo[]) => {
-    setSparkData('short-saver', { videos: newVideos });
-    setVideos(newVideos);
-  };
-
-  // Load saved videos
+  // Load saved videos on mount
   useEffect(() => {
-    loadVideos();
-  }, []);
-
-  // Initialize with default video if no videos exist
-  useEffect(() => {
-    if (videos.length === 0) {
+    const data = getSparkData('short-saver');
+    if (data?.videos && data.videos.length > 0) {
+      // Load saved videos
+      setVideos(data.videos);
+    } else {
+      // Initialize with default video if no saved data exists
       const defaultVideo: ShortVideo = {
         id: 'ShKH1p_uWaA',
         url: 'https://www.youtube.com/shorts/ShKH1p_uWaA',
@@ -85,10 +79,33 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
         name: 'Nate on fighting orangutan'
       };
       
-      setVideos([defaultVideo]);
-      saveVideos([defaultVideo]);
+      const initialVideos = [defaultVideo];
+      setVideos(initialVideos);
+      setSparkData('short-saver', { videos: initialVideos });
     }
-  }, [videos.length, saveVideos]);
+    
+    // Mark initialization as complete after a brief delay to ensure state is set
+    setTimeout(() => {
+      isInitializing.current = false;
+    }, 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Save videos to storage whenever videos change (but not on initial load)
+  useEffect(() => {
+    // Skip save during initialization
+    if (isInitializing.current) {
+      return;
+    }
+    
+    // Skip save if videos array is empty
+    if (videos.length === 0) {
+      return;
+    }
+    
+    // Save to persistent storage
+    setSparkData('short-saver', { videos });
+  }, [videos, setSparkData]);
 
   // Update filtered videos when videos or selectedCategory changes
   useEffect(() => {
@@ -98,13 +115,6 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       setFilteredVideos(videos);
     }
   }, [videos, selectedCategory]);
-
-  const loadVideos = () => {
-    const data = getSparkData('short-saver');
-    if (data?.videos) {
-      setVideos(data.videos);
-    }
-  };
 
   // Get all unique categories from videos
   const getCategories = (): string[] => {
@@ -202,7 +212,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       };
 
       const updatedVideos = [...videos, newVideo];
-      saveVideos(updatedVideos);
+      setVideos(updatedVideos);
       setNewUrl('');
       
       HapticFeedback.success();
@@ -295,7 +305,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     };
 
     const updatedVideos = videos.map(v => v.id === editingVideo.id ? updatedVideo : v);
-    saveVideos(updatedVideos);
+    setVideos(updatedVideos);
     handleCloseModal();
     HapticFeedback.success();
   };
@@ -314,7 +324,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
           style: 'destructive',
           onPress: () => {
             const updatedVideos = videos.filter(video => video.id !== editingVideo.id);
-            saveVideos(updatedVideos);
+            setVideos(updatedVideos);
             handleCloseModal();
             HapticFeedback.medium();
           }
@@ -670,6 +680,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
             title="Short Saver Settings"
             subtitle="Manage your saved YouTube Shorts"
             icon="🎬"
+            sparkId="short-saver"
           />
           
           

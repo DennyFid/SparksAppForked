@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,6 +7,8 @@ import { HapticFeedback } from '../utils/haptics';
 import { NotificationService } from '../utils/notifications';
 import { SettingsFeedbackSection, SettingsScrollView } from '../components/SettingsComponents';
 import { AdminFeedbackManager } from '../components/AdminFeedbackManager';
+import { AdminReviewsManager } from '../components/AdminReviewsManager';
+import { NotificationBadge } from '../components/NotificationBadge';
 import { AdminResponseService } from '../services/AdminResponseService';
 import { ServiceFactory } from '../services/ServiceFactory';
 import { FeedbackService } from '../services/FeedbackService';
@@ -32,7 +34,32 @@ export const SettingsScreen: React.FC = () => {
   // Admin and initialization state
   const [isInitialized, setIsInitialized] = useState(false);
   const [showAdminManager, setShowAdminManager] = useState(false);
+  const [showReviewsManager, setShowReviewsManager] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [unreadFeedbackCount, setUnreadFeedbackCount] = useState(0);
+
+  // Refresh unread feedback count periodically for admins
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const refreshUnreadCount = async () => {
+      try {
+        const count = await AdminResponseService.getUnreadFeedbackCount();
+        console.log('🔔 Unread feedback count:', count);
+        setUnreadFeedbackCount(count);
+      } catch (error) {
+        console.error('Error refreshing unread feedback count:', error);
+      }
+    };
+
+    // Refresh immediately
+    refreshUnreadCount();
+
+    // Refresh every 5 seconds
+    const interval = setInterval(refreshUnreadCount, 5000);
+
+    return () => clearInterval(interval);
+  }, [isAdmin]);
   
   // Spark management state
   const [isReordering, setIsReordering] = useState(false);
@@ -63,6 +90,12 @@ export const SettingsScreen: React.FC = () => {
         const adminStatus = await AdminResponseService.isAdmin();
         setIsAdmin(adminStatus);
         console.log('🔑 Admin status:', adminStatus);
+        
+        // Load unread feedback count for admin
+        if (adminStatus) {
+          const unreadCount = await AdminResponseService.getUnreadFeedbackCount();
+          setUnreadFeedbackCount(unreadCount);
+        }
         
         // Debug: Show current device ID
         const sessionInfo = AnalyticsService.getSessionInfo();
@@ -227,8 +260,8 @@ export const SettingsScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🔍 Debug Info</Text>
         <Text style={styles.debugText}>Admin Status: {isAdmin ? '✅ Admin' : '❌ Not Admin'}</Text>
-        <Text style={styles.debugText}>Device ID: {currentDeviceId || 'Loading...'}</Text>
-        <Text style={styles.debugText}>Analytics Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</Text>
+        {/* <Text style={styles.debugText}>Device ID: {currentDeviceId || 'Loading...'}</Text> */}
+        {/* <Text style={styles.debugText}>Analytics Initialized: {isInitialized ? '✅ Yes' : '❌ No'}</Text> */}
         <Text style={styles.debugText}>Expected Device ID: device_1761186342237_3wfem84rw</Text>
         
         {currentDeviceId && !isAdmin && (
@@ -243,8 +276,15 @@ export const SettingsScreen: React.FC = () => {
                   { 
                     text: 'Add', 
                     onPress: () => {
-                      // This would need to be added to the ADMIN_DEVICE_IDS array in FeedbackNotificationService.ts
-                      Alert.alert('Manual Step Required', `Add this device ID to ADMIN_DEVICE_IDS in FeedbackNotificationService.ts:\n\n'${currentDeviceId}'`);
+                      // Open email client with device ID
+                      const subject = encodeURIComponent('DEVICE_IDS');
+                      const body = encodeURIComponent(currentDeviceId);
+                      const mailtoUrl = `mailto:matt@dyor.com?subject=${subject}&body=${body}`;
+                      
+                      Linking.openURL(mailtoUrl).catch((err) => {
+                        console.error('Error opening email client:', err);
+                        Alert.alert('Error', 'Could not open email client. Please send an email to matt@dyor.com with subject "DEVICE_IDS" and body containing your device ID.');
+                      });
                     }
                   }
                 ]
@@ -263,9 +303,35 @@ export const SettingsScreen: React.FC = () => {
           
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => setShowAdminManager(true)}
+            onPress={async () => {
+              setShowAdminManager(true);
+              // Refresh unread count when opening
+              const count = await AdminResponseService.getUnreadFeedbackCount();
+              setUnreadFeedbackCount(count);
+            }}
           >
-            <Text style={styles.actionButtonText}>📝 Manage Feedback & Responses</Text>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonText}>📝 Manage Feedback & Responses</Text>
+              {unreadFeedbackCount > 0 && (
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>
+                    {unreadFeedbackCount > 99 ? '99+' : unreadFeedbackCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={async () => {
+              setShowReviewsManager(true);
+              // Refresh unread count when opening
+              const count = await AdminResponseService.getUnreadFeedbackCount();
+              setUnreadFeedbackCount(count);
+            }}
+          >
+            <Text style={styles.actionButtonText}>⭐ View Recent Reviews</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -346,7 +412,10 @@ export const SettingsScreen: React.FC = () => {
               return (
                 <View key={sparkId} style={styles.sparkCard}>
                   <View style={styles.sparkCardContent}>
-                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    <View style={styles.sparkIconContainer}>
+                      <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                      <NotificationBadge sparkId={sparkId} size="small" />
+                    </View>
                     <View style={styles.sparkInfo}>
                       <Text style={styles.sparkTitle}>{spark.metadata.title}</Text>
                       <Text style={styles.sparkDescription}>{spark.metadata.description}</Text>
@@ -405,7 +474,27 @@ export const SettingsScreen: React.FC = () => {
       {/* Admin Feedback Manager Modal */}
       <AdminFeedbackManager
         visible={showAdminManager}
-        onClose={() => setShowAdminManager(false)}
+        onClose={async () => {
+          setShowAdminManager(false);
+          // Refresh unread count when closing
+          if (isAdmin) {
+            const count = await AdminResponseService.getUnreadFeedbackCount();
+            setUnreadFeedbackCount(count);
+          }
+        }}
+      />
+      
+      {/* Admin Reviews Manager Modal */}
+      <AdminReviewsManager
+        visible={showReviewsManager}
+        onClose={async () => {
+          setShowReviewsManager(false);
+          // Refresh unread count when closing
+          if (isAdmin) {
+            const count = await AdminResponseService.getUnreadFeedbackCount();
+            setUnreadFeedbackCount(count);
+          }
+        }}
       />
       </SettingsScrollView>
     </View>
@@ -483,9 +572,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginVertical: 5,
   },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   actionButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  adminBadge: {
+    backgroundColor: colors.error || '#FF3B30',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
   },
   dangerButton: {
@@ -540,9 +649,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  sparkIconContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
   sparkIcon: {
     fontSize: 24,
-    marginRight: 12,
   },
   sparkInfo: {
     flex: 1,

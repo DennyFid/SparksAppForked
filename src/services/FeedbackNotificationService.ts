@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+
 // Dynamic import for expo-notifications to handle cases where it's not available
 let Notifications: any = null;
 let isNotificationsAvailable = false;
@@ -34,12 +35,35 @@ export class FeedbackNotificationService {
   private static readonly ADMIN_DEVICES_KEY = 'admin_devices';
   private static readonly NOTIFICATION_CHANNEL_ID = 'feedback-responses';
 
+  /**
+   * Get the persistent device ID from AsyncStorage
+   * This ID persists across app sessions and device restarts (until app is uninstalled)
+   * This is the most reliable way to get a consistent device identifier without login
+   */
+  static async getPersistentDeviceId(): Promise<string> {
+    try {
+      let deviceId = await AsyncStorage.getItem('analytics_device_id');
+      if (!deviceId) {
+        // If no device ID exists, create one (this should rarely happen)
+        deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await AsyncStorage.setItem('analytics_device_id', deviceId);
+        console.log('✅ Created new persistent device ID:', deviceId);
+      }
+      return deviceId;
+    } catch (error) {
+      console.error('Error getting persistent device ID:', error);
+      // Fallback to a session-based ID if AsyncStorage fails
+      return `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+  }
+
   // Admin device IDs - you can add your device IDs here
   private static readonly ADMIN_DEVICE_IDS = [
     'device_1761188124738_43laovhht', // Replace with your actual device ID
     'device_1761108969148_hwegb6ecb', // Add more if needed
     'device_1761438183470_ss39iv0t6',
-    'device_1761186342237_3wfem84rw' // Added current simulator device ID
+    'device_1761186342237_3wfem84rw', // Added current simulator device ID
+    'device_1761517171849_ux8n12sm7'
   ];
 
   /**
@@ -264,6 +288,7 @@ export class FeedbackNotificationService {
   static async getUnreadCount(deviceId: string, sparkId?: string): Promise<number> {
     try {
       const responses = await this.getPendingResponses(deviceId);
+      
       if (sparkId) {
         return responses.filter(r => r.sparkId === sparkId && !r.read).length;
       }

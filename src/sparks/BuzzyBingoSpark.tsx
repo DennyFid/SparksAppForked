@@ -660,6 +660,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
             <SettingsHeader
               title="Buzzy Bingo Settings"
               subtitle="Manage your word sets and game preferences"
+              sparkId="buzzy-bingo"
             />
             <SettingsFeedbackSection sparkName="Buzzy Bingo" sparkId="buzzy-bingo" />
 

@@ -304,6 +304,7 @@ const CardScoreSettings: React.FC<{
           title="CardScore Settings"
           subtitle="Manage your player sets"
           icon="♠️"
+          sparkId="card-score"
         />
 
         <SettingsFeedbackSection sparkName="CardScore" sparkId="card-score" />

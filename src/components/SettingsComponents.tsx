@@ -67,15 +67,22 @@ interface SettingsHeaderProps {
   title: string;
   subtitle: string;
   icon?: string;
+  sparkId?: string; // For showing Spark Message Count badge
 }
 
-export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ title, subtitle, icon }) => {
+export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ title, subtitle, icon, sparkId }) => {
   const { colors } = useTheme();
 
   const styles = StyleSheet.create({
     header: {
       alignItems: 'center',
       marginBottom: 30,
+    },
+    titleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
     },
     title: {
       fontSize: 28,
@@ -92,7 +99,14 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ title, subtitle,
 
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>{icon && `${icon} `}{title}</Text>
+      <View style={styles.titleContainer}>
+        <View style={{ position: 'relative' }}>
+          <Text style={styles.title}>{icon && `${icon} `}{title}</Text>
+          {sparkId && (
+            <NotificationBadge sparkId={sparkId} size="small" />
+          )}
+        </View>
+      </View>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );
@@ -689,16 +703,29 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
       refresh: loadUserFeedback,
     }), []);
 
-  // Mark responses as read when feedback is loaded
+  // Mark responses as read when feedback with responses is viewed
   useEffect(() => {
     const markResponsesAsRead = async () => {
       try {
-        const AnalyticsService = ServiceFactory.getAnalyticsService();
-        const sessionInfo = AnalyticsService.getSessionInfo();
-        const deviceId = sessionInfo.userId || 'anonymous';
+        // Use persistent device ID to ensure consistency
+        const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
         
-        // Mark all responses as read for this spark
-        await FeedbackNotificationService.markAllResponsesAsRead(deviceId, sparkId);
+        // Find all feedback items that have responses
+        const feedbacksWithResponses = userFeedbacks.filter(item => item.response && item.response.trim());
+        
+        if (feedbacksWithResponses.length > 0) {
+          // Mark all responses as read for this spark when user views them
+          // This will update the badge count immediately
+          await FeedbackNotificationService.markAllResponsesAsRead(deviceId, sparkId);
+          console.log('✅ Marked', feedbacksWithResponses.length, 'response(s) as read for spark:', sparkId);
+          
+          // Also mark individual feedback items as read if they have IDs
+          for (const feedback of feedbacksWithResponses) {
+            if (feedback.id) {
+              await FeedbackNotificationService.markResponseAsRead(deviceId, feedback.id);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error marking responses as read:', error);
       }
@@ -712,10 +739,8 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
   const loadUserFeedback = async () => {
     try {
       setIsLoading(true);
-      // Get device ID for this user
-      const AnalyticsService = ServiceFactory.getAnalyticsService();
-      const sessionInfo = AnalyticsService.getSessionInfo();
-      const deviceId = sessionInfo.userId || 'anonymous';
+      // Use persistent device ID to ensure consistency
+      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
       console.log('🔍 Loading feedback for deviceId:', deviceId, 'sparkId:', sparkId);
       
       // Ensure Firebase is initialized before trying to get feedback
@@ -756,7 +781,9 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
         }
       }
       
-      const deviceId = sessionInfo.userId || 'anonymous';
+      // Use persistent device ID to ensure consistency
+      const FeedbackNotificationService = (await import('../services/FeedbackNotificationService')).FeedbackNotificationService;
+      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
       console.log('📝 Submitting feedback for user:', deviceId);
       
       // Submit feedback only (rating is handled separately)
@@ -810,29 +837,21 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
       
       const AnalyticsService = ServiceFactory.getAnalyticsService();
       const FirebaseService = ServiceFactory.getFirebaseService();
-      const sessionInfo = AnalyticsService.getSessionInfo();
-      if (!sessionInfo.isInitialized || !sessionInfo.userId) {
-        console.log('⚠️ Analytics not initialized, attempting to initialize...');
-        try {
-          await AnalyticsService.initialize();
-          console.log('✅ Analytics initialized for rating submission');
-        } catch (error) {
-          console.error('❌ Failed to initialize analytics:', error);
-          Alert.alert('Error', 'Failed to initialize analytics. Please try again.');
-          return;
-        }
-      }
       
-      const deviceId = sessionInfo.userId || 'anonymous';
+      // Use persistent device ID to ensure consistency
+      const FeedbackNotificationService = (await import('../services/FeedbackNotificationService')).FeedbackNotificationService;
+      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
       console.log('⭐ Submitting rating for user:', deviceId);
       
       // Submit rating only
+      const AnalyticsService = ServiceFactory.getAnalyticsService();
+      const sessionInfo = AnalyticsService.getSessionInfo();
       await FeedbackService.submitFeedback({
         userId: deviceId,
         sparkId,
         sparkName,
         rating,
-        sessionId: sessionInfo.sessionId,
+        sessionId: sessionInfo.sessionId || deviceId,
         platform: 'ios' as 'ios' | 'android' | 'web',
       });
       

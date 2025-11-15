@@ -198,6 +198,7 @@ const SoundboardSettings: React.FC<{
           title="Soundboard Settings"
           subtitle="Manage your sound collection"
           icon="🎛️"
+          sparkId="soundboard"
         />
 
         <SettingsSection title={`Your Sounds (${editingSoundChips.length})`}>

@@ -497,6 +497,25 @@ export class WebFirebaseService {
     }
   }
 
+  static async markFeedbackAsViewedByAdmin(feedbackId: string): Promise<void> {
+    if (!this._initialized || !this.db) {
+      throw new Error('Firebase not initialized');
+    }
+    
+    try {
+      const feedbackRef = doc(this.db, 'feedback', feedbackId);
+      await updateDoc(feedbackRef, {
+        viewedByAdmin: true,
+        viewedByAdminAt: new Date()
+      });
+      
+      console.log('✅ Feedback marked as viewed by admin');
+    } catch (error) {
+      console.error('Error marking feedback as viewed by admin:', error);
+      throw error;
+    }
+  }
+
   // Legacy method - not used anymore since we store response directly in feedback document
   static async addFeedbackResponse(feedbackId: string, response: { adminId: string; text: string }): Promise<string> {
     // This method is no longer used - responses are stored directly in the feedback document

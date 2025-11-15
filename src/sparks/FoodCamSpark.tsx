@@ -65,6 +65,7 @@ const FoodCamSettings: React.FC<{
           title="FoodCam Settings"
           subtitle="Manage your visual food diary preferences"
           icon="📸"
+          sparkId="foodcam"
         />
 
         <SettingsFeedbackSection sparkName="FoodCam" sparkId="foodcam" />
