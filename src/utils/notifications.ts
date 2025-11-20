@@ -344,7 +344,22 @@ export class NotificationService {
     try {
       const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
       const activityNotifications = scheduledNotifications.filter(
-        (notification: any) => notification.content.data?.type === 'activity-start'
+        (notification: any) => {
+          // Check for old activity-start type
+          if (notification.content.data?.type === 'activity-start') {
+            return true;
+          }
+          // Check for new spark-notification type with activity identifiers
+          if (notification.content.data?.type === 'spark-notification') {
+            const identifier = notification.identifier || '';
+            const sparkId = notification.content.data?.sparkId || '';
+            // Cancel if identifier starts with 'activity-' or sparkId is tee-time-timer/minute-minder
+            return identifier.startsWith('activity-') || 
+                   sparkId === 'tee-time-timer' || 
+                   sparkId === 'minute-minder';
+          }
+          return false;
+        }
       );
       
       for (const notification of activityNotifications) {

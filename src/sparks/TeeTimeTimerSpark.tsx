@@ -721,8 +721,13 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     completedActivities: new Set(),
   });
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedTime, setSelectedTime] = useState(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(true);
+  // Initialize with default time (current time + total duration + 5 minutes)
+  const [selectedTime, setSelectedTime] = useState(() => {
+    const now = new Date();
+    const totalDuration = defaultActivities.reduce((sum, a) => sum + a.duration, 0);
+    return new Date(now.getTime() + (totalDuration + 5) * 60 * 1000);
+  });
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -978,9 +983,6 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     }
   };
 
-  const handleCancelTimePicker = () => {
-    setShowTimePicker(false);
-  };
 
   const startTimer = async (teeTime: Date, startTime: Date) => {
     setTimerState({
@@ -1002,20 +1004,17 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     await NotificationService.cancelAllActivityNotifications();
     
     const now = new Date();
+    const futureActivities: Array<{ name: string; id: string; startTime: Date }> = [];
+    const pastActivities: Array<{ name: string; id: string; startTime: Date }> = [];
     
-    // Schedule notification for tee time itself
+    // Check tee time itself
     if (teeTime.getTime() > now.getTime()) {
-      await NotificationService.scheduleActivityNotification(
-        'Tee Time!',
-        teeTime,
-        'tee-time',
-        'Tee Time Timer',
-        'tee-time-timer',
-        '⛳'
-      );
+      futureActivities.push({ name: 'Tee Time!', id: 'tee-time', startTime: teeTime });
+    } else {
+      pastActivities.push({ name: 'Tee Time!', id: 'tee-time', startTime: teeTime });
     }
     
-    // Schedule notifications for each activity at its START time
+    // Categorize activities as future or past
     for (let i = 0; i < activities.length; i++) {
       const activity = activities[i];
       
@@ -1027,19 +1026,51 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       // Create a new Date object for the activity start time
       const activityStartTime = new Date(startTime.getTime() + minutesFromStart * 60 * 1000);
       
-      // Only schedule if the activity is in the future
       if (activityStartTime.getTime() > now.getTime()) {
-        // Ensure we pass a proper Date object
-        const futureDate = new Date(activityStartTime);
-        await NotificationService.scheduleActivityNotification(
-          activity.name,
-          futureDate,
-          activity.id,
-          'Tee Time Timer',
-          'tee-time-timer',
-          '⛳'
-        );
+        futureActivities.push({ name: activity.name, id: activity.id, startTime: activityStartTime });
+      } else {
+        pastActivities.push({ name: activity.name, id: activity.id, startTime: activityStartTime });
       }
+    }
+    
+    // If all activities are past, ask user if they want to schedule for tomorrow
+    if (futureActivities.length === 0 && pastActivities.length > 0) {
+      Alert.alert(
+        'All Activities Past',
+        'All activities have already started. Would you like to schedule reminders for tomorrow?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Schedule for Tomorrow', onPress: async () => {
+            // Schedule all activities for tomorrow
+            for (const activity of pastActivities) {
+              const tomorrowDate = new Date(activity.startTime);
+              tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+              
+              await NotificationService.scheduleActivityNotification(
+                activity.name,
+                tomorrowDate,
+                activity.id,
+                'Tee Time Timer',
+                'tee-time-timer',
+                '⛳'
+              );
+            }
+          }}
+        ]
+      );
+      return;
+    }
+    
+    // Schedule notifications for future activities (today)
+    for (const activity of futureActivities) {
+      await NotificationService.scheduleActivityNotification(
+        activity.name,
+        activity.startTime,
+        activity.id,
+        'Tee Time Timer',
+        'tee-time-timer',
+        '⛳'
+      );
     }
   };
 
@@ -1142,21 +1173,57 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     },
     timePickerContainer: {
       backgroundColor: colors.surface,
-      borderRadius: 20,
-      padding: 20,
-      margin: 20,
+      borderRadius: 24,
+      padding: 28,
       alignItems: 'center',
+      marginHorizontal: 20,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
       elevation: 4,
+      borderWidth: 1,
+      borderColor: colors.border + '40',
     },
     timePickerTitle: {
       fontSize: 20,
       fontWeight: '600',
       color: colors.text,
-      marginBottom: 20,
+      marginBottom: 24,
+      letterSpacing: 0.3,
+    },
+    timePickerWrapper: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 24,
+      width: '100%',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border + '60',
+    },
+    timePicker: {
+      width: '100%',
+    },
+    startButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 18,
+      paddingHorizontal: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    startButtonText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '700',
+      letterSpacing: 0.5,
     },
     timePickerButtons: {
       flexDirection: 'row',
@@ -1166,26 +1233,54 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     },
     setupCard: {
       backgroundColor: colors.surface,
-      borderRadius: 20,
-      padding: 40,
+      borderRadius: 24,
+      padding: 32,
       alignItems: 'center',
-      marginBottom: 30,
+      marginBottom: 24,
+      marginHorizontal: 20,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
       elevation: 4,
+      borderWidth: 1,
+      borderColor: colors.border + '40',
     },
     setupText: {
-      fontSize: 18,
+      fontSize: 22,
+      fontWeight: '600',
       color: colors.text,
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: 24,
     },
-    totalTimeText: {
-      fontSize: 16,
+    statsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+    },
+    statItem: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    statValue: {
+      fontSize: 32,
+      fontWeight: '700',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 14,
       color: colors.textSecondary,
-      textAlign: 'center',
+      fontWeight: '500',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    statDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: colors.border,
+      marginHorizontal: 24,
     },
     buttonContainer: {
       flexDirection: 'row',
@@ -1289,49 +1384,38 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
         <View style={styles.setupContainer}>
           <View style={styles.setupCard}>
             <Text style={styles.setupText}>Ready to prepare for your round?</Text>
-            <Text style={styles.totalTimeText}>
-              {activities.length} activities • {totalDuration} minutes total
-            </Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{activities.length}</Text>
+                <Text style={styles.statLabel}>activities</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{totalDuration}</Text>
+                <Text style={styles.statLabel}>minutes</Text>
+              </View>
+            </View>
           </View>
-
-          {!showTimePicker && (
-            <TouchableOpacity
-              style={styles.setTeeTimeButton}
-              onPress={() => {
-                // Set default time to current time + total duration
-                const now = new Date();
-                const defaultTime = new Date(now.getTime() + totalDuration * 60 * 1000);
-                setSelectedTime(defaultTime);
-                setShowTimePicker(true);
-              }}
-            >
-              <Text style={styles.primaryButtonText}>Set Tee Time</Text>
-            </TouchableOpacity>
-          )}
 
           {showTimePicker && (
             <View style={styles.timePickerContainer}>
               <Text style={styles.timePickerTitle}>Select Tee Time</Text>
-              <DateTimePicker
-                value={selectedTime}
-                mode="time"
-                display="default"
-                onChange={handleTimePickerChange}
-              />
-              <View style={styles.timePickerButtons}>
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={handleCancelTimePicker}
-                >
-                  <Text style={styles.secondaryButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
-                  onPress={handleConfirmTeeTime}
-                >
-                  <Text style={styles.primaryButtonText}>Start</Text>
-                </TouchableOpacity>
+              <View style={styles.timePickerWrapper}>
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display="default"
+                  onChange={handleTimePickerChange}
+                  style={styles.timePicker}
+                />
               </View>
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleConfirmTeeTime}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.startButtonText}>Start Timer</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>

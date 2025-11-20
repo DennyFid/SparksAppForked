@@ -376,9 +376,9 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     const now = new Date();
     const completedActivities = new Set<number>();
     const futureActivities: Array<{ index: number; startDate: Date }> = [];
-    const pastActivities: Array<{ index: number; startDate: Date }> = [];
+    const activitiesForTomorrow: Array<{ index: number; startDate: Date }> = [];
     
-    // First pass: categorize activities as future (today) or past
+    // First pass: categorize activities as future (today) or candidates for tomorrow
     parsedActivities.forEach((activity, index) => {
       const [hours, minutes] = activity.startTime.split(':').map(Number);
       const activityStartDate = new Date();
@@ -389,17 +389,31 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       // If the activity end time has already passed, mark as completed
       if (now.getTime() >= activityEndDate.getTime()) {
         completedActivities.add(index);
+        // Check if this activity could still be scheduled for tomorrow
+        const tomorrowStartDate = new Date(activityStartDate);
+        tomorrowStartDate.setDate(tomorrowStartDate.getDate() + 1);
+        const tomorrowEndDate = new Date(tomorrowStartDate.getTime() + activity.duration * 60 * 1000);
+        // Only add to tomorrow list if it hasn't ended even tomorrow
+        if (now.getTime() < tomorrowEndDate.getTime()) {
+          activitiesForTomorrow.push({ index, startDate: tomorrowStartDate });
+        }
       } else if (activityStartDate.getTime() > now.getTime()) {
         // Activity is in the future today
         futureActivities.push({ index, startDate: activityStartDate });
       } else {
-        // Activity start time has passed today
-        pastActivities.push({ index, startDate: activityStartDate });
+        // Activity start time has passed today but hasn't ended yet
+        // Check if it could be scheduled for tomorrow
+        const tomorrowStartDate = new Date(activityStartDate);
+        tomorrowStartDate.setDate(tomorrowStartDate.getDate() + 1);
+        const tomorrowEndDate = new Date(tomorrowStartDate.getTime() + activity.duration * 60 * 1000);
+        if (now.getTime() < tomorrowEndDate.getTime()) {
+          activitiesForTomorrow.push({ index, startDate: tomorrowStartDate });
+        }
       }
     });
     
-    // If all activities are past, ask user if they want to schedule for tomorrow
-    if (futureActivities.length === 0 && pastActivities.length > 0) {
+    // If no future activities remain today, but there are activities that could be scheduled for tomorrow
+    if (futureActivities.length === 0 && activitiesForTomorrow.length > 0) {
       Alert.alert(
         'All Activities Past',
         'All activities have already started today. Would you like to schedule reminders for tomorrow?',
@@ -414,26 +428,18 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
             HapticFeedback.success();
           }},
           { text: 'Schedule for Tomorrow', onPress: async () => {
-            // Schedule all past activities for tomorrow
-            for (const { index, startDate } of pastActivities) {
-              const tomorrowDate = new Date(startDate);
-              tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-              
-              const activityEndDate = new Date(tomorrowDate.getTime() + parsedActivities[index].duration * 60 * 1000);
-              
-              // Only schedule if the activity hasn't ended even tomorrow
-              if (now.getTime() < activityEndDate.getTime()) {
-                NotificationService.scheduleActivityNotification(
-                  parsedActivities[index].name,
-                  tomorrowDate,
-                  `minute-minder-${index}`,
-                  'Minute Minder',
-                  'minute-minder',
-                  '⏳'
-                ).catch(error => {
-                  console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
-                });
-              }
+            // Schedule all activities for tomorrow
+            for (const { index, startDate } of activitiesForTomorrow) {
+              NotificationService.scheduleActivityNotification(
+                parsedActivities[index].name,
+                startDate,
+                `minute-minder-${index}`,
+                'Minute Minder',
+                'minute-minder',
+                '⏳'
+              ).catch(error => {
+                console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
+              });
             }
             
             setTimerState({
@@ -487,13 +493,86 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     HapticFeedback.medium();
   };
 
-  const handleSaveActivities = () => {
+  const handleSaveActivities = async () => {
     const parsed = parseActivities(activitiesText);
     if (parsed.length === 0) {
       Alert.alert('Invalid Format', 'Please use the format: HH:MM, duration, Activity Name');
       return;
     }
     setIsEditing(false);
+    
+    // If timer is active, reschedule notifications
+    if (timerState.isActive) {
+      await NotificationService.cancelAllActivityNotifications();
+      
+      const now = new Date();
+      const futureActivities: Array<{ index: number; startDate: Date }> = [];
+      const activitiesForTomorrow: Array<{ index: number; startDate: Date }> = [];
+      
+      // Categorize activities as future (today) or candidates for tomorrow
+      parsed.forEach((activity, index) => {
+        const [hours, minutes] = activity.startTime.split(':').map(Number);
+        const activityStartDate = new Date();
+        activityStartDate.setHours(hours, minutes, 0, 0);
+        
+        const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
+        
+        if (activityStartDate.getTime() > now.getTime()) {
+          // Activity is in the future today
+          futureActivities.push({ index, startDate: activityStartDate });
+        } else {
+          // Activity has started or ended today - check if it could be scheduled for tomorrow
+          const tomorrowStartDate = new Date(activityStartDate);
+          tomorrowStartDate.setDate(tomorrowStartDate.getDate() + 1);
+          const tomorrowEndDate = new Date(tomorrowStartDate.getTime() + activity.duration * 60 * 1000);
+          // Only add to tomorrow list if it hasn't ended even tomorrow
+          if (now.getTime() < tomorrowEndDate.getTime()) {
+            activitiesForTomorrow.push({ index, startDate: tomorrowStartDate });
+          }
+        }
+      });
+      
+      // If no future activities remain today, but there are activities that could be scheduled for tomorrow
+      if (futureActivities.length === 0 && activitiesForTomorrow.length > 0) {
+        Alert.alert(
+          'All Activities Past',
+          'All activities have already started today. Would you like to schedule reminders for tomorrow?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Schedule for Tomorrow', onPress: async () => {
+              // Schedule all activities for tomorrow
+              for (const { index, startDate } of activitiesForTomorrow) {
+                NotificationService.scheduleActivityNotification(
+                  parsed[index].name,
+                  startDate,
+                  `minute-minder-${index}`,
+                  'Minute Minder',
+                  'minute-minder',
+                  '⏳'
+                ).catch(error => {
+                  console.error(`Error scheduling notification for ${parsed[index].name}:`, error);
+                });
+              }
+            }}
+          ]
+        );
+      } else {
+        // Schedule notifications for future activities (today)
+        for (const { index, startDate } of futureActivities) {
+          NotificationService.scheduleActivityNotification(
+            parsed[index].name,
+            startDate,
+            `minute-minder-${index}`,
+            'Minute Minder',
+            'minute-minder',
+            '⏳'
+          ).catch(error => {
+            console.error(`Error scheduling notification for ${parsed[index].name}:`, error);
+          });
+        }
+      }
+    }
+    
     HapticFeedback.success();
   };
 
