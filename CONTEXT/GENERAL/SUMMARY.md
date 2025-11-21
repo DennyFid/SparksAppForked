@@ -1,0 +1,84 @@
+# Sparks App - Available Sparks
+
+Sparks is a collection of 19 unique, purpose-built mini-apps designed to make your daily life easier, more productive, and more fun. Each Spark is a focused tool that does one thing exceptionally well.
+
+## 🎯 Productivity
+
+### 📝 Todo List
+Organize tasks with due dates and completion tracking. Simple, effective task management at your fingertips.
+
+### 🎒 Packing List
+Never forget essentials again. Organize and track your travel or trip packing items with ease.
+
+### ⏳ Minute Minder
+Track your daily activities with start times and countdown timers. Perfect for managing your daily routine and staying on schedule.
+
+## 🌍 Travel
+
+### ✈️ TripStory
+Plan, remember, and share your trips with photos—lots and lots of photos. Create beautiful visual stories of your adventures.
+
+## 🍽️ Food
+
+### 📸 FoodCam
+Visual food diary with photo timeline and camera integration. Document your culinary journey one meal at a time.
+
+## 🎓 Education
+
+### 🃏 Spanish Flashcards
+Study with interactive flip cards and progress tracking. Master Spanish vocabulary through spaced repetition.
+
+### 🇪🇸 Amigo
+Practice Spanish conversation with Ana and Miguel. Interactive language practice that feels like chatting with friends.
+
+### 📖 Spanish Reader
+Learn to read Spanish with interleaved English and Spanish text from "To Build a Fire". Build reading comprehension naturally.
+
+## ⛳ Golf
+
+### 🏌️‍♂️ Golf Brain
+Track golf rounds with detailed shot analysis and course management. Improve your game with data-driven insights.
+
+### ⛳ Tee Time Timer
+Nail your golf prep routine. Never rush to the first tee again with perfectly timed warm-up reminders.
+
+## 🎮 Games
+
+### 💼 Business Simulator
+Run your own virtual company with strategic decisions. Build your empire and test your business acumen.
+
+### 🎯 Buzzy Bingo
+Buzzword bingo game - mark squares as you hear tech terms. Perfect for meetings and conferences.
+
+## 🎵 Media
+
+### 👁️ Toview
+Track movies, books, and shows you want to watch. Keep a running list with view dates so you never lose track of recommendations.
+
+### 🎬 Short Saver
+Save and organize your favorite YouTube videos. Build your personal collection of must-watch content.
+
+### 🎛️ Sound Board
+Record and play custom sound clips with categories. Create your own audio library for any occasion.
+
+## 🛠️ Utilities
+
+### 🎡 Decision Spinner
+Make decisions with a customizable spinning wheel. Let fate decide when you can't.
+
+### 💱 Quick Convert
+Currency conversion tool with configurable exchange rates and denominations. Essential for travelers and international shoppers.
+
+### ♠️ CardScore
+Fast, simple scorekeeping for card games. Focus on playing, not on mental math.
+
+## 🧙‍♂️ Community
+
+### 🧙‍♂️ Spark Wizard
+Submit your own Spark idea and become a product manager. Help shape the future of Sparks by sharing your ideas.
+
+---
+
+**Total Sparks:** 19 unique mini-apps  
+**Categories:** Productivity, Travel, Food, Education, Golf, Games, Media, Utilities, Community  
+**All Sparks:** Available now and ready to make your life...just a little bit better⚡️

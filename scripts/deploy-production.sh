@@ -84,10 +84,11 @@ echo ""
 
 echo -e "${BLUE}🍎 App Store Connect:${NC}"
 echo "1. Go to: https://appstoreconnect.apple.com/apps/6752919846/distribution/info"
+https://appstoreconnect.apple.com/apps/6752919846/distribution/ios/version/deliverable
 echo "2. Wait for build to appear in TestFlight (usually 5-15 minutes)"
 echo "3. Once processed, go to 'App Store' tab"
-echo "4. Click: '+ Version or Platform'"
-echo "5. Select the new build (version ${CURRENT_VERSION})"
+echo "4. Click: '+' Next to iOS App"
+echo "5. Select the new build (version ${CURRENT_VERSION}) about halfway down the page"
 echo "6. Add 'What's New' release notes"
 echo "7. Click: 'Save' then 'Submit for Review'"
 echo ""

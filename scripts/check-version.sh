@@ -9,6 +9,15 @@ echo ""
 APP_JSON_VERSION=$(node -e "console.log(require('./app.json').expo.version)")
 echo "✓ app.json version: $APP_JSON_VERSION"
 
+# Check if using managed workflow (no ios/android folders)
+if [ ! -d "ios" ] && [ ! -d "android" ]; then
+  echo "ℹ️  Using managed workflow (EAS will generate native code)"
+  echo ""
+  echo "✅ Version: $APP_JSON_VERSION"
+  echo "   Ready to build!"
+  exit 0
+fi
+
 # Check iOS Info.plist if it exists
 if [ -f "ios/Sparks/Info.plist" ]; then
   IOS_VERSION=$(grep -A 1 "CFBundleShortVersionString" ios/Sparks/Info.plist | grep "string" | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
@@ -25,7 +34,7 @@ if [ -f "ios/Sparks/Info.plist" ]; then
     exit 1
   fi
 else
-  echo "ℹ️  iOS folder not found (this is normal for managed workflow)"
+  echo "ℹ️  iOS folder not found"
 fi
 
 # Check Android build.gradle if it exists
@@ -44,7 +53,7 @@ if [ -f "android/app/build.gradle" ]; then
     exit 1
   fi
 else
-  echo "ℹ️  Android folder not found (this is normal for managed workflow)"
+  echo "ℹ️  Android folder not found"
 fi
 
 echo ""

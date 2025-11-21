@@ -21,7 +21,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
   const { getUserSparks } = useSparkStore();
   const { colors } = useTheme();
   const userSparkIds = getUserSparks();
-  
+
   // Filter to only show user's sparks
   const userSparks = userSparkIds.map(sparkId => getSparkById(sparkId)).filter(Boolean);
 
@@ -127,13 +127,13 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.title}>My Sparks</Text>
         <Text style={styles.subtitle}>
-          {userSparks.length === 0 
-            ? 'No sparks yet - discover some in the marketplace!' 
+          {userSparks.length === 0
+            ? 'No sparks yet - discover some in the marketplace!'
             : `${userSparks.length} spark${userSparks.length !== 1 ? 's' : ''} in your collection`
           }
         </Text>
       </View>
-      
+
       {userSparks.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>✨</Text>
@@ -155,20 +155,13 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.grid}>
             {userSparks.map((spark, index) => {
               if (!spark) return null;
-              
+
               return (
                 <TouchableOpacity
                   key={spark.metadata.id}
-                  style={[
-                    styles.sparkCard,
-                    { 
-                      opacity: spark.metadata.available ? 1 : 0.6,
-                    }
-                  ]}
+                  style={styles.sparkCard}
                   onPress={() => {
-                    if (spark.metadata.available) {
-                      navigation.navigate('Spark', { sparkId: spark.metadata.id });
-                    }
+                    navigation.navigate('Spark', { sparkId: spark.metadata.id });
                   }}
                 >
                   <View style={styles.sparkCardContent}>
@@ -177,7 +170,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
                       <NotificationBadge sparkId={spark.metadata.id} size="small" />
                     </View>
                     <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
-                    <PendingResponseNotification 
+                    <PendingResponseNotification
                       sparkId={spark.metadata.id}
                       onPress={() => {
                         // Navigate to settings page for this spark

@@ -16,10 +16,19 @@ interface Props {
 export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   const allSparks = getAllSparks();
   const { colors } = useTheme();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const handleSparkPress = (sparkId: string) => {
     navigation.navigate('Spark', { sparkId });
   };
+
+  const handleCategoryPress = (category: string) => {
+    // Toggle: if same category is clicked, clear filter; otherwise set new filter
+    setSelectedCategory(prev => prev === category ? null : category);
+  };
+
+  // Get unique categories from all sparks
+  const categories = Array.from(new Set(allSparks.map(spark => spark.metadata.category)));
 
   // Get new sparks (3 most recently created)
   const newSparks = allSparks
@@ -31,28 +40,29 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     .sort((a, b) => b.metadata.rating - a.metadata.rating)
     .slice(0, 3);
 
-  // Get all sparks alphabetically
+  // Get all sparks alphabetically, filtered by category if selected
   const allSparksAlphabetical = allSparks
+    .filter(spark => !selectedCategory || spark.metadata.category === selectedCategory)
     .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
 
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasPartialStar = rating % 1 !== 0;
-    
+
     // Full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
         <Text key={`full-${i}`} style={styles.star}>⭐</Text>
       );
     }
-    
+
     // Partial star
     if (hasPartialStar) {
       const partialPercentage = (rating % 1) * 100;
       stars.push(
         <View key="partial" style={styles.partialStarContainer}>
-          <View style={[styles.partialStarBackground, { width: `${100 - partialPercentage}%` }]}>
+          <View style={[styles.partialStarBackground, { width: `${100 - partialPercentage}%` }>
             <Text style={styles.starGray}>⭐</Text>
           </View>
           <View style={styles.partialStarForeground}>
@@ -61,7 +71,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       );
     }
-    
+
     // Empty stars
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
@@ -69,7 +79,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
         <Text key={`empty-${i}`} style={styles.starGray}>⭐</Text>
       );
     }
-    
+
     return stars;
   };
 
@@ -226,6 +236,36 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     partialStarForeground: {
       position: 'relative',
     },
+    categoryPillsContainer: {
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      backgroundColor: colors.background,
+    },
+    categoryPillsScrollView: {
+      flexDirection: 'row',
+    },
+    categoryPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      marginRight: 8,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryPillActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    categoryPillText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+      textTransform: 'capitalize',
+    },
+    categoryPillTextActive: {
+      color: colors.background,
+    },
   });
 
   return (
@@ -234,7 +274,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.title}>Discover Sparks</Text>
         <Text style={styles.subtitle}>Explore new experiences</Text>
       </View>
-      
+
       <ScrollView>
         {/* New Sparks Section */}
         <View style={styles.sectionHeader}>
@@ -245,10 +285,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
             return (
               <TouchableOpacity
                 key={spark.metadata.id}
-                style={[
-                  styles.sparkCard,
-                  { opacity: spark.metadata.available ? 1 : 0.6 }
-                ]}
+                style={styles.sparkCard}
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContent}>
@@ -273,9 +310,6 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 key={spark.metadata.id}
                 style={[
-                  styles.sparkCard,
-                  { opacity: spark.metadata.available ? 1 : 0.6 }
-                ]}
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContentWithRating}>
@@ -296,6 +330,31 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
           })}
         </View>
 
+        {/* Category Filter Pills */}
+        <View style={styles.categoryPillsContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryPillsScrollView}
+          >
+            {categories.sort().map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryPill,
+                  selectedCategory === category && styles.categoryPillActive
+                onPress={() => handleCategoryPress(category)}
+              >
+                <Text style={[
+                  styles.categoryPillText,
+                  selectedCategory === category && styles.categoryPillTextActive>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* All Sparks Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>All Sparks</Text>
@@ -306,9 +365,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 key={spark.metadata.id}
                 style={[
-                  styles.sparkCard,
-                  { opacity: spark.metadata.available ? 1 : 0.6 }
-                ]}
+                  styles.sparkCard
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContent}>
