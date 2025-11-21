@@ -2,12 +2,27 @@
 
 ## Quick Deployment Workflow
 
-**IMPORTANT: Always increment version before building!**
+**The Easy Way - Automated Script:**
 
 ```bash
-# 1. Update version in app.json (e.g., 1.0.1 → 1.0.2)
-# 2. Build and submit in one command:
-npx eas build --platform all --profile production --auto-submit
+# 1. Update version in app.json (e.g., 1.0.2 → 1.0.3)
+# 2. Run the deployment script:
+npm run deploy:production
+
+# Or directly:
+./scripts/deploy-production.sh
+```
+
+**What the script does:**
+1. ✅ Checks version consistency across all files
+2. ✅ Auto-fixes any version mismatches with `expo prebuild`
+3. ✅ Confirms deployment with you
+4. ✅ Builds and submits to both app stores
+5. ✅ Shows you the manual steps for Google Play and App Store
+
+**Manual verification only:**
+```bash
+npm run check:version
 ```
 
 ## Pre-Deployment Checklist
@@ -320,3 +335,29 @@ npx eas submit --platform android
 
 **What's Next:**
 Future updates may include additional micro-experiences, social features, and enhanced customization options.
+
+---
+
+## Quick Reference Card
+
+### Production Deployment (Most Common)
+```bash
+# 1. Update version in app.json
+# 2. Run deployment script
+npm run deploy:production
+```
+
+### Check Version Consistency
+```bash
+npm run check:version
+```
+
+### Important URLs
+- **EAS Builds**: https://expo.dev/accounts/mattdyor/projects/sparks-app/builds
+- **Google Play Console**: https://play.google.com/console/u/0/developers/7574537990443980441/app/4974480089571997239/tracks/production
+- **App Store Connect**: https://appstoreconnect.apple.com/apps/6752919846/distribution/info
+
+### Version Numbering
+- **Patch** (bug fixes): 1.0.0 → 1.0.1
+- **Minor** (new features): 1.0.1 → 1.1.0
+- **Major** (breaking changes): 1.1.0 → 2.0.0

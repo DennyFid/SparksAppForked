@@ -13,7 +13,9 @@
     "build:all": "npx eas-cli build --platform all --profile production",
     "submit:ios": "npx eas-cli submit --platform ios",
     "submit:android": "npx eas-cli submit --platform android",
-    "deploy:web": "expo export --platform web"
+    "deploy:web": "expo export --platform web",
+    "deploy:production": "./scripts/deploy-production.sh",
+    "check:version": "./scripts/check-version.sh"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -46,7 +48,7 @@
     "firebase": "^12.4.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-native": "0.81.4",
+    "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
