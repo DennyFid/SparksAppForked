@@ -68,7 +68,7 @@ const Dropdown: React.FC<{
         <Text style={textStyle}>{selectedValue || placeholder}</Text>
         <Text style={[textStyle, { fontSize: 12 }]}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
-      
+
       {isOpen && shouldUseModal ? (
         <Modal
           visible={isOpen}
@@ -127,7 +127,7 @@ const Dropdown: React.FC<{
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[textStyle, { 
+                    <Text style={[textStyle, {
                       color: selectedValue === option ? '#007AFF' : '#333',
                       fontWeight: selectedValue === option ? '600' : '400'
                     }]}>
@@ -171,7 +171,7 @@ const Dropdown: React.FC<{
               }}
               activeOpacity={0.7}
             >
-              <Text style={[textStyle, { 
+              <Text style={[textStyle, {
                 color: selectedValue === option ? '#007AFF' : '#333',
                 fontWeight: selectedValue === option ? '600' : '400'
               }]}>
@@ -229,7 +229,7 @@ const ToviewSettings: React.FC<{
 
   const addProvider = () => {
     if (!newProvider.trim() || settings.providers.includes(newProvider.trim())) return;
-    
+
     const updatedProviders = [...settings.providers, newProvider.trim()];
     const newSettings = { ...settings, providers: updatedProviders };
     setSettings(newSettings);
@@ -280,7 +280,7 @@ const ToviewSettings: React.FC<{
           <SettingsText>
             Manage which streaming services appear in the provider dropdown.
           </SettingsText>
-          
+
           {settings.providers.length > 0 && (
             <>
               {settings.providers.map((provider) => (
@@ -391,7 +391,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         setToviews(defaultToviews);
         await saveData(defaultToviews);
       }
-      
+
       // Load settings
       if (data && data.settings) {
         setSettings(data.settings);
@@ -432,7 +432,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
     if (categoryMatch) {
       const watchWithMatch = categoryMatch[3];
       const watchWith = watchWithMatch ? watchWithMatch.split(',').map(name => name.trim()) : undefined;
-      
+
       return {
         category: categoryMatch[1].trim(),
         displayText: categoryMatch[2].trim(),
@@ -559,7 +559,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
     const { category, displayText, watchWith } = parseToviewText(editingText);
     const watchWithArray = editingWatchWith.trim() ? editingWatchWith.split(',').map(name => name.trim()) : undefined;
-    
+
     const updatedToviews = toviews.map(toview => {
       if (toview.id === editingItem.id) {
         return {
@@ -607,7 +607,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategoryIcon = (category?: string) => {
     if (!category) return '👁️';
-    
+
     const lowerCategory = category.toLowerCase();
     switch (lowerCategory) {
       case 'movie': return '📽️';
@@ -626,7 +626,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategoryColor = (category?: string) => {
     if (!category) return colors.primary;
-    
+
     const lowerCategory = category.toLowerCase();
     switch (lowerCategory) {
       case 'movie': return '#FF6B6B';
@@ -651,10 +651,10 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
       // Check if it's a person filter (starts with @)
       if (filterCategory.startsWith('@')) {
         const personName = filterCategory.substring(1);
-        filtered = filtered.filter(toview => 
+        filtered = filtered.filter(toview =>
           toview.watchWith && toview.watchWith.includes(personName)
         );
-      } 
+      }
       // Otherwise it's a category filter
       else {
         filtered = filtered.filter(toview => toview.category === filterCategory);
@@ -676,7 +676,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategories = () => {
     const categories = new Set(toviews.map(toview => toview.category).filter(Boolean));
-    
+
     // Also include categories from the current input text
     if (newToviewText.trim()) {
       const { category } = parseToviewText(newToviewText);
@@ -684,7 +684,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         categories.add(category);
       }
     }
-    
+
     return Array.from(categories).sort();
   };
 
@@ -711,7 +711,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   const people = getPeople();
 
   if (showSettings) {
-    return <ToviewSettings onClose={onCloseSettings || (() => {})} />;
+    return <ToviewSettings onClose={onCloseSettings || (() => { })} />;
   }
 
   return (
@@ -781,7 +781,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
                 { backgroundColor: filterCategory === category ? colors.primary : colors.background, borderColor: colors.border }
               ]}
               onPress={() => {
-                setFilterCategory(category);
+                setFilterCategory(category ?? null);
                 setNewToviewText(`${category}: `);
                 textInputRef.current?.focus();
               }}
@@ -888,7 +888,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
                   </View>
                 </View>
               </TouchableOpacity>
-              
+
               {/* Edit button removed - use long tap instead */}
             </View>
           ))
@@ -905,7 +905,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Toview</Text>
-            
+
             <TextInput
               style={[styles.modalInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
               placeholder="Toview text (Category: Name supported)"
@@ -1266,16 +1266,6 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-  },
-  modalButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
   // New styles for improved EditModal
   modalInput: {

@@ -46,6 +46,16 @@ A collection of potential new Sparks to build for the app. Each spark should be 
 - Progress tracking and spaced repetition
 - Daily quiz mode
 
+### 𐄷 Weight Tracker
+**Category:** Health  
+**Description:** Weekly weigh in reminder and tracker
+- Just a really simple interface for entering weight each week
+- If users have not entered a weight this week, they are prompted to specify a pound higher or lower or the same as last week, and the tenths of a pound (0-9) and then submit. 
+- Users are presented with a graph of their weekly weigh ins. 
+- In settings, they can specify whether they want to see the scale (pounds/kilos) or just the graph with weeks labeled. 
+- Settings also allows user to specify pounds vs. kilograms. 
+- Reminders to complete daily practice
+
 ### ⛳ Golf Drills
 **Category:** Golf  
 **Description:** Daily golf practice routine manager

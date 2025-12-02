@@ -9,11 +9,16 @@ export class SimpleAnalyticsService {
   private static userId: string | null = null;
   private static isInitialized: boolean = false;
 
-  static async initialize(firestoreDb: any): Promise<void> {
+  static async initialize(firestoreDb?: any): Promise<void> {
     console.log('🚀 SimpleAnalyticsService.initialize() called');
-    
+
     try {
-      this.db = firestoreDb;
+      if (firestoreDb) {
+        this.db = firestoreDb;
+      } else {
+        console.log('⚠️ SimpleAnalyticsService.initialize() called without Firestore DB - using fallback');
+      }
+
       this.deviceId = await this.getOrCreateDeviceId();
       this.isInitialized = true;
       console.log('✅ Simple Analytics initialized with deviceId:', this.deviceId);
@@ -113,16 +118,17 @@ export class SimpleAnalyticsService {
   }
 
   // Additional compatibility methods
-  static async initialize(): Promise<void> {
-    // This method is called by existing code, but we need the Firestore DB
-    // The actual initialization happens in ServiceFactory.ensureAnalyticsInitialized()
-    console.log('⚠️ SimpleAnalyticsService.initialize() called without Firestore DB - using fallback');
-    
-    // Fallback initialization without Firestore
-    this.deviceId = await this.getOrCreateDeviceId();
-    this.isInitialized = true;
-    console.log('✅ Simple Analytics fallback initialized with deviceId:', this.deviceId);
-  }
+  // Additional compatibility methods
+  // static async initialize(): Promise<void> {
+  //   // This method is called by existing code, but we need the Firestore DB
+  //   // The actual initialization happens in ServiceFactory.ensureAnalyticsInitialized()
+  //   console.log('⚠️ SimpleAnalyticsService.initialize() called without Firestore DB - using fallback');
+
+  //   // Fallback initialization without Firestore
+  //   this.deviceId = await this.getOrCreateDeviceId();
+  //   this.isInitialized = true;
+  //   console.log('✅ Simple Analytics fallback initialized with deviceId:', this.deviceId);
+  // }
 
   static async trackFeatureUsage(feature: string, sparkId: string = 'app', sparkName?: string, properties?: object): Promise<void> {
     await this.logEvent('feature_usage', sparkId, sparkName, { feature, ...properties });
@@ -133,10 +139,10 @@ export class SimpleAnalyticsService {
   }
 
   static async trackError(error: Error, context: string): Promise<void> {
-    await this.logEvent('error', 'app', 'App', { 
-      errorMessage: error.message, 
-      errorStack: error.stack, 
-      context 
+    await this.logEvent('error', 'app', 'App', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      context
     });
   }
 
@@ -145,10 +151,10 @@ export class SimpleAnalyticsService {
   }
 
   static async trackCrash(error: Error, errorInfo: any): Promise<void> {
-    await this.logEvent('crash', 'app', 'App', { 
-      errorMessage: error.message, 
-      errorStack: error.stack, 
-      errorInfo: JSON.stringify(errorInfo) 
+    await this.logEvent('crash', 'app', 'App', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorInfo: JSON.stringify(errorInfo)
     });
   }
 

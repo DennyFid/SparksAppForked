@@ -166,7 +166,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       const foodCamDir = `${FileSystem.documentDirectory}foodcam/`;
       const dirInfo = await FileSystem.getInfoAsync(foodCamDir);
       console.log('FoodCam directory exists:', dirInfo.exists);
-      
+
       if (dirInfo.exists) {
         const files = await FileSystem.readDirectoryAsync(foodCamDir);
         console.log('FoodCam files count:', files.length);
@@ -216,8 +216,8 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
 
     // Use local date formatting for comparison instead of UTC
     const formatLocalDate = (d: Date) => {
-      return d.getFullYear() + '-' + 
-        String(d.getMonth() + 1).padStart(2, '0') + '-' + 
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
         String(d.getDate()).padStart(2, '0');
     };
 
@@ -249,8 +249,8 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
       const now = new Date();
       const timestamp = now.getTime();
       // Use local date instead of UTC to avoid timezone issues
-      const date = now.getFullYear() + '-' + 
-        String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+      const date = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
         String(now.getDate()).padStart(2, '0');
       const photoId = generatePhotoId();
 
@@ -292,7 +292,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
         quality: 0.8,
         base64: false, // Don't need base64 for file operations
         exif: false, // Don't need EXIF data
-        preferredAssetRepresentationMode: ImagePicker.UIImagePickerAssetRepresentationMode?.current || 'current',
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode?.Current || 'current',
       });
 
       await handlePhotoResult(result);
@@ -324,7 +324,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
         base64: false, // Don't need base64 for file operations
         exif: false, // Don't need EXIF data
         selectionLimit: 1, // Only allow single photo selection
-        preferredAssetRepresentationMode: ImagePicker.UIImagePickerAssetRepresentationMode?.current || 'current',
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode?.Current || 'current',
       });
 
       await handlePhotoResult(result);
@@ -648,7 +648,7 @@ export const FoodCamSpark: React.FC<FoodCamSparkProps> = ({
   if (showSettings) {
     return (
       <FoodCamSettings
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }

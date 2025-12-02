@@ -3,25 +3,26 @@ import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously, User } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
-import { 
-  User as AnalyticsUser, 
-  SparkFeedback, 
-  AnalyticsEvent, 
-  FeatureFlag, 
-  AggregatedRating, 
+import {
+  User as AnalyticsUser,
+  SparkFeedback,
+  AnalyticsEvent,
+  FeatureFlag,
+  AggregatedRating,
+  AggregatedRatingItem,
   AnalyticsData,
-  SessionData 
+  SessionData
 } from '../types/analytics';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyD6FqXdcKlaKqQtOQQYv0Mg-R5Em95vTJM",
-  authDomain: "sparkopedia-330f6.firebaseapp.com",
-  projectId: "sparkopedia-330f6",
-  storageBucket: "sparkopedia-330f6.firebasestorage.app",
-  messagingSenderId: "229332029977",
-  appId: "1:229332029977:web:401c76f507f092c24a9088",
-  measurementId: "G-K5YN3D4VQ6"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
 export class WebFirebaseService {
@@ -32,7 +33,7 @@ export class WebFirebaseService {
 
   static async initialize(): Promise<void> {
     console.log('🚀 WebFirebaseService.initialize() called');
-    
+
     try {
       // Initialize Firebase if not already initialized
       let app;
@@ -49,23 +50,23 @@ export class WebFirebaseService {
       try {
         // Use default auth for all platforms (Web SDK works in React Native)
         this.auth = getAuth(app);
-        
+
         // Try anonymous sign-in with retry logic
         let retryCount = 0;
         const maxRetries = 3;
-        
+
         while (retryCount < maxRetries) {
           try {
             console.log(`🔄 Attempting anonymous sign-in (attempt ${retryCount + 1})`);
             const userCredential = await signInAnonymously(this.auth);
             this.currentUser = userCredential.user;
             console.log('✅ Firebase Auth initialized with user:', this.currentUser.uid);
-            console.log('✅ Auth token available:', !!this.currentUser.accessToken);
+            console.log('✅ Auth token available:', !!(this.currentUser as any).accessToken);
             break; // Success, exit retry loop
           } catch (signInError: any) {
             retryCount++;
             console.log(`⚠️ Anonymous sign-in attempt ${retryCount} failed:`, signInError.message);
-            
+
             if (retryCount >= maxRetries) {
               console.log('❌ All anonymous sign-in attempts failed, continuing without auth');
               // Continue without auth - Firestore will still work
@@ -79,7 +80,7 @@ export class WebFirebaseService {
         console.log('⚠️ Firebase Auth not available, continuing without auth:', authError.message);
         // Continue without auth - Firestore will still work
       }
-      
+
       this._initialized = true;
       console.log('✅ Web Firebase initialized with user:', this.currentUser?.uid);
     } catch (error) {
@@ -99,7 +100,7 @@ export class WebFirebaseService {
 
     try {
       return {
-        uid: this.currentUser.uid,
+        id: this.currentUser.uid,
         isAnonymous: this.currentUser.isAnonymous,
         createdAt: this.currentUser.metadata.creationTime ? new Date(this.currentUser.metadata.creationTime) : new Date(),
         lastSignInAt: this.currentUser.metadata.lastSignInTime ? new Date(this.currentUser.metadata.lastSignInTime) : new Date(),
@@ -110,7 +111,7 @@ export class WebFirebaseService {
     }
   }
 
-  static async submitFeedback(feedback: Omit<SparkFeedback, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  static async submitFeedback(feedback: Omit<SparkFeedback, 'id' | 'timestamp' | 'createdAt' | 'updatedAt'>): Promise<string> {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
@@ -168,6 +169,13 @@ export class WebFirebaseService {
           createdAt: data.createdAt.toDate(),
           updatedAt: data.updatedAt.toDate(),
           adminResponse: data.adminResponse || null,
+          sparkName: data.sparkName || 'Unknown Spark',
+          sessionDuration: data.sessionDuration || 0,
+          completedActions: data.completedActions || [],
+          feedbackType: data.feedbackType || 'rating',
+          appVersion: data.appVersion || '1.0.0',
+          platform: data.platform || 'web',
+          timestamp: data.createdAt.toDate(),
         });
       });
 
@@ -208,6 +216,13 @@ export class WebFirebaseService {
           hasUnreadAdminResponse: data.hasUnreadAdminResponse || false,
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
+          sparkName: data.sparkName || 'Unknown Spark',
+          sessionDuration: data.sessionDuration || 0,
+          completedActions: data.completedActions || [],
+          feedbackType: data.feedbackType || 'rating',
+          appVersion: data.appVersion || '1.0.0',
+          platform: data.platform || 'web',
+          timestamp: data.createdAt.toDate(),
         });
       });
 
@@ -284,8 +299,14 @@ export class WebFirebaseService {
           userId: data.userId,
           sessionId: data.sessionId,
           timestamp: data.timestamp.toDate(),
+          eventType: data.eventType || data.eventName || 'unknown',
+          eventData: data.eventData || data.properties || {},
+          appVersion: data.appVersion || '1.0.0',
+          platform: data.platform || 'web',
         });
       });
+
+      events.sort((a, b) => (b.timestamp as any).getTime() - (a.timestamp as any).getTime());
 
       // Calculate aggregated data
       const totalEvents = events.length;
@@ -312,7 +333,7 @@ export class WebFirebaseService {
     }
   }
 
-  static async getAggregatedRatings(sparkId: string): Promise<AggregatedRating[]> {
+  static async getAggregatedRatings(sparkId: string): Promise<AggregatedRating> {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
@@ -335,19 +356,23 @@ export class WebFirebaseService {
       });
 
       // Calculate aggregated ratings
-      const ratingCounts: { [key: number]: number } = {};
+      const totalRatings = ratings.length;
+      const sum = ratings.reduce((acc, rating) => acc + rating, 0);
+      const averageRating = totalRatings > 0 ? sum / totalRatings : 0;
+
+      const ratingDistribution: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
       ratings.forEach(rating => {
-        ratingCounts[rating] = (ratingCounts[rating] || 0) + 1;
+        ratingDistribution[rating] = (ratingDistribution[rating] || 0) + 1;
       });
 
-      const aggregatedRatings: AggregatedRating[] = Object.entries(ratingCounts).map(([rating, count]) => ({
-        rating: parseInt(rating),
-        count,
-        percentage: (count / ratings.length) * 100,
-      }));
+      const aggregatedRating: AggregatedRating = {
+        averageRating: Math.round(averageRating * 100) / 100,
+        totalRatings,
+        ratingDistribution
+      };
 
       console.log(`✅ Retrieved aggregated ratings for spark ${sparkId}: ${ratings.length} total ratings`);
-      return aggregatedRatings;
+      return aggregatedRating;
     } catch (error) {
       console.error('❌ Error getting aggregated ratings:', error);
       throw error;
@@ -382,7 +407,7 @@ export class WebFirebaseService {
 
     try {
       const flagDoc = await getDoc(doc(this.db, 'feature_flags', flagId));
-      
+
       if (!flagDoc.exists()) {
         return null;
       }
@@ -443,22 +468,30 @@ export class WebFirebaseService {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         const sessionId = data.sessionId;
-        
+
         if (!sessionMap[sessionId]) {
           sessionMap[sessionId] = {
-            sessionId,
+            sessionId: sessionId,
             userId: data.userId,
+            sparkId: data.sparkId,
             startTime: data.timestamp.toDate(),
             endTime: data.timestamp.toDate(),
-            sparkId: data.sparkId,
-            eventCount: 0,
             duration: 0,
+            actions: [],
+            completed: false,
+            platform: 'web',
+            appVersion: '1.0.0',
+            eventCount: 0,
           };
         }
 
-        sessionMap[sessionId].eventCount++;
+        sessionMap[sessionId].eventCount = (sessionMap[sessionId].eventCount || 0) + 1;
         sessionMap[sessionId].endTime = data.timestamp.toDate();
-        sessionMap[sessionId].duration = sessionMap[sessionId].endTime.getTime() - sessionMap[sessionId].startTime.getTime();
+        if (sessionMap[sessionId].endTime && sessionMap[sessionId].startTime) {
+          const end = sessionMap[sessionId].endTime instanceof Date ? sessionMap[sessionId].endTime as Date : (sessionMap[sessionId].endTime as any).toDate();
+          const start = sessionMap[sessionId].startTime instanceof Date ? sessionMap[sessionId].startTime as Date : (sessionMap[sessionId].startTime as any).toDate();
+          sessionMap[sessionId].duration = end.getTime() - start.getTime();
+        }
       });
 
       const sessions = Object.values(sessionMap);
@@ -475,13 +508,13 @@ export class WebFirebaseService {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
-    
+
     try {
       // Debug authentication status
       console.log('🔍 Auth status:', this.auth?.currentUser);
       console.log('🔍 Auth UID:', this.auth?.currentUser?.uid);
       console.log('🔍 Auth token:', this.auth?.currentUser?.accessToken);
-      
+
       // Update only the main feedback document with the response
       const feedbackRef = doc(this.db, 'feedback', feedbackId);
       await updateDoc(feedbackRef, {
@@ -489,7 +522,7 @@ export class WebFirebaseService {
         adminId: response.adminId,
         respondedAt: new Date()
       });
-      
+
       console.log('✅ Feedback response updated successfully');
     } catch (error) {
       console.error('Error updating feedback response:', error);
@@ -529,18 +562,18 @@ export class WebFirebaseService {
       // Firestore doesn't support != null, so we query all feedback for this user
       // and filter in code
       const constraints = [where('userId', '==', userId)];
-      
+
       if (sparkId) {
         constraints.push(where('sparkId', '==', sparkId));
       }
-      
+
       const q = query(
         collection(this.db, 'feedback'),
         ...constraints
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       // Filter for: has response AND not read
       let unreadCount = 0;
       querySnapshot.forEach((doc) => {
@@ -551,7 +584,7 @@ export class WebFirebaseService {
           unreadCount++;
         }
       });
-      
+
       return unreadCount;
     } catch (error) {
       console.error('Error getting unread feedback count:', error);
@@ -640,7 +673,7 @@ export class WebFirebaseService {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');
     }
-    
+
     try {
       // Get all feedback for this user and spark that have responses
       const feedbackQuery = query(
@@ -649,9 +682,9 @@ export class WebFirebaseService {
         where('sparkId', '==', sparkId)
       );
       const feedbackSnapshot = await getDocs(feedbackQuery);
-      
+
       const responsesWithFeedback: any[] = [];
-      
+
       // Return feedback items that have responses
       feedbackSnapshot.docs.forEach(feedbackDoc => {
         const feedbackData = feedbackDoc.data();
@@ -666,7 +699,7 @@ export class WebFirebaseService {
           });
         }
       });
-      
+
       return responsesWithFeedback;
     } catch (error) {
       console.error('Error getting user feedback responses:', error);
@@ -740,7 +773,7 @@ export class WebFirebaseService {
     console.log(`👤 Update user (placeholder):`, userId, userData);
   }
 
-  async saveSparkSubmission(submission: any): Promise<void> {
+  static async saveSparkSubmission(submission: any): Promise<void> {
     try {
       if (!this.db) {
         console.error('Firestore not initialized');
@@ -755,7 +788,7 @@ export class WebFirebaseService {
     }
   }
 
-  async getSparkSubmissions(userId?: string): Promise<any[]> {
+  static async getSparkSubmissions(userId?: string): Promise<any[]> {
     try {
       if (!this.db) {
         console.error('Firestore not initialized');
@@ -763,13 +796,14 @@ export class WebFirebaseService {
       }
 
       let query = this.db.collection('sparkSubmissions');
-      
+
+
       if (userId) {
         query = query.where('userId', '==', userId);
       }
 
       const snapshot = await query.get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
     } catch (error) {
       console.error('❌ Error getting spark submissions:', error);
       return [];
@@ -784,11 +818,11 @@ export class WebFirebaseService {
     try {
       if (!WebFirebaseService.db) {
         console.error('Firestore not initialized');
-        return () => {}; // Return empty cleanup function
+        return () => { }; // Return empty cleanup function
       }
 
       console.log('👂 Starting feedback response listener for user:', userId);
-      
+
       // Listen to feedback where this user has submitted feedback
       const feedbackQuery = query(
         collection(WebFirebaseService.db, 'feedback'),
@@ -801,21 +835,21 @@ export class WebFirebaseService {
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'modified') {
               const data = change.doc.data();
-              
+
               // Check if an admin response was just added
               if (data.response && !change.doc.metadata.hasPendingWrites) {
                 // New response detected!
                 const sparkId = data.sparkId || 'unknown';
                 const sparkName = data.sparkName || 'Unknown Spark';
                 const feedbackId = change.doc.id;
-                
+
                 console.log('📬 New feedback response detected:', {
                   feedbackId,
                   sparkId,
                   sparkName,
                   response: data.response
                 });
-                
+
                 // Notify the callback
                 onNewResponse(feedbackId, sparkId, sparkName);
               }
@@ -831,7 +865,7 @@ export class WebFirebaseService {
       return unsubscribe;
     } catch (error) {
       console.error('❌ Error setting up feedback response listener:', error);
-      return () => {}; // Return empty cleanup function
+      return () => { }; // Return empty cleanup function
     }
   }
 }

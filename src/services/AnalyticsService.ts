@@ -11,7 +11,7 @@ try {
   firebaseAnalytics = analytics.default;
   console.log('✅ Firebase Analytics available');
 } catch (error) {
-  console.log('⚠️ Firebase Analytics not available:', error.message);
+  console.log('⚠️ Firebase Analytics not available:', (error as any).message);
 }
 
 export class AnalyticsService {
@@ -25,18 +25,18 @@ export class AnalyticsService {
 
   static async initialize(): Promise<void> {
     console.log('🚀 AnalyticsService.initialize() called');
-    
+
     try {
       // Generate or get device ID
       this.userId = await this.getOrCreateDeviceId();
       console.log('✅ Device ID set:', this.userId);
-      
+
       this.isInitialized = true;
       console.log('✅ Analytics initialized:', this.isInitialized);
-      
+
       this.startBatchFlush();
       console.log('✅ Batch flush started');
-      
+
       // Track app open
       await this.trackSparkOpen('app', 'Sparks App');
       console.log('✅ App open tracked');
@@ -73,7 +73,7 @@ export class AnalyticsService {
       eventData: {
         sparkName: sparkName || sparkId,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0', // TODO: Get from app config
@@ -81,7 +81,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-    
+
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
@@ -91,15 +91,15 @@ export class AnalyticsService {
         });
         console.log('✅ Spark opened event sent to Firebase Analytics');
       } catch (error) {
-        console.log('⚠️ Error sending spark_opened to Firebase Analytics:', error.message);
+        console.log('⚠️ Error sending spark_opened to Firebase Analytics:', (error as any).message);
       }
     }
   }
 
   static async trackSparkComplete(
-    sparkId: string, 
+    sparkId: string,
     sparkName: string,
-    duration: number, 
+    duration: number,
     actions: string[]
   ): Promise<void> {
     if (!this.isInitialized || !this.userId) return;
@@ -113,7 +113,7 @@ export class AnalyticsService {
         duration,
         actions,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -121,7 +121,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-    
+
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
@@ -133,7 +133,7 @@ export class AnalyticsService {
         });
         console.log('✅ Spark completed event sent to Firebase Analytics');
       } catch (error) {
-        console.log('⚠️ Error sending spark_completed to Firebase Analytics:', error.message);
+        console.log('⚠️ Error sending spark_completed to Firebase Analytics:', (error as any).message);
       }
     }
   }
@@ -149,7 +149,7 @@ export class AnalyticsService {
         errorStack: error.stack,
         context,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -161,10 +161,10 @@ export class AnalyticsService {
 
   static async trackFeatureUsage(feature: string, sparkId: string = 'app', sparkName?: string, properties?: object): Promise<void> {
     console.log('🔍 AnalyticsService.trackFeatureUsage called:', { feature, sparkId, sparkName, properties });
-    console.log('🔍 AnalyticsService state:', { 
-      isInitialized: this.isInitialized, 
+    console.log('🔍 AnalyticsService state:', {
+      isInitialized: this.isInitialized,
       userId: this.userId,
-      sessionId: this.sessionId 
+      sessionId: this.sessionId
     });
 
     if (!this.isInitialized || !this.userId) {
@@ -179,7 +179,7 @@ export class AnalyticsService {
     }
 
     const event: Omit<AnalyticsEvent, 'id' | 'timestamp'> = {
-      userId: this.userId,
+      userId: this.userId || 'anonymous',
       eventType: 'feature_used',
       sparkId,
       eventData: {
@@ -187,7 +187,7 @@ export class AnalyticsService {
         feature,
         properties: properties || {},
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -196,7 +196,7 @@ export class AnalyticsService {
 
     console.log('🔍 Event to be queued:', event);
     await this.queueEvent(event);
-    
+
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
@@ -208,10 +208,10 @@ export class AnalyticsService {
         });
         console.log('✅ Event sent to Firebase Analytics');
       } catch (error) {
-        console.log('⚠️ Error sending to Firebase Analytics:', error.message);
+        console.log('⚠️ Error sending to Firebase Analytics:', (error as any).message);
       }
     }
-    
+
     console.log('✅ Event queued successfully');
   }
 
@@ -223,7 +223,7 @@ export class AnalyticsService {
       eventType: 'settings_accessed',
       eventData: {
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -243,7 +243,7 @@ export class AnalyticsService {
       eventData: {
         sparkName,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -251,7 +251,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-    
+
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
@@ -261,7 +261,7 @@ export class AnalyticsService {
         });
         console.log('✅ Spark added event sent to Firebase Analytics');
       } catch (error) {
-        console.log('⚠️ Error sending spark_added to Firebase Analytics:', error.message);
+        console.log('⚠️ Error sending spark_added to Firebase Analytics:', (error as any).message);
       }
     }
   }
@@ -276,7 +276,7 @@ export class AnalyticsService {
       eventData: {
         sparkName,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -284,7 +284,7 @@ export class AnalyticsService {
     };
 
     await this.queueEvent(event);
-    
+
     // Also send to Firebase Analytics
     if (firebaseAnalytics) {
       try {
@@ -294,7 +294,7 @@ export class AnalyticsService {
         });
         console.log('✅ Spark removed event sent to Firebase Analytics');
       } catch (error) {
-        console.log('⚠️ Error sending spark_removed to Firebase Analytics:', error.message);
+        console.log('⚠️ Error sending spark_removed to Firebase Analytics:', (error as any).message);
       }
     }
   }
@@ -309,7 +309,7 @@ export class AnalyticsService {
       eventData: {
         action,
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -353,7 +353,7 @@ export class AnalyticsService {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
-    
+
     await this.flushEvents();
     this.isInitialized = false;
     this.userId = null;
@@ -401,7 +401,7 @@ export class AnalyticsService {
         value,
         context: context || '',
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -411,27 +411,7 @@ export class AnalyticsService {
     await this.queueEvent(event);
   }
 
-  // User Engagement Tracking
-  static async trackUserEngagement(action: string, sparkId?: string): Promise<void> {
-    if (!this.isInitialized || !this.userId) return;
 
-    const event: Omit<AnalyticsEvent, 'id' | 'timestamp'> = {
-      userId: this.userId,
-      eventType: 'feature_used',
-      sparkId,
-      eventData: {
-        feature: 'user_engagement',
-        action,
-        platform: Platform.OS,
-        timestamp: Date.now(),
-      },
-      sessionId: this.sessionId,
-      appVersion: '1.0.0',
-      platform: Platform.OS as 'ios' | 'android' | 'web',
-    };
-
-    await this.queueEvent(event);
-  }
 
   // Error Boundary Integration
   static async trackCrash(error: Error, errorInfo: any): Promise<void> {
@@ -446,7 +426,7 @@ export class AnalyticsService {
         errorInfo: JSON.stringify(errorInfo),
         context: 'crash',
         platform: Platform.OS,
-        timestamp: Date.now(),
+
       },
       sessionId: this.sessionId,
       appVersion: '1.0.0',
@@ -479,14 +459,5 @@ export class AnalyticsService {
     return this.sessionId;
   }
 
-  static setUserProperties(properties: object): void {
-    if (!this.isInitialized || !this.userId) return;
 
-    // Update user properties in Firebase
-    FirebaseService.updateUser(this.userId, {
-      demographics: properties as any,
-    }).catch(error => {
-      console.error('Error updating user properties:', error);
-    });
-  }
 }

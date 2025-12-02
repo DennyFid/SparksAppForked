@@ -24,6 +24,9 @@ import { MinuteMinderSpark } from '../sparks/MinuteMinderSpark';
 import { BuzzyBingoSpark } from '../sparks/BuzzyBingoSpark';
 import { CardScoreSpark } from '../sparks/CardScoreSpark';
 import { GolfWisdomSpark } from '../sparks/GolfWisdomSpark';
+import WeightTrackerSpark from '../sparks/WeightTrackerSpark';
+import ShareSparks from '../sparks/ShareSparks';
+import ComingUpSpark from '../sparks/ComingUpSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -126,7 +129,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       title: 'FoodCam',
       description: 'Visual food diary with photo timeline and camera integration',
       icon: '📸',
-      category: 'food',
+      category: 'health',
       createdAt: '2024-01-07T00:00:00.000Z',
       rating: 4.4,
     },
@@ -224,7 +227,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       icon: '🎬',
       category: 'media',
       createdAt: '2024-01-15T00:00:00.000Z',
-      rating: 4.3,
+      rating: 4.6,
     },
     component: ShortSaverSpark,
   },
@@ -271,7 +274,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       description: 'Buzzword bingo game - mark squares as you hear tech terms',
       icon: '🎯',
       category: 'game',
-      createdAt: new Date().toISOString(),
+      createdAt: '2025-11-01T00:00:00.000Z',
       rating: 4.5,
     },
     component: BuzzyBingoSpark as React.ComponentType<any>,
@@ -283,7 +286,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       description: 'Fast, simple scorekeeping for card games',
       icon: '♠️',
       category: 'utility',
-      createdAt: new Date().toISOString(),
+      createdAt: '2025-11-01T00:00:00.000Z',
       rating: 4.0,
     },
     component: CardScoreSpark,
@@ -292,13 +295,49 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     metadata: {
       id: 'golfWisdom',
       title: 'Golf Wisdom',
-      description: 'Inspirational golf wisdom from Jerry',
+      description: 'Inspirational golf wisdom from Tam O\'Shanter',
       icon: '📖',
       category: 'golf',
-      createdAt: '2024-01-20T00:00:00.000Z',
+      createdAt: '2025-12-01T00:00:00.000Z',
       rating: 4.3,
     },
     component: GolfWisdomSpark,
+  },
+  'weight-tracker': {
+    metadata: {
+      id: 'weight-tracker',
+      title: 'Weight Tracker',
+      description: 'Track your weight, set goals, and visualize progress',
+      icon: '⚖️',
+      category: 'health',
+      createdAt: '2025-12-01T00:00:00.000Z',
+      rating: 4.5,
+    },
+    component: WeightTrackerSpark,
+  },
+  'share-sparks': {
+    metadata: {
+      id: 'share-sparks',
+      title: 'Share Sparks',
+      description: 'Share the Sparks app with friends',
+      icon: '⚡️',
+      category: 'utility',
+      createdAt: '2025-12-01T00:00:00.000Z',
+      rating: 4.5,
+    },
+    component: ShareSparks,
+  },
+  'coming-up': {
+    metadata: {
+      id: 'coming-up',
+      title: 'Coming Up',
+      description: 'Track upcoming birthdays, anniversaries, and big days',
+      icon: '🗓️',
+      category: 'utility',
+      createdAt: '2025-12-01T00:00:00.000Z',
+      rating: 4.4,
+    },
+    component: ComingUpSpark,
   },
 };
 

@@ -219,14 +219,13 @@ const QuickConvertSettings: React.FC<{
 
         <SettingsSection title="Exchange Rate">
           <View style={styles.exchangeRateContainer}>
+            <Text style={[styles.countryLabel, { color: colors.text }]}>Exchange Rate</Text>
             <SettingsInput
-              label="Exchange Rate"
               value={exchangeRate}
               onChangeText={setExchangeRate}
               placeholder="18.40"
-              keyboardType="numeric"
-              description="Enter the exchange rate (e.g., 18.40 means 1 USD = 18.40 foreign currency)"
             />
+            <Text style={[{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }]}>Enter the exchange rate (e.g., 18.40 means 1 USD = 18.40 foreign currency)</Text>
             <TouchableOpacity
               style={[styles.fetchRateButton, { backgroundColor: colors.primary }]}
               onPress={handleFetchExchangeRate}
@@ -259,7 +258,7 @@ const QuickConvertSettings: React.FC<{
                 </View>
               ))}
             </View>
-            
+
             <View style={styles.addDenominationContainer}>
               <TextInput
                 style={[styles.addDenominationInput, { borderColor: colors.border, color: colors.text }]}
@@ -283,7 +282,7 @@ const QuickConvertSettings: React.FC<{
 
         <SaveCancelButtons onSave={handleSave} onCancel={onClose} />
       </SettingsScrollView>
-    </SettingsContainer>
+    </SettingsContainer >
   );
 };
 
@@ -401,7 +400,7 @@ const ExchangeRateModal: React.FC<{
           <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
             Enter the exchange rate for {selectedCountryInfo.flag} {selectedCountryInfo.name}
           </Text>
-          
+
           <View style={styles.modalExchangeRateContainer}>
             <TextInput
               style={[styles.exchangeRateInput, { borderColor: colors.border, color: colors.text }]}
@@ -420,7 +419,7 @@ const ExchangeRateModal: React.FC<{
               </View>
             )}
           </View>
-          
+
           <Text style={[styles.rateDescription, { color: colors.textSecondary }]}>
             This means 1 USD = {exchangeRate || 'X'} {selectedCountryInfo.code}
           </Text>
@@ -493,10 +492,13 @@ const QuickConvertSpark: React.FC<QuickConvertSparkProps> = ({
 }) => {
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
-  
+
   const [data, setData] = useState<QuickConvertData>(() => {
-    const savedData = getSparkData('quick-convert');
-    return savedData || {
+    const savedData = getSparkData('quick-convert') as QuickConvertData | null;
+    if (savedData && savedData.exchangeRate) {
+      return savedData;
+    }
+    return {
       exchangeRate: 0,
       selectedCountry: 'MXN',
       usdDenominations: [...DEFAULT_USD_DENOMINATIONS],
@@ -523,7 +525,7 @@ const QuickConvertSpark: React.FC<QuickConvertSparkProps> = ({
       usdDenominations: [...DEFAULT_USD_DENOMINATIONS],
       lastUpdated: new Date().toISOString(),
     };
-    
+
     setData(newData);
     setSparkData('quick-convert', newData);
     setShowSetupModal(false);
@@ -554,7 +556,7 @@ const QuickConvertSpark: React.FC<QuickConvertSparkProps> = ({
   if (showSettings) {
     return (
       <QuickConvertSettings
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
         data={data}
         onSave={handleSaveSettings}
       />
@@ -611,11 +613,11 @@ const QuickConvertSpark: React.FC<QuickConvertSparkProps> = ({
         {/* Conversion Table */}
         <View style={[styles.tableContainer, { backgroundColor: colors.surface }]}>
           <Text style={[styles.tableTitle, { color: colors.text }]}>Conversion Table</Text>
-          
+
           {safeUsdDenominations.map((usdAmount, index) => {
             const foreignAmount = usdAmount * (data.exchangeRate || 0);
             const isEvenRow = index % 2 === 0;
-            
+
             return (
               <View
                 key={usdAmount}

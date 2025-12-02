@@ -233,7 +233,7 @@ const CustomTabBar: React.FC<BottomTabBarProps & { tabBarVisible: boolean }> = (
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
                 accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
+                // testID={options.tabBarTestID} // tabBarTestID doesn't exist in type
                 onPress={onPress}
                 style={styles.tab}
               >

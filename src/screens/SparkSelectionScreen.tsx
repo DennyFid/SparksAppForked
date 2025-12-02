@@ -143,7 +143,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
           <TouchableOpacity
             style={[styles.discoverButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('Marketplace')}
+            onPress={() => (navigation as any).navigate('Marketplace')}
           >
             <Text style={[styles.discoverButtonText, { color: colors.background }]}>
               Discover Sparks

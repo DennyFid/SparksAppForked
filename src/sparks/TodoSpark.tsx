@@ -88,7 +88,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   const [showFutureTodos, setShowFutureTodos] = useState(false);
   const [showOlderDoneTodos, setShowOlderDoneTodos] = useState(false);
   const taskInputRef = useRef<TextInput>(null);
-  
+
   // Feedback system state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
@@ -262,21 +262,21 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     };
 
     setTodos(prev => [...prev, newTask]);
-    
+
     // Track analytics
     const AnalyticsService = ServiceFactory.getAnalyticsService();
     AnalyticsService.trackFeatureUsage('add_task', 'todo', 'Todo List', {
       category: category || 'none',
       hasDueDate: false
     });
-    
+
     // If a category is selected, pre-fill the input with the category prefix
     if (selectedCategory) {
       setNewTaskText(`${selectedCategory}: `);
     } else {
       setNewTaskText('');
     }
-    
+
     HapticFeedback.light();
 
     // Small delay to prevent rapid successive clicks
@@ -288,7 +288,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Toggle task completion
   const toggleTask = (id: number) => {
     const today = getTodayDateString();
-    
+
     setTodos(prev => prev.map(task => {
       if (task.id === id) {
         const newCompleted = !task.completed;
@@ -302,7 +302,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       }
       return task;
     }));
-    
+
     HapticFeedback.light();
   };
 
@@ -329,15 +329,15 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     setTodos(prev => prev.map(task =>
       task.id === editingTask.id
         ? {
-            ...task,
-            text: editText.trim(),
-            displayText,
-            category,
-            dueDate: selectedDate,
-            completed: editCompleted,
-            completedDate: editCompleted ? today : undefined,
-            sortTimeMs: Date.now(),
-          }
+          ...task,
+          text: editText.trim(),
+          displayText,
+          category,
+          dueDate: selectedDate,
+          completed: editCompleted,
+          completedDate: editCompleted ? today : undefined,
+          sortTimeMs: Date.now(),
+        }
         : task
     ));
 
@@ -359,15 +359,15 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     setTodos(prev => prev.map(task =>
       task.id === editingTask.id
         ? {
-            ...task,
-            text: editText.trim(),
-            displayText,
-            category,
-            dueDate: dateString,
-            completed: editCompleted,
-            completedDate: editCompleted ? today : undefined,
-            sortTimeMs: Date.now(),
-          }
+          ...task,
+          text: editText.trim(),
+          displayText,
+          category,
+          dueDate: dateString,
+          completed: editCompleted,
+          completedDate: editCompleted ? today : undefined,
+          sortTimeMs: Date.now(),
+        }
         : task
     ));
 
@@ -404,7 +404,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     date.setDate(date.getDate() + days);
     const newDateString = date.toISOString().split('T')[0];
     setSelectedDate(newDateString);
-    
+
     // Auto-save and close modal when quick date is selected
     setTimeout(() => {
       saveEditedTaskWithDate(newDateString);
@@ -503,13 +503,13 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Check if there are future todos to show
   const hasFutureTodos = () => {
     const today = getTodayDateString();
-    
+
     return todos.some(task => {
       // First filter by category if selected
       if (selectedCategory && task.category !== selectedCategory) {
         return false;
       }
-      
+
       // Check if it's a future todo (incomplete and due date is after today)
       return !task.completed && task.dueDate > today;
     });
@@ -518,13 +518,13 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Check if there are older done todos to show
   const hasOlderDoneTodos = () => {
     const today = getTodayDateString();
-    
+
     return todos.some(task => {
       // First filter by category if selected
       if (selectedCategory && task.category !== selectedCategory) {
         return false;
       }
-      
+
       // Check if it's an older done todo (completed but not from today)
       return task.completed && task.completedDate !== today;
     });
@@ -869,7 +869,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   if (showSettings) {
     return (
       <TodoSettings
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -927,7 +927,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
         <Text style={styles.sectionTitle}>
           Tasks ({filteredTodos.filter(t => !t.completed).length} pending)
         </Text>
-        
+
         {filteredTodos.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
@@ -944,8 +944,8 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
                 todo.dueDate === getTodayDateString()
                   ? styles.todoItemToday
                   : (todo.dueDate === getTomorrowDateString()
-                      ? styles.todoItemTomorrow
-                      : styles.todoItemFuture),
+                    ? styles.todoItemTomorrow
+                    : styles.todoItemFuture),
                 index === filteredTodos.length - 1 && styles.lastItem
               ]}
               onPress={() => toggleTask(todo.id)}
@@ -1008,7 +1008,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit Todo</Text>
-            
+
             <TextInput
               style={styles.modalInput}
               placeholder="Task text"
@@ -1020,7 +1020,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
               returnKeyType="done"
               blurOnSubmit={true}
               onKeyPress={(e) => {
-                if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                if (e.nativeEvent.key === 'Enter') {
                   saveEditedTask();
                 }
               }}
@@ -1045,17 +1045,17 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
                 {(() => {
                   const today = new Date();
                   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-                  
+
                   // Build base options
                   const baseOptions = [
                     { label: 'Today', days: 0 },
                     { label: '+1 Day', days: 1 },
                     { label: '+1 Week', days: 7 },
                   ];
-                  
+
                   // Add logical date buttons based on current day
                   const logicalOptions: Array<{ label: string; days: number }> = [];
-                  
+
                   // If Monday (1) to Thursday (4), add Saturday button
                   if (dayOfWeek >= 1 && dayOfWeek <= 4) {
                     const daysUntilSaturday = 6 - dayOfWeek; // Saturday is day 6
@@ -1066,10 +1066,10 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
                     const daysUntilMonday = 8 - dayOfWeek; // Monday is day 1, so 8 - 6 = 2 days
                     logicalOptions.push({ label: 'Monday', days: daysUntilMonday });
                   }
-                  
+
                   // Combine base options with logical options
                   const allOptions = [...baseOptions, ...logicalOptions];
-                  
+
                   return allOptions.map((option) => {
                     const optionDate = new Date();
                     optionDate.setDate(optionDate.getDate() + option.days);

@@ -126,7 +126,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
   const spark = getSparkById(sparkId);
 
   // Detect if we're in the marketplace or my sparks
-  const isFromMarketplace = navigation.getState().routes[0]?.name === 'Marketplace';
+  const isFromMarketplace = navigation.getState()?.routes[0]?.name === 'MarketplaceList';
   const isInUserCollection = isUserSpark(sparkId);
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
         ServiceFactory.ensureAnalyticsInitialized().then(() => {
           const AnalyticsService = ServiceFactory.getAnalyticsService();
           if (AnalyticsService.trackSparkOpen) {
-            AnalyticsService.trackSparkOpen(sparkId, spark.name);
+            AnalyticsService.trackSparkOpen(sparkId, spark.metadata.title);
           }
         });
       });
@@ -190,7 +190,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       console.log('QuickSwitch: Target spark found:', targetSpark);
 
       if (targetSpark) {
-        navigation.replace('Spark', { sparkId: selectedSparkId });
+        (navigation as any).replace('Spark', { sparkId: selectedSparkId });
       } else {
         console.error('QuickSwitch: Spark not found:', selectedSparkId);
       }
@@ -202,7 +202,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       const previousSpark = recentSparks.find(id => id !== sparkId);
       if (previousSpark) {
         HapticFeedback.light();
-        navigation.replace('Spark', { sparkId: previousSpark });
+        (navigation as any).replace('Spark', { sparkId: previousSpark });
       }
     } else {
       handleQuickSwitch();
@@ -226,20 +226,22 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={{ flex: 1 }}>
         <SparkComponent
-          showSettings={showSparkSettings}
-          onCloseSettings={() => setShowSparkSettings(false)}
-          onStateChange={(state) => {
-            // Handle spark state changes
-            console.log('Spark state changed:', state);
-          }}
-          onComplete={(result) => {
-            // Handle spark completion
-            console.log('Spark completed:', result);
-            updateSparkProgress(sparkId, {
-              completionPercentage: 100,
-              customData: result,
-            });
-          }}
+          {...{
+            showSettings: showSparkSettings,
+            onCloseSettings: () => setShowSparkSettings(false),
+            onStateChange: (state: any) => {
+              // Handle spark state changes
+              console.log('Spark state changed:', state);
+            },
+            onComplete: (result: any) => {
+              // Handle spark completion
+              console.log('Spark completed:', result);
+              updateSparkProgress(sparkId, {
+                completionPercentage: 100,
+                customData: result,
+              });
+            },
+          } as any}
         />
       </View>
 

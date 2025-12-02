@@ -200,15 +200,15 @@ interface PackingListSparkProps {
   onComplete?: (result: any) => void;
 }
 
-export const PackingListSpark: React.FC<PackingListSparkProps> = ({ 
+export const PackingListSpark: React.FC<PackingListSparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
-  onComplete 
+  onComplete
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
-  
+
   const [items, setItems] = useState<PackingItem[]>(defaultItems);
 
   // Load saved data on mount
@@ -401,7 +401,7 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       <PackingListSettings
         items={items}
         onSave={saveCustomItems}
-        onClose={onCloseSettings}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -411,14 +411,14 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       <View style={styles.header}>
         <Text style={styles.title}>🎒 Packing List</Text>
         <Text style={styles.subtitle}>Tap items to mark as packed</Text>
-        
+
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
             {packedCount} of {totalCount} items packed
           </Text>
           <View style={styles.progressBar}>
-            <View 
-              style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
+            <View
+              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
             />
           </View>
           <Text style={styles.progressLabel}>
@@ -435,16 +435,16 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
             style={[styles.listItem, index === items.length - 1 && styles.lastItem]}
             onPress={() => toggleItemPacked(item.id)}
           >
-            <Text 
+            <Text
               style={[
-                styles.itemText, 
+                styles.itemText,
                 item.packed && styles.itemTextPacked
               ]}
             >
               {item.item}
             </Text>
             <View style={[
-              styles.countBadge, 
+              styles.countBadge,
               item.packed && styles.countBadgePacked
             ]}>
               <Text style={styles.countText}>{item.count}</Text>
@@ -457,13 +457,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       </View>
 
       <View style={styles.bottomButtons}>
-        <TouchableOpacity 
-          style={styles.uncheckAllButton} 
+        <TouchableOpacity
+          style={styles.uncheckAllButton}
           onPress={uncheckAll}
         >
           <Text style={styles.uncheckAllButtonText}>Uncheck All Items</Text>
         </TouchableOpacity>
-        
+
       </View>
     </ScrollView>
   );

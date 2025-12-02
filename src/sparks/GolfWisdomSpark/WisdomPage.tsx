@@ -27,7 +27,7 @@ export const WisdomPage: React.FC<WisdomPageProps> = ({ quote }) => {
             </View>
 
             {/* Attribution */}
-            <Text style={styles.attribution}>— Jerry</Text>
+            <Text style={styles.attribution}>— {quote.contributor || 'Tam O\'Shanter'}</Text>
 
             {/* Bottom decorative flourish */}
             <View style={styles.bottomFlourish}>

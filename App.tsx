@@ -15,7 +15,7 @@ let firebaseApp: any = null;
 try {
   const firebase = require('@react-native-firebase/app');
   firebaseApp = firebase.default;
-  
+
   // Initialize Firebase app if not already initialized
   if (!firebaseApp.apps.length) {
     firebaseApp.initializeApp();
@@ -24,7 +24,7 @@ try {
     console.log('✅ Firebase app already initialized');
   }
 } catch (error) {
-  console.log('⚠️ Firebase not available:', error.message);
+  console.log('⚠️ Firebase not available:', (error as Error).message);
 }
 
 export default function App() {
@@ -39,22 +39,22 @@ export default function App() {
 
 function AppContent() {
   const { preferences } = useAppStore();
-  
+
   // Initialize notifications when app starts
   useEffect(() => {
     const initializeNotifications = async () => {
       // Set up notification handler
       await NotificationService.requestPermissions();
-      
+
       // Initialize feedback notification service
       await FeedbackNotificationService.initialize();
-      
+
       // Register background task for notifications
       await NotificationService.registerBackgroundTask();
-      
+
       // Update app icon badge with aggregated unread counts
       await FeedbackNotificationService.updateAppIconBadge();
-      
+
     };
 
     initializeNotifications();
@@ -62,21 +62,21 @@ function AppContent() {
     // Listen for notification responses (when user taps notification)
     const subscription = NotificationService.addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
-      
+
       // Import navigation ref dynamically to avoid circular dependencies
       import('./src/navigation/AppNavigator').then(({ navigationRef }) => {
         if (navigationRef.isReady()) {
           if (data?.type === 'spark-notification' && data?.sparkId) {
             // Navigate to the specific spark
             // First navigate to MySparks stack, then to the Spark screen
-            navigationRef.navigate('MySparks', {
+            (navigationRef as any).navigate('MySparks', {
               screen: 'Spark',
               params: { sparkId: data.sparkId },
             });
             console.log(`✅ Navigated to spark ${data.sparkId} from notification`);
           } else if (data?.type === 'activity-start' && data?.sparkId) {
             // Legacy activity notifications - navigate to spark
-            navigationRef.navigate('MySparks', {
+            (navigationRef as any).navigate('MySparks', {
               screen: 'Spark',
               params: { sparkId: data.sparkId },
             });
@@ -97,14 +97,14 @@ function AppContent() {
         const AnalyticsService = ServiceFactory.getAnalyticsService();
         const sessionInfo = AnalyticsService.getSessionInfo();
         const deviceId = sessionInfo.userId || sessionInfo.sessionId || 'anonymous';
-        
+
         console.log('👂 Starting feedback response listener for device:', deviceId);
         feedbackListenerCleanup = FeedbackNotificationService.startListeningForNewResponses(deviceId);
       } catch (error) {
         console.error('❌ Error starting feedback listener:', error);
       }
     };
-    
+
     // Start the listener after a short delay to ensure Firebase is initialized
     const listenerTimeout = setTimeout(startFeedbackListener, 2000);
     startFeedbackListener();
@@ -127,7 +127,7 @@ function AppContent() {
       clearInterval(badgeUpdateInterval);
     };
   }, []);
-  
+
   return (
     <>
       <AppNavigator />

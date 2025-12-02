@@ -6,7 +6,7 @@ export const TitlePage: React.FC = () => {
         <View style={styles.container}>
             <Text style={styles.icon}>⛳</Text>
             <Text style={styles.title}>Golf Wisdom</Text>
-            <Text style={styles.subtitle}>by Jerry</Text>
+            <Text style={styles.subtitle}>by Tam O'Shanter</Text>
         </View>
     );
 };
