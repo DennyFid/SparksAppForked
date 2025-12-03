@@ -344,6 +344,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   const [settings, setSettings] = useState<ToviewSettings>({ providers: [] });
   const [editingProvider, setEditingProvider] = useState('');
   const [editingWatchWith, setEditingWatchWith] = useState('');
+  const [providerDropdownKey, setProviderDropdownKey] = useState(0);
   const textInputRef = useRef<TextInput>(null);
 
   // Load data on mount
@@ -470,6 +471,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
     await saveData(updatedToviews);
     setNewToviewText('');
     setSelectedProvider('');
+    setProviderDropdownKey(prev => prev + 1); // Force dropdown reset
     HapticFeedback.light();
   };
 
@@ -730,24 +732,19 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
       <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TextInput
           style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-          placeholder="Add new Toview (use category: View)"
+          placeholder="Add Category: Toview (withPerson1, Person2))"
           placeholderTextColor={colors.textSecondary}
           value={newToviewText}
           onChangeText={setNewToviewText}
           onSubmitEditing={addToview}
           returnKeyType="done"
         />
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={addToview}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Provider dropdown */}
       <View style={[styles.providerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Dropdown
+          key={`provider-${providerDropdownKey}`}
           options={settings.providers}
           selectedValue={selectedProvider}
           onSelect={setSelectedProvider}
@@ -798,15 +795,15 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
               key={`@${person}`}
               style={[
                 styles.filterChip,
-                styles.personChip,
-                { backgroundColor: filterCategory === `@${person}` ? '#9B59B6' : '#E8D5F2', borderColor: '#9B59B6' }
+                styles.categoryChip,
+                { backgroundColor: filterCategory === `@${person}` ? '#9B59B6' : colors.background, borderColor: colors.border }
               ]}
               onPress={() => {
                 setFilterCategory(`@${person}`);
                 setNewToviewText('');
               }}
             >
-              <Text style={[styles.filterChipText, { color: filterCategory === `@${person}` ? 'white' : '#9B59B6' }]}>
+              <Text style={[styles.filterChipText, { color: filterCategory === `@${person}` ? 'white' : colors.text }]}>
                 {person}
               </Text>
             </TouchableOpacity>
@@ -1069,31 +1066,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addContainer: {
-    flexDirection: 'row',
     padding: 16,
     borderBottomWidth: 1,
-    alignItems: 'center',
   },
   textInput: {
-    flex: 1,
     height: 44,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
-    marginRight: 12,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
   },
   filtersContainer: {
     padding: 16,

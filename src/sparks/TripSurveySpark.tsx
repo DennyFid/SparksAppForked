@@ -11,6 +11,8 @@ import {
   Share,
   Clipboard,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
@@ -49,7 +51,7 @@ interface Trip {
   updatedAt: string;
   isFinalized: boolean;
   possibleDates: DateRange[];
-  blackoutDates: DateRange[];
+  blackoutDates: string[];
   locations: string[];
   packages: Package[];
   people: string[];
@@ -96,7 +98,6 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
-  const [dateRangeType, setDateRangeType] = useState<'possible' | 'blackout'>('possible');
   const [dateRangeStart, setDateRangeStart] = useState('');
   const [dateRangeEnd, setDateRangeEnd] = useState('');
 
@@ -121,7 +122,22 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
   const loadTrips = () => {
     const data = getSparkData('trip-survey');
     if (data?.trips) {
-      setTrips(data.trips);
+      // Migrate blackout dates from DateRange[] to string[] if needed
+      const migratedTrips = data.trips.map((trip: any) => {
+        if (trip.blackoutDates && Array.isArray(trip.blackoutDates) && trip.blackoutDates.length > 0) {
+          // Check if first item is a DateRange object (has id, startDate, endDate)
+          const firstItem = trip.blackoutDates[0];
+          if (firstItem && typeof firstItem === 'object' && firstItem.startDate && firstItem.endDate) {
+            // Migrate from DateRange[] to string[]
+            return {
+              ...trip,
+              blackoutDates: trip.blackoutDates.map((dr: DateRange) => formatDateRange(dr)),
+            };
+          }
+        }
+        return trip;
+      });
+      setTrips(migratedTrips);
     }
   };
 
@@ -148,8 +164,30 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
   };
 
+  // Get local date string in YYYY-MM-DD format
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get local ISO string (for timestamps)
+  const getLocalISOString = (): string => {
+    const now = new Date();
+    const offset = now.getTimezoneOffset();
+    const localTime = new Date(now.getTime() - (offset * 60 * 1000));
+    return localTime.toISOString();
+  };
+
+  // Parse YYYY-MM-DD as local date (not UTC)
+  const parseLocalDate = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -167,8 +205,8 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
     const newTrip: Trip = {
       id: generateId(),
       name: newTripName.trim(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getLocalISOString(),
+      updatedAt: getLocalISOString(),
       isFinalized: false,
       possibleDates: [],
       blackoutDates: [],
@@ -193,7 +231,6 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
   // Add possible date
   const handleAddPossibleDate = (trip: Trip) => {
-    setDateRangeType('possible');
     setDateRangeStart('');
     setDateRangeEnd('');
     setShowDateRangeModal(true);
@@ -202,14 +239,34 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
   // Add blackout date
   const handleAddBlackoutDate = (trip: Trip) => {
-    setDateRangeType('blackout');
-    setDateRangeStart('');
-    setDateRangeEnd('');
-    setShowDateRangeModal(true);
-    HapticFeedback.light();
+    Alert.prompt(
+      'Add Blackout Date',
+      'Enter blackout date text (e.g., "Out for August" or "July 2, 2025 to Jul 5, 2025"):',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: (text?: string) => {
+            if (text?.trim()) {
+              const updatedTrip = {
+                ...trip,
+                blackoutDates: [...trip.blackoutDates, text.trim()],
+                updatedAt: getLocalISOString(),
+              };
+              const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+              saveTrips(updatedTrips);
+              setSelectedTrip(updatedTrip);
+              HapticFeedback.success();
+            }
+          },
+        },
+      ],
+      'plain-text',
+      ''
+    );
   };
 
-  // Save date range
+  // Save date range (only for possible dates now)
   const handleSaveDateRange = () => {
     if (!selectedTrip) return;
 
@@ -225,9 +282,9 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
       return;
     }
 
-    // Validate that start is before end
-    const start = new Date(dateRangeStart);
-    const end = new Date(dateRangeEnd);
+    // Validate that start is before end (using local dates)
+    const start = parseLocalDate(dateRangeStart);
+    const end = parseLocalDate(dateRangeEnd);
     if (start > end) {
       Alert.alert('Error', 'Start date must be before end date');
       return;
@@ -241,11 +298,8 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
     const updatedTrip = {
       ...selectedTrip,
-      [dateRangeType === 'possible' ? 'possibleDates' : 'blackoutDates']: [
-        ...(dateRangeType === 'possible' ? selectedTrip.possibleDates : selectedTrip.blackoutDates),
-        newDateRange,
-      ],
-      updatedAt: new Date().toISOString(),
+      possibleDates: [...selectedTrip.possibleDates, newDateRange],
+      updatedAt: getLocalISOString(),
     };
 
     const updatedTrips = trips.map((t) => (t.id === selectedTrip.id ? updatedTrip : t));
@@ -266,12 +320,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Add',
-          onPress: (location) => {
+          onPress: (location?: string) => {
             if (location?.trim()) {
               const updatedTrip = {
                 ...trip,
                 locations: [...trip.locations, location.trim()],
-                updatedAt: new Date().toISOString(),
+                updatedAt: getLocalISOString(),
               };
               const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
               saveTrips(updatedTrips);
@@ -305,7 +359,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Next',
-          onPress: (name) => {
+          onPress: (name?: string) => {
             if (name?.trim()) {
               Alert.prompt(
                 'Add Package',
@@ -314,7 +368,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Next',
-                    onPress: (priceStr) => {
+                    onPress: (priceStr?: string) => {
                       const price = parsePrice(priceStr || '0');
                       if (price > 0) {
                         Alert.prompt(
@@ -324,7 +378,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                             { text: 'Cancel', style: 'cancel' },
                             {
                               text: 'Add',
-                              onPress: (daysStr) => {
+                              onPress: (daysStr?: string) => {
                                 const days = parseInt(daysStr || '0', 10);
                                 if (!isNaN(days) && days > 0) {
                                   const newPackage: Package = {
@@ -336,7 +390,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                                   const updatedTrip = {
                                     ...trip,
                                     packages: [...trip.packages, newPackage],
-                                    updatedAt: new Date().toISOString(),
+                                    updatedAt: getLocalISOString(),
                                   };
                                   const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
                                   saveTrips(updatedTrips);
@@ -378,12 +432,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Add',
-          onPress: (name) => {
+          onPress: (name?: string) => {
             if (name?.trim()) {
               const updatedTrip = {
                 ...trip,
                 people: [...trip.people, name.trim()],
-                updatedAt: new Date().toISOString(),
+                updatedAt: getLocalISOString(),
               };
               const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
               saveTrips(updatedTrips);
@@ -398,40 +452,176 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
     );
   };
 
+  // Delete possible date
+  const handleDeletePossibleDate = (trip: Trip, dateRangeId: string) => {
+    Alert.alert(
+      'Delete Date Range',
+      'Are you sure you want to delete this date range?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedTrip = {
+              ...trip,
+              possibleDates: trip.possibleDates.filter((dr) => dr.id !== dateRangeId),
+              updatedAt: getLocalISOString(),
+            };
+            const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+            saveTrips(updatedTrips);
+            setSelectedTrip(updatedTrip);
+            HapticFeedback.success();
+          },
+        },
+      ]
+    );
+  };
+
+  // Delete blackout date
+  const handleDeleteBlackoutDate = (trip: Trip, blackoutIndex: number) => {
+    Alert.alert(
+      'Delete Blackout Date',
+      'Are you sure you want to delete this blackout date?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedTrip = {
+              ...trip,
+              blackoutDates: trip.blackoutDates.filter((_, idx) => idx !== blackoutIndex),
+              updatedAt: getLocalISOString(),
+            };
+            const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+            saveTrips(updatedTrips);
+            setSelectedTrip(updatedTrip);
+            HapticFeedback.success();
+          },
+        },
+      ]
+    );
+  };
+
+  // Delete location
+  const handleDeleteLocation = (trip: Trip, locationIndex: number) => {
+    Alert.alert(
+      'Delete Location',
+      'Are you sure you want to delete this location?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedTrip = {
+              ...trip,
+              locations: trip.locations.filter((_, idx) => idx !== locationIndex),
+              updatedAt: getLocalISOString(),
+            };
+            const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+            saveTrips(updatedTrips);
+            setSelectedTrip(updatedTrip);
+            HapticFeedback.success();
+          },
+        },
+      ]
+    );
+  };
+
+  // Delete package
+  const handleDeletePackage = (trip: Trip, packageId: string) => {
+    Alert.alert(
+      'Delete Package',
+      'Are you sure you want to delete this package?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedTrip = {
+              ...trip,
+              packages: trip.packages.filter((pkg) => pkg.id !== packageId),
+              updatedAt: getLocalISOString(),
+            };
+            const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+            saveTrips(updatedTrips);
+            setSelectedTrip(updatedTrip);
+            HapticFeedback.success();
+          },
+        },
+      ]
+    );
+  };
+
+  // Delete person
+  const handleDeletePerson = (trip: Trip, personIndex: number) => {
+    Alert.alert(
+      'Delete Person',
+      'Are you sure you want to delete this person?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedTrip = {
+              ...trip,
+              people: trip.people.filter((_, idx) => idx !== personIndex),
+              updatedAt: getLocalISOString(),
+            };
+            const updatedTrips = trips.map((t) => (t.id === trip.id ? updatedTrip : t));
+            saveTrips(updatedTrips);
+            setSelectedTrip(updatedTrip);
+            HapticFeedback.success();
+          },
+        },
+      ]
+    );
+  };
+
   // Generate share text
   const generateShareText = (trip: Trip): string => {
     let text = `Trip Survey: ${trip.name}\n\n`;
 
     text += 'Possible Dates:\n';
     if (trip.possibleDates.length === 0) {
-      text += '- None\n';
+      text += '- None -yes\n';
     } else {
       trip.possibleDates.forEach((dateRange) => {
-        text += `- ${formatDateRange(dateRange)}\n`;
+        text += `- ${formatDateRange(dateRange)} -yes\n`;
       });
     }
 
     text += '\nLocations:\n';
     if (trip.locations.length === 0) {
-      text += '- None\n';
+      text += '- None -yes\n';
     } else {
       trip.locations.forEach((location) => {
-        text += `- ${location}\n`;
+        text += `- ${location} -yes\n`;
       });
     }
 
     text += '\nPackages:\n';
     if (trip.packages.length === 0) {
-      text += '- None\n';
+      text += '- None -yes\n';
     } else {
       trip.packages.forEach((pkg) => {
-        text += `- ${pkg.name} - $${pkg.price} - ${pkg.days} days\n`;
+        text += `- ${pkg.name} - $${pkg.price} - ${pkg.days} days -yes\n`;
       });
     }
 
-    text += '\nPlease respond with your preferences for each option above by adding a yes, no, or maybe at the end of each line - do not change the value or add values - just add yes, no, or maybe to each option.\n\n';
-    text += 'If you have any Blackout Dates that you cannot travel, list them below:\n';
-    text += '- None';
+    text += '\nPlease respond with your preferences for each option above by adding a yes, no, or maybe at the end of each line (you can replace -yes with -no or -maybe, or just add yes/no/maybe). Do not change the value or add values - just modify the yes/no/maybe at the end of each option.\n\n';
+    text += 'If you have any Blackout Dates that you cannot travel, list them below (each date on a new line starting with *):\n';
+    if (trip.blackoutDates.length === 0) {
+      text += '* None\n';
+    } else {
+      trip.blackoutDates.forEach((blackoutText) => {
+        text += `* ${blackoutText}\n`;
+      });
+    }
 
     return text;
   };
@@ -485,26 +675,31 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         continue;
       }
 
-      // Parse blackout dates
-      if (blackoutSection && !line.startsWith('-')) {
-        blackoutDates = (blackoutDates ? blackoutDates + '\n' : '') + line;
+      // Parse blackout dates (lines starting with *)
+      if (blackoutSection) {
+        if (line.startsWith('*')) {
+          const blackoutDate = line.substring(1).trim();
+          if (blackoutDate && blackoutDate.toLowerCase() !== 'none') {
+            blackoutDates = (blackoutDates ? blackoutDates + '\n' : '') + blackoutDate;
+          }
+        }
         continue;
       }
 
-      // Extract yes/no/maybe
-      const yesMatch = /\b(yes|y)\b/i;
-      const noMatch = /\b(no|n)\b/i;
-      const maybeMatch = /\b(maybe|m)\b/i;
-
+      // Extract yes/no/maybe - check for -yes/-no/-maybe or yes/no/maybe at the end
+      const answerMatch = line.match(/\s*[-]?\s*(yes|no|maybe|y|n|m)\s*$/i);
       let answer = '';
-      if (yesMatch.test(line)) answer = 'yes';
-      else if (noMatch.test(line)) answer = 'no';
-      else if (maybeMatch.test(line)) answer = 'maybe';
+      if (answerMatch) {
+        const answerText = answerMatch[1].toLowerCase();
+        if (answerText.startsWith('y')) answer = 'yes';
+        else if (answerText.startsWith('n')) answer = 'no';
+        else if (answerText.startsWith('m')) answer = 'maybe';
+      }
 
       if (!answer) continue;
 
-      // Remove yes/no/maybe from line to get the option text
-      const optionText = line.replace(/\b(yes|no|maybe|y|n|m)\b/gi, '').trim();
+      // Remove yes/no/maybe from line to get the option text (remove trailing -yes/-no/-maybe or yes/no/maybe)
+      const optionText = line.replace(/\s*[-]?\s*(yes|no|maybe|y|n|m)\s*$/gi, '').trim();
 
       if (currentSection === 'dates') {
         // Match date ranges
@@ -574,7 +769,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
       rawText: responseText,
       parsedAnswers: answers,
       blackoutDatesText: blackoutDates,
-      receivedAt: new Date().toISOString(),
+      receivedAt: getLocalISOString(),
     };
 
     // Remove any existing response from this participant for this trip
@@ -613,7 +808,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
       finalLocations: selectedFinalLocations,
       finalPackages: selectedFinalPackages.length > 0 ? selectedFinalPackages : undefined,
       finalPeople: selectedFinalPeople.length > 0 ? selectedFinalPeople : undefined,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getLocalISOString(),
     };
 
     const updatedTrips = trips.map((t) => (t.id === selectedTrip.id ? updatedTrip : t));
@@ -631,7 +826,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
     const updatedTrip: Trip = {
       ...selectedTrip,
       isFinalized: false,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getLocalISOString(),
     };
 
     const updatedTrips = trips.map((t) => (t.id === selectedTrip.id ? updatedTrip : t));
@@ -718,7 +913,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         fontWeight: '600',
       },
       tripCard: {
-        backgroundColor: colors.card,
+        backgroundColor: colors.surface,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -835,16 +1030,29 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         marginBottom: 12,
       },
       item: {
-        backgroundColor: colors.card,
+        backgroundColor: colors.surface,
         borderRadius: 8,
         padding: 12,
         marginBottom: 8,
         borderWidth: 1,
         borderColor: colors.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
       },
       itemText: {
         fontSize: 14,
         color: colors.text,
+        flex: 1,
+      },
+      deleteButton: {
+        padding: 8,
+        marginLeft: 8,
+      },
+      deleteButtonText: {
+        color: '#FF3B30',
+        fontSize: 16,
+        fontWeight: '600',
       },
       addButton: {
         backgroundColor: colors.primary + '20',
@@ -900,6 +1108,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               selectedTrip.possibleDates.map((dateRange) => (
                 <View key={dateRange.id} style={styles.item}>
                   <Text style={styles.itemText}>{formatDateRange(dateRange)}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeletePossibleDate(selectedTrip, dateRange.id)}
+                  >
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             )}
@@ -908,26 +1122,6 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               onPress={() => handleAddPossibleDate(selectedTrip)}
             >
               <Text style={styles.addButtonText}>+ Add Date Range</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Blackout Dates */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Blackout Dates</Text>
-            {selectedTrip.blackoutDates.length === 0 ? (
-              <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>No blackout dates</Text>
-            ) : (
-              selectedTrip.blackoutDates.map((dateRange) => (
-                <View key={dateRange.id} style={styles.item}>
-                  <Text style={styles.itemText}>{formatDateRange(dateRange)}</Text>
-                </View>
-              ))
-            )}
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => handleAddBlackoutDate(selectedTrip)}
-            >
-              <Text style={styles.addButtonText}>+ Add Blackout Date</Text>
             </TouchableOpacity>
           </View>
 
@@ -940,6 +1134,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               selectedTrip.locations.map((location, index) => (
                 <View key={index} style={styles.item}>
                   <Text style={styles.itemText}>{location}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteLocation(selectedTrip, index)}
+                  >
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             )}
@@ -962,6 +1162,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                   <Text style={styles.itemText}>
                     {pkg.name} - ${pkg.price} - {pkg.days} days
                   </Text>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeletePackage(selectedTrip, pkg.id)}
+                  >
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             )}
@@ -982,6 +1188,12 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               selectedTrip.people.map((person, index) => (
                 <View key={index} style={styles.item}>
                   <Text style={styles.itemText}>{person}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeletePerson(selectedTrip, index)}
+                  >
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             )}
@@ -990,6 +1202,32 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               onPress={() => handleAddPerson(selectedTrip)}
             >
               <Text style={styles.addButtonText}>+ Add Person</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Blackout Dates */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Blackout Dates</Text>
+            {selectedTrip.blackoutDates.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>No blackout dates</Text>
+            ) : (
+              selectedTrip.blackoutDates.map((blackoutText, index) => (
+                <View key={index} style={styles.item}>
+                  <Text style={styles.itemText}>{blackoutText}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteBlackoutDate(selectedTrip, index)}
+                  >
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => handleAddBlackoutDate(selectedTrip)}
+            >
+              <Text style={styles.addButtonText}>+ Add Blackout Date</Text>
             </TouchableOpacity>
           </View>
 
@@ -1168,7 +1406,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
       rowHeader: {
         width: 150,
         padding: 12,
-        backgroundColor: colors.card,
+        backgroundColor: colors.surface,
         borderRightWidth: 1,
         borderRightColor: colors.border,
         justifyContent: 'center',
@@ -1189,21 +1427,24 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         color: colors.text,
       },
       cellTextYes: {
+        fontSize: 12,
         color: '#4CAF50',
         fontWeight: '600',
       },
       cellTextNo: {
+        fontSize: 12,
         color: '#F44336',
         fontWeight: '600',
       },
       cellTextMaybe: {
+        fontSize: 12,
         color: '#FF9800',
         fontWeight: '600',
       },
       columnHeader: {
         width: 120,
         padding: 12,
-        backgroundColor: colors.card,
+        backgroundColor: colors.surface,
         alignItems: 'center',
         borderRightWidth: 1,
         borderRightColor: colors.border,
@@ -1220,7 +1461,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
     });
 
     // Build matrix data
-    const options: Array<{ type: 'date' | 'location' | 'package'; id: string; label: string }> = [];
+    const options: Array<{ type: 'date' | 'location' | 'package' | 'blackout'; id: string; label: string }> = [];
 
     selectedTrip.possibleDates.forEach((dateRange) => {
       options.push({
@@ -1243,6 +1484,36 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
         type: 'package',
         id: pkg.id,
         label: `${pkg.name} - $${pkg.price} - ${pkg.days} days`,
+      });
+    });
+
+    // Add blackout dates from the trip (as text entries)
+    // Collect all unique blackout dates from responses and trip
+    const allBlackoutDates = new Set<string>();
+    
+    // Add trip's blackout dates
+    selectedTrip.blackoutDates.forEach((blackoutText) => {
+      allBlackoutDates.add(blackoutText.trim());
+    });
+    
+    // Add blackout dates from responses (extract individual lines)
+    responses
+      .filter((r) => r.tripId === selectedTrip.id && r.blackoutDatesText)
+      .forEach((response) => {
+        const lines = response.blackoutDatesText!.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+        lines.forEach((line) => {
+          if (line.toLowerCase() !== 'none') {
+            allBlackoutDates.add(line);
+          }
+        });
+      });
+    
+    // Add each unique blackout date as an option
+    Array.from(allBlackoutDates).forEach((blackoutText) => {
+      options.push({
+        type: 'blackout',
+        id: blackoutText, // Use text as ID
+        label: `🚫 ${blackoutText}`,
       });
     });
 
@@ -1284,6 +1555,34 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                   </Text>
                 </View>
                 {selectedTrip.people.map((person) => {
+                  // For blackout dates, check if this specific blackout date text matches
+                  if (option.type === 'blackout') {
+                    const response = responses.find(
+                      (r) => r.tripId === selectedTrip.id && r.participantName === person
+                    );
+                    if (response?.blackoutDatesText) {
+                      const responseLines = response.blackoutDatesText
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0 && line.toLowerCase() !== 'none');
+                      // Check for exact match (case-insensitive)
+                      const hasMatch = responseLines.some(
+                        (line) => line.toLowerCase() === option.id.toLowerCase()
+                      );
+                      return (
+                        <View key={person} style={styles.cell}>
+                          <Text style={styles.cellText}>{hasMatch ? '✓' : '-'}</Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <View key={person} style={styles.cell}>
+                        <Text style={styles.cellText}>-</Text>
+                      </View>
+                    );
+                  }
+
+                  // For regular options (dates, locations, packages)
                   const answer = getResponseForOption(selectedTrip.id, person, option.type, option.id);
                   let cellStyle = styles.cellText;
                   if (answer === 'yes') cellStyle = styles.cellTextYes;
@@ -1307,46 +1606,56 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
   // Render modals
   const renderCreateTripModal = () => (
     <Modal visible={showCreateTripModal} transparent animationType="slide">
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-        <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
-            Create New Trip
-          </Text>
-          <TextInput
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 8,
-              padding: 12,
-              fontSize: 16,
-              color: colors.text,
-              marginBottom: 16,
-            }}
-            placeholder="Trip name"
-            placeholderTextColor={colors.textSecondary}
-            value={newTripName}
-            onChangeText={setNewTripName}
-            autoFocus
-          />
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-            <TouchableOpacity
-              style={{ padding: 12, marginRight: 12 }}
-              onPress={() => {
-                setShowCreateTripModal(false);
-                setNewTripName('');
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, width: '90%', maxWidth: 400 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
+              Create New Trip
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 16,
+                color: colors.text,
+                marginBottom: 16,
               }}
-            >
-              <Text style={{ color: colors.textSecondary }}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}
-              onPress={handleCreateTrip}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Create</Text>
-            </TouchableOpacity>
+              placeholder="Trip name"
+              placeholderTextColor={colors.textSecondary}
+              value={newTripName}
+              onChangeText={setNewTripName}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                style={{ padding: 12, marginRight: 12 }}
+                onPress={() => {
+                  setShowCreateTripModal(false);
+                  setNewTripName('');
+                }}
+              >
+                <Text style={{ color: colors.textSecondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}
+                onPress={handleCreateTrip}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Create</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
@@ -1355,72 +1664,82 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
     return (
       <Modal visible={showAddResponseModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
-              Add Response
-            </Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, maxHeight: '80%', width: '90%', maxWidth: 400 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
+                Add Response
+              </Text>
 
-            <Text style={{ fontSize: 14, color: colors.text, marginBottom: 8 }}>Participant:</Text>
-            <ScrollView style={{ maxHeight: 150, marginBottom: 16 }}>
-              {selectedTrip.people.map((person) => (
-                <TouchableOpacity
-                  key={person}
-                  style={{
-                    padding: 12,
-                    backgroundColor: responseParticipant === person ? colors.primary + '20' : colors.card,
-                    borderRadius: 8,
-                    marginBottom: 8,
-                    borderWidth: 1,
-                    borderColor: responseParticipant === person ? colors.primary : colors.border,
-                  }}
-                  onPress={() => setResponseParticipant(person)}
-                >
-                  <Text style={{ color: colors.text }}>{person}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <Text style={{ fontSize: 14, color: colors.text, marginBottom: 8 }}>Participant:</Text>
+              <ScrollView style={{ maxHeight: 150, marginBottom: 16 }}>
+                {selectedTrip.people.map((person) => (
+                  <TouchableOpacity
+                    key={person}
+                    style={{
+                      padding: 12,
+                      backgroundColor: responseParticipant === person ? colors.primary + '20' : colors.surface,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: responseParticipant === person ? colors.primary : colors.border,
+                    }}
+                    onPress={() => setResponseParticipant(person)}
+                  >
+                    <Text style={{ color: colors.text }}>{person}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-            <Text style={{ fontSize: 14, color: colors.text, marginBottom: 8 }}>Response Text:</Text>
-            <TextInput
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 8,
-                padding: 12,
-                fontSize: 14,
-                color: colors.text,
-                marginBottom: 16,
-                minHeight: 200,
-                textAlignVertical: 'top',
-              }}
-              placeholder="Paste the response text here..."
-              placeholderTextColor={colors.textSecondary}
-              value={responseText}
-              onChangeText={setResponseText}
-              multiline
-            />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-              <TouchableOpacity
-                style={{ padding: 12, marginRight: 12 }}
-                onPress={() => {
-                  setShowAddResponseModal(false);
-                  setResponseParticipant('');
-                  setResponseText('');
+              <Text style={{ fontSize: 14, color: colors.text, marginBottom: 8 }}>Response Text:</Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 14,
+                  color: colors.text,
+                  marginBottom: 16,
+                  minHeight: 200,
+                  textAlignVertical: 'top',
                 }}
-              >
-                <Text style={{ color: colors.textSecondary }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}
-                onPress={handleAddResponse}
-              >
-                <Text style={{ color: '#fff', fontWeight: '600' }}>Save</Text>
-              </TouchableOpacity>
+                placeholder="Paste the response text here..."
+                placeholderTextColor={colors.textSecondary}
+                value={responseText}
+                onChangeText={setResponseText}
+                multiline
+              />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                <TouchableOpacity
+                  style={{ padding: 12, marginRight: 12 }}
+                  onPress={() => {
+                    setShowAddResponseModal(false);
+                    setResponseParticipant('');
+                    setResponseText('');
+                  }}
+                >
+                  <Text style={{ color: colors.textSecondary }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}
+                  onPress={handleAddResponse}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     );
   };
@@ -1434,8 +1753,17 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
     return (
       <Modal visible={showFinalizeModal} transparent animationType="slide">
-        <ScrollView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} contentContainerStyle={{ justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, width: '90%', maxWidth: 400 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
               Finalize Trip
             </Text>
@@ -1447,7 +1775,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                   key={`start-${index}`}
                   style={{
                     padding: 12,
-                    backgroundColor: finalStartDate === startDate ? colors.primary + '20' : colors.card,
+                    backgroundColor: finalStartDate === startDate ? colors.primary + '20' : colors.surface,
                     borderRadius: 8,
                     marginBottom: 8,
                     borderWidth: 1,
@@ -1467,7 +1795,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                   key={`end-${index}`}
                   style={{
                     padding: 12,
-                    backgroundColor: finalEndDate === endDate ? colors.primary + '20' : colors.card,
+                    backgroundColor: finalEndDate === endDate ? colors.primary + '20' : colors.surface,
                     borderRadius: 8,
                     marginBottom: 8,
                     borderWidth: 1,
@@ -1489,7 +1817,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                     key={location}
                     style={{
                       padding: 12,
-                      backgroundColor: isSelected ? colors.primary + '20' : colors.card,
+                      backgroundColor: isSelected ? colors.primary + '20' : colors.surface,
                       borderRadius: 8,
                       marginBottom: 8,
                       borderWidth: 1,
@@ -1523,7 +1851,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                         key={pkg.id}
                         style={{
                           padding: 12,
-                          backgroundColor: isSelected ? colors.primary + '20' : colors.card,
+                          backgroundColor: isSelected ? colors.primary + '20' : colors.surface,
                           borderRadius: 8,
                           marginBottom: 8,
                           borderWidth: 1,
@@ -1561,7 +1889,7 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
                         key={person}
                         style={{
                           padding: 12,
-                          backgroundColor: isSelected ? colors.primary + '20' : colors.card,
+                          backgroundColor: isSelected ? colors.primary + '20' : colors.surface,
                           borderRadius: 8,
                           marginBottom: 8,
                           borderWidth: 1,
@@ -1603,7 +1931,8 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     );
   };
@@ -1615,8 +1944,17 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
 
     return (
       <Modal visible={showShareModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, maxHeight: '80%', width: '90%', maxWidth: 400 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
               Share Survey
             </Text>
@@ -1666,7 +2004,8 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               <Text style={{ color: colors.textSecondary }}>Close</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     );
   };
@@ -1674,10 +2013,19 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
   const renderDateRangeModal = () => {
     return (
       <Modal visible={showDateRangeModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 20, width: '90%', maxWidth: 400 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>
-              Add {dateRangeType === 'possible' ? 'Possible' : 'Blackout'} Date Range
+              Add Possible Date Range
             </Text>
 
             <Text style={{ fontSize: 14, color: colors.text, marginBottom: 8 }}>Start Date (YYYY-MM-DD):</Text>
@@ -1734,7 +2082,8 @@ export const TripSurveySpark: React.FC<TripSurveySparkProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     );
   };

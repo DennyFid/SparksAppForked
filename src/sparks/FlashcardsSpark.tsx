@@ -344,19 +344,16 @@ const FlashcardSettings: React.FC<{
         <SettingsSection title={`Your Phrases (${customCards.length})`}>
           {customCards.map((card) => (
             <SettingsItem key={card.id}>
-              <SettingsText>{card.english} → {card.spanish}</SettingsText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity
-                  onPress={() => editCard(card)}
-                  style={{
-                    padding: 8,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text style={{ fontSize: 18 }}>✏️</Text>
-                </TouchableOpacity>
-                <SettingsRemoveButton onPress={() => removeCard(card.id)} />
-              </View>
+              <TouchableOpacity
+                onPress={() => editCard(card)}
+                style={{ flex: 1 }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <SettingsText>{card.english} → {card.spanish}</SettingsText>
+                  <Text style={{ fontSize: 16 }}>✎</Text>
+                </View>
+              </TouchableOpacity>
+              <SettingsRemoveButton onPress={() => removeCard(card.id)} />
             </SettingsItem>
           ))}
         </SettingsSection>
