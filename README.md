@@ -47,11 +47,19 @@ SparksApp is a mobile application featuring a collection of micro-experiences ("
     ```
 
 3.  **Configure Environment Variables**
-    *   Copy the example environment file:
+    *   Create a `.env` file in the project root with your Firebase configuration:
         ```bash
-        cp .env.example .env
+        EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key_here
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+        EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+        EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+        EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+        EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
         ```
-    *   Open `.env` and fill in your Firebase configuration keys. You will need to create a Firebase project and enable Firestore and Authentication (Anonymous).
+    *   Get these values from Firebase Console (Project Settings > General > Your apps > Web app)
+    *   You will need to create a Firebase project and enable Firestore and Authentication (Anonymous).
+    *   **Important:** All Firebase environment variables must use the `EXPO_PUBLIC_` prefix.
 
 4.  **Start the app**
     ```bash

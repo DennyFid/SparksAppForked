@@ -20,6 +20,7 @@ import {
 } from '../components/SettingsComponents';
 import AddPhraseModal, { Phrase } from '../components/AddPhraseModal';
 import { CommonModal } from '../components/CommonModal';
+import { EditFlashcardModal, TranslationCard as TranslationCardType } from '../components/EditFlashcardModal';
 import { createCommonStyles } from '../styles/CommonStyles';
 import { StyleTokens } from '../styles/StyleTokens';
 
@@ -34,157 +35,6 @@ interface TranslationCard {
   lastAsked: Date | null;
   needsReview: boolean;
 }
-
-// Edit Phrase Modal Component
-const EditPhraseModal: React.FC<{
-  visible: boolean;
-  onClose: () => void;
-  onSave: (phrase: Omit<Phrase, 'id'>) => void;
-  onDelete: () => void;
-  card: TranslationCard;
-}> = ({ visible, onClose, onSave, onDelete, card }) => {
-  const { colors } = useTheme();
-  const [spanishText, setSpanishText] = useState(card.spanish);
-  const [englishText, setEnglishText] = useState(card.english);
-
-  useEffect(() => {
-    if (visible) {
-      setSpanishText(card.spanish);
-      setEnglishText(card.english);
-    }
-  }, [visible, card]);
-
-  const handleSave = () => {
-    if (!spanishText.trim() || !englishText.trim()) {
-      Alert.alert('Error', 'Please enter both Spanish and English text.');
-      return;
-    }
-
-    onSave({
-      spanish: spanishText.trim(),
-      english: englishText.trim(),
-      speaker: 'friend1'
-    });
-  };
-
-  const handleDelete = () => {
-    Alert.alert(
-      'Delete Phrase',
-      'Are you sure you want to delete this phrase?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: onDelete
-        }
-      ]
-    );
-  };
-
-  const commonStyles = createCommonStyles(colors);
-  const styles = StyleSheet.create({
-    ...commonStyles,
-    fieldLabel: {
-      fontSize: StyleTokens.fontSize.md,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: StyleTokens.spacing.sm,
-    },
-    textInput: {
-      ...commonStyles.input,
-      marginBottom: StyleTokens.spacing.md,
-    },
-    buttonContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      gap: StyleTokens.spacing.xs,
-    },
-    button: {
-      flex: 1,
-      padding: StyleTokens.spacing.sm,
-      borderRadius: StyleTokens.borderRadius.md,
-      alignItems: 'center',
-    },
-    cancelButton: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    deleteButton: {
-      backgroundColor: colors.error,
-    },
-    saveButton: {
-      backgroundColor: colors.primary,
-    },
-    buttonText: {
-      fontSize: StyleTokens.fontSize.md,
-      fontWeight: '600',
-    },
-    cancelButtonText: {
-      color: colors.text,
-    },
-    deleteButtonText: {
-      color: colors.background,
-    },
-    saveButtonText: {
-      color: colors.background,
-    },
-  });
-
-  const footer = (
-    <View style={styles.buttonContainer}>
-      <TouchableOpacity
-        style={[styles.button, styles.cancelButton]}
-        onPress={onClose}
-      >
-        <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.deleteButton]}
-        onPress={handleDelete}
-      >
-        <Text style={[styles.buttonText, styles.deleteButtonText]}>Delete</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, styles.saveButton]}
-        onPress={handleSave}
-      >
-        <Text style={[styles.buttonText, styles.saveButtonText]}>Save</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  return (
-    <CommonModal
-      visible={visible}
-      title="Edit Phrase"
-      onClose={onClose}
-      footer={footer}
-    >
-      <Text style={styles.fieldLabel}>Spanish phrase</Text>
-      <TextInput
-        style={styles.textInput}
-        placeholder="Enter Spanish phrase..."
-        placeholderTextColor={colors.textSecondary}
-        value={spanishText}
-        onChangeText={setSpanishText}
-        multiline
-        autoFocus
-      />
-
-      <Text style={styles.fieldLabel}>English translation</Text>
-      <TextInput
-        style={styles.textInput}
-        placeholder="Enter English translation..."
-        placeholderTextColor={colors.textSecondary}
-        value={englishText}
-        onChangeText={setEnglishText}
-        multiline
-      />
-    </CommonModal>
-  );
-};
 
 const defaultTranslations: TranslationCard[] = [
   // { id: 1, english: "Hello", spanish: "Hola", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
@@ -275,7 +125,7 @@ const FlashcardSettings: React.FC<{
     setShowEditModal(true);
   };
 
-  const saveEditCard = (updatedPhrase: Omit<Phrase, 'id'>) => {
+  const saveEditCard = (updatedPhrase: { english: string; spanish: string }) => {
     if (!editingCard) return;
     
     const updatedCards = customCards.map(card => 
@@ -369,7 +219,7 @@ const FlashcardSettings: React.FC<{
         showSpeakerSelection={false}
       />
       {editingCard && (
-        <EditPhraseModal
+        <EditFlashcardModal
           visible={showEditModal}
           onClose={() => {
             setShowEditModal(false);
@@ -424,6 +274,8 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [autoPlayActive, setAutoPlayActive] = useState(false);
   const [autoPlayPhase, setAutoPlayPhase] = useState<'english' | 'spanish1' | 'spanish2' | null>(null);
   const [autoPlayProgress, setAutoPlayProgress] = useState(0); // 0-1 for current phase progress
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCard, setEditingCard] = useState<TranslationCard | null>(null);
 
   // Animation values
   const celebrationAnimation = useRef(new Animated.Value(0)).current;
@@ -785,6 +637,96 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     const updatedCards = [...cards, newCard];
     setCards(updatedCards);
     setSparkData('flashcards', { cards: updatedCards });
+  };
+
+  const handleEditCardDuringSession = (updatedPhrase: { english: string; spanish: string }) => {
+    if (!editingCard) return;
+
+    // Update the card in the cards array
+    const updatedCards = cards.map(card =>
+      card.id === editingCard.id
+        ? {
+            ...card,
+            english: updatedPhrase.english.trim(),
+            spanish: updatedPhrase.spanish.trim(),
+          }
+        : card
+    );
+    setCards(updatedCards);
+
+    // Update currentCard if it's the one being edited
+    if (currentCard && currentCard.id === editingCard.id) {
+      setCurrentCard({
+        ...currentCard,
+        english: updatedPhrase.english.trim(),
+        spanish: updatedPhrase.spanish.trim(),
+      });
+    }
+
+    // Update the card in sessionQueue if it exists there
+    setSessionQueue(prev => prev.map(card =>
+      card.id === editingCard.id
+        ? {
+            ...card,
+            english: updatedPhrase.english.trim(),
+            spanish: updatedPhrase.spanish.trim(),
+          }
+        : card
+    ));
+
+    setEditingCard(null);
+    setShowEditModal(false);
+    HapticFeedback.success();
+
+    // Notify user that change will apply immediately
+    Alert.alert(
+      'Card Updated',
+      'The card has been updated. Changes are applied immediately.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleDeleteCardDuringSession = () => {
+    if (!editingCard) return;
+
+    // Check if we have at least one card remaining
+    if (cards.length <= 1) {
+      Alert.alert('Error', 'You must have at least one card');
+      return;
+    }
+
+    // Remove from cards array
+    const updatedCards = cards.filter(card => card.id !== editingCard.id);
+    setCards(updatedCards);
+
+    // Remove from sessionQueue
+    setSessionQueue(prev => prev.filter(card => card.id !== editingCard.id));
+
+    // If currentCard is the one being deleted, move to next card
+    if (currentCard && currentCard.id === editingCard.id) {
+      if (sessionQueue.length > 0) {
+        // Get next card from queue
+        const nextCard = sessionQueue[0];
+        setCurrentCard(nextCard);
+        setSessionQueue(prev => prev.slice(1));
+        setShowAnswer(false);
+        setIsCountingDown(true);
+        setCountdown(5);
+      } else {
+        // No more cards in queue, end session
+        resetSession();
+      }
+    }
+
+    setEditingCard(null);
+    setShowEditModal(false);
+    HapticFeedback.medium();
+
+    Alert.alert(
+      'Card Deleted',
+      'The card has been deleted from your deck.',
+      [{ text: 'OK' }]
+    );
   };
 
   const startNextCard = () => {
@@ -1626,8 +1568,26 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
                 style={{
                   alignItems: 'center',
                   justifyContent: 'center',
+                  position: 'relative',
                 }}
               >
+                {!autoPlayActive && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditingCard(currentCard);
+                      setShowEditModal(true);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      padding: 8,
+                      zIndex: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 20, color: colors.textSecondary }}>✎</Text>
+                  </TouchableOpacity>
+                )}
                 <Text style={styles.englishText}>{currentCard.english}</Text>
                 <Text style={styles.spanishText}>{currentCard.spanish}</Text>
               </View>
@@ -1772,6 +1732,20 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         initialSpeaker="friend1"
         showSpeakerSelection={false}
       />
+
+      {/* Edit Card Modal (during session) */}
+      {editingCard && (
+        <EditFlashcardModal
+          visible={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingCard(null);
+          }}
+          onSave={handleEditCardDuringSession}
+          onDelete={handleDeleteCardDuringSession}
+          card={editingCard}
+        />
+      )}
     </ScrollView>
   );
 };
