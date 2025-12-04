@@ -16,6 +16,21 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Step 0: Verify required files exist
+echo "📋 Step 0: Verifying required configuration files..."
+if [ ! -f "google-services.json" ]; then
+  echo -e "${RED}✗ Error: google-services.json not found in project root${NC}"
+  echo "Please ensure google-services.json exists before deploying."
+  exit 1
+fi
+if [ ! -f "GoogleService-Info.plist" ]; then
+  echo -e "${RED}✗ Error: GoogleService-Info.plist not found in project root${NC}"
+  echo "Please ensure GoogleService-Info.plist exists before deploying."
+  exit 1
+fi
+echo -e "${GREEN}✓ Required configuration files found${NC}"
+echo ""
+
 # Step 1: Check version consistency
 echo "📋 Step 1: Checking version consistency..."
 if ./scripts/check-version.sh; then
@@ -24,6 +39,18 @@ else
   echo ""
   echo -e "${YELLOW}⚠️  Version mismatch detected. Fixing...${NC}"
   echo ""
+  
+  # Ensure googleServicesFile is set in app.json before prebuild
+  echo "Ensuring google-services.json path is configured in app.json..."
+  node -e "
+    const fs = require('fs');
+    const appJson = require('../app.json');
+    if (!appJson.expo.android.googleServicesFile) {
+      appJson.expo.android.googleServicesFile = './google-services.json';
+      fs.writeFileSync('../app.json', JSON.stringify(appJson, null, 2) + '\n');
+      console.log('✓ Added googleServicesFile to Android config');
+    }
+  "
   
   # Run prebuild to sync versions
   echo "Running: npx expo prebuild --clean"
@@ -64,6 +91,10 @@ node -e "
   appJson.expo.version = '${NEW_VERSION}';
   appJson.expo.ios.buildNumber = '${NEW_VERSION}';
   appJson.expo.android.versionName = '${NEW_VERSION}';
+  // Ensure googleServicesFile is set for Android
+  if (!appJson.expo.android.googleServicesFile) {
+    appJson.expo.android.googleServicesFile = './google-services.json';
+  }
   fs.writeFileSync('./app.json', JSON.stringify(appJson, null, 2) + '\n');
 "
 
