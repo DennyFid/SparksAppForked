@@ -834,7 +834,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
         <TextInput
           ref={taskInputRef}
           style={styles.taskInput}
-          placeholder="Add a new task... (use category: task format)"
+          placeholder="Add a new task (eg, category: task)"
           placeholderTextColor={colors.textSecondary}
           value={newTaskText}
           onChangeText={setNewTaskText}

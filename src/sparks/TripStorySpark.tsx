@@ -109,53 +109,59 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
+  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
+  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+
+  // Form state
   const [showCreateTrip, setShowCreateTrip] = useState(false);
+  const [newTripTitle, setNewTripTitle] = useState('');
+  const [newTripStartDate, setNewTripStartDate] = useState('');
+  const [newTripEndDate, setNewTripEndDate] = useState('');
+  const [activitiesListText, setActivitiesListText] = useState('');
+
+  // Activity state
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [newActivityName, setNewActivityName] = useState('');
+  const [newActivityTime, setNewActivityTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+
+  // Photo state
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [photoCaptureMode, setPhotoCaptureMode] = useState<'camera' | 'library'>('camera');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [showTripDetail, setShowTripDetail] = useState(false);
-  const [showPhotoDetail, setShowPhotoDetail] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
-  const [showActivitySelector, setShowActivitySelector] = useState(false);
-  const [showMapView, setShowMapView] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState(false);
-  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
-  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
-  const [showCustomPhotoPicker, setShowCustomPhotoPicker] = useState(false);
-  const [customPickerPhotos, setCustomPickerPhotos] = useState<MediaLibrary.Asset[]>([]);
+
+  // Custom picker state
+  const [customPickerPhotos, setCustomPickerPhotos] = useState<any[]>([]);
   const [customPickerPhotoUris, setCustomPickerPhotoUris] = useState<Map<string, string>>(new Map());
   const [selectedPickerPhotos, setSelectedPickerPhotos] = useState<Set<string>>(new Set());
   const [customPickerDate, setCustomPickerDate] = useState<string | null>(null);
   const [customPickerAllowMultiple, setCustomPickerAllowMultiple] = useState(false);
-  const [customPickerActivity, setCustomPickerActivity] = useState<Activity | undefined>(undefined);
-  const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null); // Track which date/activity is loading
-  const borderAnimation = useRef(new Animated.Value(0)).current;
+  const [customPickerActivity, setCustomPickerActivity] = useState<Activity | null>(null);
+  const [showCustomPhotoPicker, setShowCustomPhotoPicker] = useState(false);
+  const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null);
 
-  // Animate border color when loading
-  useEffect(() => {
-    if (loadingPhotosByDate) {
-      // Create pulsing animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(borderAnimation, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(borderAnimation, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
-    } else {
-      borderAnimation.setValue(0);
-    }
-  }, [loadingPhotosByDate, borderAnimation]);
+  // Detail view state
+  const [showTripDetail, setShowTripDetail] = useState(false);
+  const [selectedTripForDetail, setSelectedTripForDetail] = useState<Trip | null>(null);
+  const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
+  const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
+
+  // Photo Detail State
+  const [photoName, setPhotoName] = useState('');
+  const [photoDate, setPhotoDate] = useState('');
+  const [photoLocation, setPhotoLocation] = useState('');
+  const [photoLat, setPhotoLat] = useState('');
+  const [photoLng, setPhotoLng] = useState('');
+  const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
+  const [showActivitySelector, setShowActivitySelector] = useState(false);
+  const [photoActivityId, setPhotoActivityId] = useState<string | null>(null);
+
+  // Edit Activity State
   const [showEditActivity, setShowEditActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editActivityName, setEditActivityName] = useState('');
@@ -164,329 +170,105 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [editActivityLat, setEditActivityLat] = useState('');
   const [editActivityLng, setEditActivityLng] = useState('');
   const [editActivityGeoStatus, setEditActivityGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
+
+  // Edit Trip State
   const [showEditTrip, setShowEditTrip] = useState(false);
   const [editTripTitle, setEditTripTitle] = useState('');
   const [editTripStartDate, setEditTripStartDate] = useState('');
   const [editTripEndDate, setEditTripEndDate] = useState('');
   const [editTripMode, setEditTripMode] = useState<'record' | 'remember'>('record');
-  const [showAddActivityModal, setShowAddActivityModal] = useState(false);
-  const [showManageActivities, setShowManageActivities] = useState(false);
-  const [activitiesListText, setActivitiesListText] = useState('');
 
-  // New trip form
-  const [newTripTitle, setNewTripTitle] = useState('');
-  const [newTripStartDate, setNewTripStartDate] = useState('');
-  const [newTripEndDate, setNewTripEndDate] = useState('');
+  // Aliases for showAddActivity to match usage in some parts of the code
+  const showAddActivityModal = showAddActivity;
+  const setShowAddActivityModal = setShowAddActivity;
 
-  // New activity form
-  const [newActivityName, setNewActivityName] = useState('');
-  const [newActivityTime, setNewActivityTime] = useState('');
-
-  // Photo detail form
-  const [photoName, setPhotoName] = useState('');
-  const [photoDate, setPhotoDate] = useState('');
-  const [photoActivityId, setPhotoActivityId] = useState<string | null>(null);
-  const [photoLocation, setPhotoLocation] = useState('');
-  const [photoLat, setPhotoLat] = useState('');
-  const [photoLng, setPhotoLng] = useState('');
-  const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
-
-  // Active state tracking (only one can be active at a time)
-  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
-  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
-  const [activeTripId, setActiveTripId] = useState<string | null>(null);
-
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const dayPositions = useRef<Map<string, number>>(new Map());
-  const activityPositions = useRef<Map<string, number>>(new Map());
-  const scrollViewRef = useRef<any>(null);
-  const currentScrollPosition = useRef<number>(0);
-
-  const getDaysRemaining = (dateStr: string): number => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(dateStr + 'T00:00:00');
-    const diffTime = targetDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const getProximityText = (days: number): string => {
-    if (days < 0) return 'Past';
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    if (days < 7) return `In ${days} days`;
-
-    const weeks = Math.round(days / 7);
-    if (days < 30) return `In ${weeks} week${weeks > 1 ? 's' : ''}`;
-
-    const months = Math.round(days / 30);
-    if (days < 365) return `In ${months} month${months > 1 ? 's' : ''}`;
-
-    return 'In 1 year+';
-  };
-
-  const getProximityColor = (days: number): string => {
-    if (days === 0) return '#FF3B30'; // Red for Today
-    if (days === 1) return '#FF9500'; // Orange for Tomorrow
-    if (days < 7) return '#FFCC00'; // Yellow for this week
-    if (days < 30) return '#34C759'; // Green for this month
-    return colors.textSecondary; // Gray for later
-  };
-
-  // Refs for horizontal image scroll views (one per row)
-  const dayPhotoScrollRefs = useRef<Map<string, any>>(new Map());
-  const activityPhotoScrollRefs = useRef<Map<string, any>>(new Map());
+  const scrollViewRef = useRef<ScrollView>(null);
   const dateScrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadTrips();
   }, []);
 
-  // Track if we're restoring from saved state (quick switch) vs user interaction
-  const isRestoringFromState = useRef(false);
-
-  // Restore scroll position ONLY when trip detail view opens from saved state (quick switch)
-  // NOT when user clicks + button or other interactions
-  useEffect(() => {
-    if (showTripDetail && currentTrip && scrollViewRef.current && isRestoringFromState.current) {
-      // Only scroll if we're restoring from state (quick switch)
-      if (activeActivityId && activeTripId === currentTrip.id) {
-        setTimeout(() => {
-          scrollToActivity(activeActivityId);
-        }, 300);
+  const savePhotoPermanently = async (uri: string, tripId: string, photoId: string): Promise<string> => {
+    try {
+      // If already in document directory, return as is
+      if (uri.includes(FileSystem.documentDirectory!)) {
+        return uri;
       }
-      else if (activeDayDate && activeTripId === currentTrip.id) {
-        setTimeout(() => {
-          scrollToDay(activeDayDate);
-        }, 300);
-      }
-      // Reset the flag after scrolling
-      isRestoringFromState.current = false;
-    }
-  }, [showTripDetail, currentTrip, activeActivityId, activeDayDate, activeTripId]);
 
-  useEffect(() => {
-    if (onStateChange) {
-      onStateChange({
-        trips,
-        currentTrip,
-        selectedDate,
-        selectedActivity
+      const filename = `trip_${tripId}_${photoId}.jpg`;
+      const destPath = `${FileSystem.documentDirectory}${filename}`;
+
+      await FileSystem.copyAsync({
+        from: uri,
+        to: destPath
       });
-    }
-  }, [trips, currentTrip, selectedDate, selectedActivity, onStateChange]);
 
-
-  const savePhotoPermanently = async (photoUri: string, tripId: string, photoId: string): Promise<string> => {
-    try {
-      // Get document directory
-      const documentDir = (FileSystem as any).documentDirectory;
-      if (!documentDir) {
-        console.warn('⚠️ Document directory not available (likely simulator/web), using original URI');
-        // In simulator/web, documentDirectory might not be available
-        // Return original URI as-is - it should still work for display
-        return photoUri;
-      }
-
-      // Check if source file exists (for file:// URIs)
-      if (photoUri.startsWith('file://')) {
-        try {
-          const fileInfo = await FileSystem.getInfoAsync(photoUri);
-          if (!fileInfo.exists) {
-            console.warn('⚠️ Source file does not exist, using original URI as fallback:', photoUri);
-            // Return original URI - it might still work for display if it's a data URI or external URL
-            return photoUri;
-          }
-        } catch (infoError) {
-          // If we can't check file info, continue and try to save anyway
-          console.warn('⚠️ Could not check file existence, proceeding with save attempt:', infoError);
-        }
-      }
-
-      // Create trips directory if it doesn't exist
-      const tripsDir = `${documentDir}trips/`;
-      const tripDir = `${tripsDir}${tripId}/`;
-
-      // Ensure directories exist
-      const tripsDirInfo = await FileSystem.getInfoAsync(tripsDir);
-      if (!tripsDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(tripsDir, { intermediates: true });
-      }
-      const tripDirInfo = await FileSystem.getInfoAsync(tripDir);
-      if (!tripDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(tripDir, { intermediates: true });
-      }
-
-      // Copy image to permanent location
-      const permanentUri = `${tripDir}${photoId}.jpg`;
-
-      console.log('📸 Attempting to save photo:', { photoUri, permanentUri });
-
-      // Try different methods based on URI type
-      if (photoUri.startsWith('ph://') || photoUri.startsWith('assets-library://')) {
-        // iOS photo library URI - need to use MediaLibrary to get actual file
-        // This should have been handled before calling this function, but just in case
-        console.warn('⚠️ Received photo library URI, this should have been converted to localUri');
-        // Return original URI as fallback instead of throwing
-        return photoUri;
-      }
-
-      if (photoUri.startsWith('content://')) {
-        // Android content URI - use downloadAsync
-        try {
-          const downloadResult = await FileSystem.downloadAsync(photoUri, permanentUri);
-          if (downloadResult.status === 200) {
-            console.log('✅ Photo saved permanently (from content URI):', permanentUri);
-            return permanentUri;
-          } else {
-            throw new Error(`Download failed with status ${downloadResult.status}`);
-          }
-        } catch (downloadError) {
-          console.warn('⚠️ Download failed, trying copyAsync:', downloadError);
-          // Fall through to try copyAsync
-        }
-      }
-
-      // Try copyAsync (works for file:// and most other URIs)
-      try {
-        await FileSystem.copyAsync({
-          from: photoUri,
-          to: permanentUri,
-        });
-        console.log('✅ Photo saved permanently (via copyAsync):', permanentUri);
-        return permanentUri;
-      } catch (copyError) {
-        // Only try base64 if copyAsync fails - but don't try if file doesn't exist
-        const errorMessage = copyError instanceof Error ? copyError.message : String(copyError);
-        if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
-          console.warn('⚠️ Source file does not exist, using original URI as fallback');
-          return photoUri;
-        }
-
-        console.warn('⚠️ copyAsync failed, trying base64 method:', copyError);
-        // Try reading as base64 and writing
-        try {
-          const base64 = await FileSystem.readAsStringAsync(photoUri, {
-            encoding: 'base64' as any,
-          });
-          await FileSystem.writeAsStringAsync(permanentUri, base64, {
-            encoding: 'base64' as any,
-          });
-          console.log('✅ Photo saved permanently (via base64):', permanentUri);
-          return permanentUri;
-        } catch (base64Error) {
-          const base64ErrorMessage = base64Error instanceof Error ? base64Error.message : String(base64Error);
-          if (base64ErrorMessage.includes('does not exist') || base64ErrorMessage.includes('No such file')) {
-            console.warn('⚠️ Source file does not exist, using original URI as fallback');
-            return photoUri;
-          }
-          // Only log as error if it's not a "file doesn't exist" error
-          console.warn('⚠️ All save methods failed, using original URI as fallback:', base64Error);
-          return photoUri;
-        }
-      }
+      return destPath;
     } catch (error) {
-      // Only log as error if it's not a "file doesn't exist" error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
-        console.warn('⚠️ Source file does not exist, using original URI as fallback');
-      } else {
-        console.warn('⚠️ Error saving photo permanently, using original URI as fallback:', error);
-      }
-      // Return original URI as fallback
-      return photoUri;
+      console.error('Error saving photo permanently:', error);
+      return uri; // Fallback to original URI if copy fails
     }
   };
 
-  const migratePhoto = async (photo: TripPhoto, tripId: string): Promise<string> => {
-    try {
-      // Get document directory
-      const documentDir = (FileSystem as any).documentDirectory;
-      if (!documentDir) {
-        console.warn('⚠️ Cannot migrate photo - document directory not available');
-        return photo.uri; // Can't migrate without document directory
-      }
-
-      // Check if photo URI is already in permanent location
-      if (photo.uri && photo.uri.startsWith(documentDir)) {
-        // Verify the file still exists (in case app was reinstalled or directory changed)
-        const fileInfo = await FileSystem.getInfoAsync(photo.uri);
-        if (fileInfo.exists) {
-          console.log('✅ Photo exists at permanent location:', photo.uri);
-          return photo.uri;
-        } else {
-          console.warn('⚠️ Photo URI points to permanent location but file does not exist:', photo.uri);
-          // File is missing, will try to re-migrate below
-        }
-      }
-
-      // Check if permanent file already exists
-      const permanentUri = `${documentDir}trips/${tripId}/${photo.id}.jpg`;
-      const fileInfo = await FileSystem.getInfoAsync(permanentUri);
-      if (fileInfo.exists) {
-        console.log('✅ Photo already exists at permanent location:', permanentUri);
-        return permanentUri;
-      }
-
-      // If original URI is a file:// or content:// URI, try to migrate it
-      if (photo.uri && (photo.uri.startsWith('file://') || photo.uri.startsWith('content://') || photo.uri.startsWith('ph://'))) {
-        console.log('🔄 Migrating photo:', photo.uri, 'to', permanentUri);
-        // Try to copy from original URI using the same robust save method
-        return await savePhotoPermanently(photo.uri, tripId, photo.id);
-      }
-
-      // If we can't migrate, return original URI (might be a data URI or external URL)
-      console.warn('⚠️ Cannot migrate photo - URI format not supported:', photo.uri);
-      return photo.uri;
-    } catch (error) {
-      console.error('❌ Error migrating photo:', error, 'Photo URI:', photo.uri);
-      // Return original URI as fallback
-      return photo.uri;
-    }
-  };
-
-  // agentToDo - I think this should be deleted. 
   const migrateAllPhotos = async (tripsToMigrate: Trip[]): Promise<Trip[]> => {
-    try {
-      console.log('🔄 Starting photo migration for', tripsToMigrate.length, 'trips');
-      const migratedTrips = await Promise.all(
-        tripsToMigrate.map(async (trip) => {
-          console.log(`🔄 Migrating photos for trip: ${trip.title} (${trip.photos.length} photos)`);
-          const migratedPhotos = await Promise.all(
-            trip.photos.map(async (photo) => {
-              const newUri = await migratePhoto(photo, trip.id);
-              // Only update if URI changed
+    const updatedTrips = [...tripsToMigrate];
+    let hasChanges = false;
+
+    for (let i = 0; i < updatedTrips.length; i++) {
+      const trip = updatedTrips[i];
+      const updatedPhotos = [...trip.photos];
+      let tripChanged = false;
+
+      for (let j = 0; j < updatedPhotos.length; j++) {
+        const photo = updatedPhotos[j];
+        // If photo has no URI but has ID (migration case) OR needs moving to permanent storage
+        if (!photo.uri || !photo.uri.includes(FileSystem.documentDirectory!)) {
+          try {
+            // If we have an ID but no URI, we might be able to recover or it's lost
+            // For this implementation, we'll assume we're migrating from a state where we have the URI
+            if (photo.uri) {
+              const newUri = await savePhotoPermanently(photo.uri, trip.id, photo.id);
               if (newUri !== photo.uri) {
-                console.log(`✅ Migrated photo ${photo.id}: ${photo.uri.substring(0, 50)}... -> ${newUri.substring(0, 50)}...`);
+                updatedPhotos[j] = { ...photo, uri: newUri };
+                tripChanged = true;
+                hasChanges = true;
               }
-              return { ...photo, uri: newUri };
-            })
-          );
-          return { ...trip, photos: migratedPhotos };
-        })
-      );
-
-      // Save migrated trips (preserve existing data) - always save to ensure URIs are updated
-      const currentData = await getSparkData('trip-story');
-      // Check if any URIs changed
-      const urisChanged = tripsToMigrate.some((trip, tripIndex) => {
-        return trip.photos.some((photo, photoIndex) => {
-          return photo.uri !== migratedTrips[tripIndex].photos[photoIndex].uri;
-        });
-      });
-
-      if (urisChanged) {
-        await setSparkData('trip-story', {
-          ...currentData,
-          trips: migratedTrips,
-        });
-        console.log('✅ Photos migrated successfully');
+            }
+          } catch (error) {
+            console.error('Error migrating photo:', error);
+          }
+        }
       }
 
-      return migratedTrips;
+      if (tripChanged) {
+        updatedTrips[i] = { ...trip, photos: updatedPhotos };
+      }
+    }
+
+    if (hasChanges) {
+      await setSparkData('trip-story', {
+        trips: updatedTrips,
+        activeDayDate,
+        activeActivityId,
+        activeTripId: currentTrip?.id || activeTripId || null
+      });
+    }
+
+    return updatedTrips;
+  };
+
+  const saveTrips = async (newTrips: Trip[]) => {
+    try {
+      await setSparkData('trip-story', {
+        trips: newTrips,
+        activeDayDate,
+        activeActivityId,
+        activeTripId: currentTrip?.id || activeTripId || null
+      });
+      setTrips(newTrips);
     } catch (error) {
-      console.error('❌ Error migrating photos:', error);
-      return tripsToMigrate;
+      console.error('Error saving trips:', error);
     }
   };
 
@@ -494,115 +276,70 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     try {
       const data = await getSparkData('trip-story');
       if (data?.trips) {
-        // Migrate photos to permanent storage
-        const migratedTrips = await migrateAllPhotos(data.trips);
+        // Check if migration is needed (if photos don't have URIs but have IDs)
+        // This is a simplified check - in production we'd check version or specific fields
+        const needsMigration = data.trips.some((t: Trip) =>
+          t.photos.some(p => !p.uri && p.id)
+        );
 
-        // Update statuses and modes based on current date
-        let hasUpdates = false;
-        const updatedTrips = migratedTrips.map(trip => {
-          const newStatus = calculateTripStatus(trip.startDate, trip.endDate);
-          if (trip.status !== newStatus) {
-            hasUpdates = true;
-            let newMode = trip.mode;
-            // Auto-switch to remember mode if trip becomes completed
-            if (trip.status !== 'completed' && newStatus === 'completed') {
-              newMode = 'remember';
-            }
-            return { ...trip, status: newStatus, mode: newMode };
-          }
-          return trip;
-        });
-
-        if (hasUpdates) {
-          await saveTrips(updatedTrips);
+        let updatedTrips = data.trips;
+        if (needsMigration) {
+          console.log('🔄 Migrating photos to permanent storage...');
+          updatedTrips = await migrateAllPhotos(data.trips);
         }
+
+        // Update trip statuses based on current date
+        updatedTrips = updatedTrips.map((trip: Trip) => ({
+          ...trip,
+          status: calculateTripStatus(trip.startDate, trip.endDate)
+        }));
 
         setTrips(updatedTrips);
 
-        // Restore active trip if we have an activeTripId
-        if (data?.activeTripId) {
-          const activeTrip = updatedTrips.find(trip => trip.id === data.activeTripId);
+        // Restore active state
+        if (data.activeTripId) {
+          const activeTrip = updatedTrips.find((t: Trip) => t.id === data.activeTripId);
           if (activeTrip) {
             setCurrentTrip(activeTrip);
-            setShowTripDetail(true);
-
-            // Restore active state only if not in remember mode
-            if (activeTrip.mode !== 'remember') {
-              if (data?.activeDayDate !== undefined) {
-                setActiveDayDate(data.activeDayDate);
-              }
-              if (data?.activeActivityId !== undefined) {
-                setActiveActivityId(data.activeActivityId);
-              }
-            }
             setActiveTripId(data.activeTripId);
-
-            // Mark that we're restoring from state so the useEffect will scroll
-            isRestoringFromState.current = true;
-            // Scroll to the active position after layout only if not in remember mode
-            if (activeTrip.mode !== 'remember') {
-              setTimeout(() => {
-                if (data?.activeActivityId && scrollViewRef.current) {
-                  // Scroll to activity if we have one
-                  scrollToActivity(data.activeActivityId);
-                } else if (data?.activeDayDate && scrollViewRef.current) {
-                  // Otherwise scroll to day
-                  scrollToDay(data.activeDayDate);
-                }
-              }, 500);
-            }
-            return; // Early return since we're opening trip detail
           }
         }
-      }
 
-      // Load active state even if no active trip (for when trip detail is already open)
-      if (data?.activeDayDate !== undefined) {
-        setActiveDayDate(data.activeDayDate);
+        if (data.activeDayDate) {
+          setActiveDayDate(data.activeDayDate);
+        }
+
+        if (data.activeActivityId) {
+          setActiveActivityId(data.activeActivityId);
+        }
       }
-      if (data?.activeActivityId !== undefined) {
-        setActiveActivityId(data.activeActivityId);
-      }
-      if (data?.activeTripId !== undefined) {
-        setActiveTripId(data.activeTripId);
-      }
+      setIsLoaded(true); // Mark as loaded
     } catch (error) {
       console.error('Error loading trips:', error);
-    }
-  };
-
-  const saveTrips = async (updatedTrips: Trip[]) => {
-    try {
-      await setSparkData('trip-story', {
-        trips: updatedTrips,
-        activeDayDate: activeDayDate,
-        activeActivityId: activeActivityId,
-        activeTripId: activeTripId,
-      });
-      setTrips(updatedTrips);
-    } catch (error) {
-      console.error('Error saving trips:', error);
+      setIsLoaded(true); // Mark as loaded even on error to allow recovery/new trips
     }
   };
 
   // Save active state whenever it changes
   useEffect(() => {
+    if (!isLoaded) return; // Prevent saving before load completes
+
     const saveActiveState = async () => {
       try {
         const currentData = await getSparkData('trip-story');
         await setSparkData('trip-story', {
           ...currentData,
-          trips: trips || currentData.trips || [],
+          trips: trips, // Use current trips state
           activeDayDate: activeDayDate,
           activeActivityId: activeActivityId,
-          activeTripId: currentTrip?.id || activeTripId || null, // Store current trip ID
+          activeTripId: currentTrip?.id || activeTripId || null,
         });
       } catch (error) {
         console.error('Error saving active state:', error);
       }
     };
     saveActiveState();
-  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips]);
+  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips, isLoaded]);
 
   const activateDay = (date: string) => {
     if (!currentTrip) return;
@@ -2018,6 +1755,37 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       case 'completed': return 'Completed';
       default: return status;
     }
+  };
+
+  const getDaysRemaining = (targetDate: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate + 'T00:00:00');
+    const diffTime = target.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getProximityText = (days: number): string => {
+    if (days < 0) return 'Past';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days < 7) return `In ${days} days`;
+
+    const weeks = Math.round(days / 7);
+    if (days < 30) return `In ${weeks} week${weeks > 1 ? 's' : ''}`;
+
+    const months = Math.round(days / 30);
+    if (days < 365) return `In ${months} month${months > 1 ? 's' : ''}`;
+
+    return 'In 1 year+';
+  };
+
+  const getProximityColor = (days: number): string => {
+    if (days === 0) return '#FF3B30'; // Red for Today
+    if (days === 1) return '#FF9500'; // Orange for Tomorrow
+    if (days < 7) return '#FFCC00'; // Yellow for this week
+    if (days < 30) return '#34C759'; // Green for this month
+    return colors.textSecondary; // Gray for later
   };
 
   const getSortedTrips = () => {
@@ -4793,7 +4561,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteButton: {
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',

@@ -85,7 +85,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         sparkId,
         sparkName: sparkId, // Use sparkId as sparkName for now
         rating: rating as 1 | 2 | 3 | 4 | 5,
-        comment: comment.trim() || undefined,
+        comment: comment.trim() || '',
         sessionDuration,
         completedActions,
         feedbackType,

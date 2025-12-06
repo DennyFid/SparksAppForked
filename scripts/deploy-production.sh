@@ -163,24 +163,7 @@ esac
 
 echo ""
 
-# Step 5: Collect release notes
-echo -e "${BLUE}Step 5: Release Notes${NC}"
-echo "Enter release notes for this version:"
-echo "Example: Added two exciting sparks: Trip Survey for planning an adventure with friends, Final Clock for inspiring healthier lifestyle choices, and Song Saver for capturing your favorite songs. Also improved Spanish Reader and Spanish Flashcards with Auto-Play features for hands-free Spanish training."
-echo ""
-read -p "Release notes: " RELEASE_NOTES
-
-if [[ -z "$RELEASE_NOTES" ]]; then
-  echo -e "${YELLOW}⚠️  No release notes provided. Using default.${NC}"
-  RELEASE_NOTES="Bug fixes and improvements."
-fi
-
-echo ""
-echo -e "${GREEN}Release notes captured:${NC}"
-echo "$RELEASE_NOTES"
-echo ""
-
-# Step 6: Confirm deployment
+# Step 5: Confirm deployment
 echo -e "${BLUE}Ready to deploy version ${NEW_VERSION} to ${PLATFORM}${NC}"
 echo ""
 read -p "Deploy version ${NEW_VERSION} to production? (y/N) " -n 1 -r
@@ -192,43 +175,18 @@ fi
 
 echo ""
 
-# Step 7: Build
-echo "📦 Step 7: Building for app stores..."
-echo "Running: npx eas build --platform ${PLATFORM} --profile production"
+# Step 6: Build and submit
+echo "📦 Step 6: Building and submitting to app stores..."
+echo "Running: npx eas build --platform ${PLATFORM} --profile production --auto-submit"
 echo ""
 
-npx eas build --platform ${PLATFORM} --profile production
+npx eas build --platform ${PLATFORM} --profile production --auto-submit
 
 echo ""
-echo -e "${GREEN}✓ Build completed!${NC}"
+echo -e "${GREEN}✓ Build and auto-submit initiated!${NC}"
 echo ""
 
-# Step 8: Submit with release notes
-echo "📤 Step 8: Submitting to app stores with release notes..."
-echo ""
-
-if [[ "$PLATFORM" == "all" ]]; then
-  echo "Submitting iOS build..."
-  echo "Running: npx eas submit --platform ios --latest --message \"${RELEASE_NOTES}\""
-  npx eas submit --platform ios --latest --message "${RELEASE_NOTES}"
-  
-  echo ""
-  echo "Submitting Android build..."
-  echo "Running: npx eas submit --platform android --latest --message \"${RELEASE_NOTES}\""
-  npx eas submit --platform android --latest --message "${RELEASE_NOTES}"
-elif [[ "$PLATFORM" == "ios" ]]; then
-  echo "Running: npx eas submit --platform ios --latest --message \"${RELEASE_NOTES}\""
-  npx eas submit --platform ios --latest --message "${RELEASE_NOTES}"
-elif [[ "$PLATFORM" == "android" ]]; then
-  echo "Running: npx eas submit --platform android --latest --message \"${RELEASE_NOTES}\""
-  npx eas submit --platform android --latest --message "${RELEASE_NOTES}"
-fi
-
-echo ""
-echo -e "${GREEN}✓ Submission completed with release notes!${NC}"
-echo ""
-
-# Step 9: Post-deployment instructions
+# Step 7: Post-deployment instructions
 echo "======================================"
 echo "📱 Next Steps - Manual Store Actions"
 echo "======================================"
@@ -237,9 +195,11 @@ echo ""
 if [[ "$PLATFORM" == "all" || "$PLATFORM" == "android" ]]; then
   echo -e "${BLUE}🤖 Google Play Console:${NC}"
   echo "1. Go to: https://play.google.com/console/u/0/developers/7574537990443980441/app/4974480089571997239/tracks/production"
-  echo "2. Release notes have been automatically submitted with the build"
-  echo "3. Review and approve the release in Google Play Console"
-  echo "4. Click: 'Start Rollout to Production'"
+  echo "2. Click: 'Create New Release'"
+  echo "3. Click: 'Add from Library' (select the build that was just submitted)"
+  echo "4. Add release notes describing what's new in version ${NEW_VERSION}"
+  echo "5. Click: 'Review Release'"
+  echo "6. Click: 'Start Rollout to Production'"
   echo ""
 fi
 
@@ -248,11 +208,11 @@ if [[ "$PLATFORM" == "all" || "$PLATFORM" == "ios" ]]; then
   echo "1. Go to: https://appstoreconnect.apple.com/apps/6752919846/distribution/info"
   echo "   Or: https://appstoreconnect.apple.com/apps/6752919846/distribution/ios/version/deliverable"
   echo "2. Wait for build to appear in TestFlight (usually 5-15 minutes)"
-  echo "3. Release notes have been automatically submitted with the build"
-  echo "4. Once processed, go to 'App Store' tab"
-  echo "5. Click: '+' Next to iOS App"
-  echo "6. Select the new build (version ${NEW_VERSION}) about halfway down the page"
-  echo "7. Review and click: 'Save' then 'Submit for Review'"
+  echo "3. Once processed, go to 'App Store' tab"
+  echo "4. Click: '+' Next to iOS App"
+  echo "5. Select the new build (version ${NEW_VERSION}) about halfway down the page"
+  echo "6. Add 'What's New' release notes"
+  echo "7. Click: 'Save' then 'Submit for Review'"
   echo ""
 fi
 

@@ -29,6 +29,7 @@ import ShareSparks from '../sparks/ShareSparks';
 import ComingUpSpark from '../sparks/ComingUpSpark';
 import { FinalClockSpark } from '../sparks/FinalClockSpark';
 import TripSurveySpark from '../sparks/TripSurveySpark';
+import { SparkStatsSpark } from '../sparks/SparkStatsSpark';
 import styled from 'styled-components/native';
 
 const PlaceholderContainer = styled.View`
@@ -145,7 +146,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       icon: '🇪🇸',
       category: 'education',
       createdAt: '2024-01-08T00:00:00.000Z',
-      rating: 4.6,
+      rating: 4.5,
     },
     component: SpanishFriendSpark,
   },
@@ -181,7 +182,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       icon: '🏌️‍♂️',
       category: 'golf',
       createdAt: '2024-01-11T00:00:00.000Z',
-      rating: 4.6,
+      rating: 4.5,
     },
     component: GolfBrainSpark,
   },
@@ -229,7 +230,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       icon: '🎬',
       category: 'media',
       createdAt: '2024-01-15T00:00:00.000Z',
-      rating: 4.6,
+      rating: 4.5,
     },
     component: ShortSaverSpark,
   },
@@ -359,11 +360,23 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       title: 'Trip Survey',
       description: 'Plan trips with group input and collaborative decision-making',
       icon: '🧭',
-      category: 'productivity',
+      category: 'travel',
       createdAt: '2025-12-02T00:00:00.000Z',
-      rating: 4.6,
+      rating: 4.3,
     },
     component: TripSurveySpark,
+  },
+  'spark-stats': {
+    metadata: {
+      id: 'spark-stats',
+      title: 'Spark Stats',
+      description: 'Community usage stats and trending sparks',
+      icon: '📊',
+      category: 'productivity',
+      createdAt: '2025-12-05T00:00:00.000Z',
+      rating: 4.5,
+    },
+    component: SparkStatsSpark,
   },
 };
 

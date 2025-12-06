@@ -18,6 +18,9 @@ Track your daily activities with start times and countdown timers. Perfect for m
 ### ✈️ TripStory
 Plan, remember, and share your trips with photos—lots and lots of photos. Create beautiful visual stories of your adventures.
 
+### 🧭 Trip Survey
+Plan trips with group input and collaborative decision-making. Collect preferences and make group travel planning easier.
+
 ## 🍽️ Food
 
 ### 📸 FoodCam

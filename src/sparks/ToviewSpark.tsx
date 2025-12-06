@@ -429,8 +429,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   };
 
   const parseToviewText = (text: string) => {
-    // Match any text followed by a colon and then the display text
-    // Also handle watchWith names in parentheses at the end
+    // 1. Try matching "Category: Title (Person)"
     const categoryMatch = text.match(/^([^:]+):\s*(.+?)(?:\s*\(([^)]+)\))?$/);
     if (categoryMatch) {
       const watchWithMatch = categoryMatch[3];
@@ -442,6 +441,21 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         watchWith
       };
     }
+
+    // 2. Try matching "Title (Person)" without category
+    const titlePersonMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+    if (titlePersonMatch) {
+      const watchWithMatch = titlePersonMatch[2];
+      const watchWith = watchWithMatch ? watchWithMatch.split(',').map(name => name.trim()) : undefined;
+
+      return {
+        category: undefined,
+        displayText: titlePersonMatch[1].trim(),
+        watchWith
+      };
+    }
+
+    // 3. Default: Just text
     return {
       category: undefined,
       displayText: text.trim(),
@@ -728,19 +742,6 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         </Text>
       </View>
 
-      {/* Add new toview */}
-      <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TextInput
-          style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-          placeholder="Add Category: Toview (withPerson1, Person2))"
-          placeholderTextColor={colors.textSecondary}
-          value={newToviewText}
-          onChangeText={setNewToviewText}
-          onSubmitEditing={addToview}
-          returnKeyType="done"
-        />
-      </View>
-
       {/* Provider dropdown */}
       <View style={[styles.providerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Dropdown
@@ -751,6 +752,19 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
           placeholder="Select provider (optional)"
           style={[styles.providerDropdown, { backgroundColor: colors.background, borderColor: colors.border }]}
           textStyle={[styles.providerDropdownText, { color: colors.text }]}
+        />
+      </View>
+
+      {/* Add new toview */}
+      <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TextInput
+          style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+          placeholder="Add Toview [eg, Category: Toview (withPerson1, Person2)]"
+          placeholderTextColor={colors.textSecondary}
+          value={newToviewText}
+          onChangeText={setNewToviewText}
+          onSubmitEditing={addToview}
+          returnKeyType="done"
         />
       </View>
 
@@ -1087,8 +1101,9 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    height: 36,
+    justifyContent: 'center',
+    borderRadius: 18,
     borderWidth: 1,
   },
   filterChipText: {
@@ -1391,7 +1406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    // marginTop: 4, // Removed to align with other pills
   },
   providerBadgeText: {
     color: 'white',
@@ -1403,11 +1418,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginTop: 4,
     gap: 4,
+    alignItems: 'center', // Ensure items don't stretch
   },
   watchWithPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start', // Consistent with other pills
   },
   watchWithPillText: {
     color: 'white',

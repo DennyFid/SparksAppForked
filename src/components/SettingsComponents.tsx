@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Linking, Modal, RefreshControl, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
 import { StarRating } from './StarRating';
@@ -7,6 +8,7 @@ import { FeedbackService } from '../services/FeedbackService';
 import { FeedbackNotificationService } from '../services/FeedbackNotificationService';
 import { NotificationBadge } from './NotificationBadge';
 import { ServiceFactory } from '../services/ServiceFactory';
+import { CommonModal } from './CommonModal';
 
 interface SettingsContainerProps {
   children: React.ReactNode;
@@ -500,108 +502,77 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ visible, onClose, sparkNa
     }
   };
 
-  const styles = StyleSheet.create({
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalContent: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 24,
-      width: '90%',
-      maxWidth: 400,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    modalSubtitle: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
-    feedbackInput: {
-      backgroundColor: colors.background,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: colors.text,
-      minHeight: 120,
-      textAlignVertical: 'top',
-      marginBottom: 20,
-    },
-    buttonRow: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    button: {
-      flex: 1,
-      padding: 12,
-      borderRadius: 8,
-      alignItems: 'center',
-    },
-    cancelButton: {
-      backgroundColor: colors.border,
-    },
-    submitButton: {
-      backgroundColor: colors.primary,
-      opacity: isSubmitting ? 0.6 : 1,
-    },
-    buttonText: {
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    cancelButtonText: {
-      color: colors.text,
-    },
-    submitButtonText: {
-      color: '#fff',
-    },
-  });
+  const footer = (
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          padding: 12,
+          borderRadius: 8,
+          alignItems: 'center',
+          backgroundColor: colors.border
+        }}
+        onPress={onClose}
+      >
+        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>Cancel</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          padding: 12,
+          borderRadius: 8,
+          alignItems: 'center',
+          backgroundColor: colors.primary,
+          opacity: isSubmitting ? 0.6 : 1
+        }}
+        onPress={handleSubmit}
+        disabled={isSubmitting}
+      >
+        <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>
+          {isSubmitting ? 'Submitting...' : 'Submit'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Share Feedback</Text>
-          <Text style={styles.modalSubtitle}>Your feedback helps us improve {sparkName}</Text>
+    <CommonModal
+      visible={visible}
+      title="Share Feedback"
+      onClose={onClose}
+      footer={footer}
+    >
+      <Text style={{
+        fontSize: 14,
+        color: colors.textSecondary,
+        marginBottom: 20,
+        textAlign: 'center'
+      }}>
+        Your feedback helps us improve {sparkName}
+      </Text>
 
-          <TextInput
-            style={styles.feedbackInput}
-            placeholder="Share your thoughts, suggestions, or issues..."
-            placeholderTextColor={colors.textSecondary}
-            value={feedback}
-            onChangeText={setFeedback}
-            multiline
-            numberOfLines={5}
-          />
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
-              <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.buttonText, styles.submitButtonText]}>
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
+      <TextInput
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.border,
+          borderWidth: 1,
+          borderRadius: 8,
+          padding: 12,
+          fontSize: 16,
+          color: colors.text,
+          minHeight: 120,
+          textAlignVertical: 'top',
+          marginBottom: 20,
+        }}
+        placeholder="Share your thoughts, suggestions, or issues..."
+        placeholderTextColor={colors.textSecondary}
+        value={feedback}
+        onChangeText={setFeedback}
+        multiline
+        numberOfLines={5}
+        autoFocus
+      />
+    </CommonModal>
   );
 };
 
@@ -753,65 +724,7 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
       refresh: loadUserFeedback,
     }), [sparkId]);
 
-    // Mark responses as read when settings page is viewed
-    // This runs on mount and whenever feedback is loaded
-    useEffect(() => {
-      const markResponsesAsRead = async () => {
-        try {
-          // Use persistent device ID to ensure consistency
-          const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-
-          // Get Firebase service
-          const { ServiceFactory } = await import('../services/ServiceFactory');
-          const FirebaseService = ServiceFactory.getFirebaseService();
-
-          // Check Firebase directly for unread feedback with responses
-          // This ensures we catch all unread responses, even if feedback list hasn't loaded yet
-          const unreadCount = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
-
-          if (unreadCount > 0) {
-            // Get all feedback for this user/spark to find which ones need to be marked as read
-            const { FeedbackService } = await import('../services/FeedbackService');
-            const allFeedback = await FeedbackService.getUserFeedback(deviceId, sparkId);
-
-            // Find feedback items with responses that haven't been read
-            const unreadFeedbackIds = allFeedback
-              .filter((f: any) => f.response && f.response.trim() && f.readByUser !== true)
-              .map((f: any) => f.id)
-              .filter(Boolean) as string[];
-
-            if (unreadFeedbackIds.length > 0) {
-              console.log(`🔍 SettingsFeedbackSection: Marking ${unreadFeedbackIds.length} feedback items as read:`, unreadFeedbackIds);
-
-              // Mark all as read in Firebase
-              await (FirebaseService as any).markMultipleFeedbackAsReadByUser(unreadFeedbackIds);
-
-              // Small delay to ensure Firebase has committed the update
-              await new Promise(resolve => setTimeout(resolve, 500));
-
-              // Verify the update worked by checking unread count again
-              const verifyCount = await (FirebaseService as any).getUnreadFeedbackCount(deviceId, sparkId);
-              console.log(`🔍 SettingsFeedbackSection: Unread count after marking as read: ${verifyCount}`);
-
-              // Update app icon badge
-              await FeedbackNotificationService.updateAppIconBadge();
-
-              // Refresh feedback to get updated readByUser status
-              await loadUserFeedback();
-            } else {
-              console.log('🔍 SettingsFeedbackSection: No unread feedback IDs to mark as read');
-            }
-          }
-        } catch (error) {
-          console.error('Error marking responses as read:', error);
-        }
-      };
-
-      // Run immediately when component mounts (settings page viewed)
-      // Also run when feedback is loaded
-      markResponsesAsRead();
-    }, [sparkId]); // Run on mount and when sparkId changes
-
+    // NOTE: Auto-clear on focus was removed. Users now manually mark as read with button.
     const handleSubmitFeedback = async (rating: number, feedback: string) => {
       try {
         console.log('🚀 SettingsFeedbackSection: Starting feedback submission...');
@@ -847,12 +760,9 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
           rating: 0, // No rating for feedback-only submissions
           sessionId: sessionInfo.sessionId,
           platform: 'ios' as 'ios' | 'android' | 'web',
+          comment: '', // Ensure comment is not undefined
+          feedback: feedback.trim() || '', // Ensure feedback is not undefined
         };
-
-        // Only add feedback if it's not empty
-        if (feedback.trim()) {
-          feedbackData.feedback = feedback.trim();
-        }
 
         await FeedbackService.submitFeedback(feedbackData);
         console.log('✅ Feedback submitted successfully');
@@ -882,11 +792,39 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
 
     const handleRatingSubmit = async (rating: number) => {
       try {
-        console.log('🚀 SettingsFeedbackSection: Starting rating submission...');
+        console.log('🚀 SettingsFeedbackSection: Starting rating submission...', { rating, sparkId, sparkName });
 
-        // Ensure services are initialized
-        await ServiceFactory.ensureAnalyticsInitialized();
-        await ServiceFactory.ensureFirebaseInitialized();
+        // Ensure services are initialized with retry logic
+        let initAttempts = 0;
+        const maxAttempts = 3;
+        let initialized = false;
+
+        while (initAttempts < maxAttempts && !initialized) {
+          try {
+            console.log(`🔄 Attempt ${initAttempts + 1}/${maxAttempts}: Initializing services...`);
+            await ServiceFactory.ensureAnalyticsInitialized();
+            await ServiceFactory.ensureFirebaseInitialized();
+
+            // Verify initialization
+            const FirebaseService = ServiceFactory.getFirebaseService();
+            if (!FirebaseService) {
+              throw new Error('Firebase service not available after initialization');
+            }
+
+            initialized = true;
+            console.log('✅ Services initialized successfully');
+          } catch (error) {
+            initAttempts++;
+            console.error(`❌ Initialization attempt ${initAttempts} failed:`, error);
+
+            if (initAttempts < maxAttempts) {
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 500 * initAttempts));
+            } else {
+              throw new Error(`Failed to initialize services after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+        }
 
         const AnalyticsService = ServiceFactory.getAnalyticsService();
         const FirebaseService = ServiceFactory.getFirebaseService();
@@ -898,37 +836,52 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
 
         // Submit rating only
         const sessionInfo = AnalyticsService.getSessionInfo();
-        await FeedbackService.submitFeedback({
+        const feedbackData = {
           userId: deviceId,
           sparkId,
           sparkName,
           rating,
           sessionId: sessionInfo.sessionId || deviceId,
           platform: 'ios' as 'ios' | 'android' | 'web',
-        });
+          comment: '', // Ensure comment is not undefined to prevent Firebase error
+          feedback: '', // Also set feedback to empty string just in case
+        };
+
+        console.log('📤 Submitting feedback data:', feedbackData);
+        await FeedbackService.submitFeedback(feedbackData);
+        console.log('✅ Rating submitted to Firebase successfully');
 
         // Track with simple analytics
         const SimpleAnalytics = ServiceFactory.getAnalyticsService();
         if (SimpleAnalytics.trackFeedbackSubmitted) {
           SimpleAnalytics.trackFeedbackSubmitted(sparkId, sparkName, true, false);
         }
-        console.log('✅ Rating submitted successfully');
+        console.log('✅ Rating tracked in analytics');
 
         // Track analytics
         await AnalyticsService.trackFeatureUsage('rating_submitted', sparkId, sparkName, {
           rating,
           hasFeedback: false,
         });
-        console.log('✅ Analytics tracked');
+        console.log('✅ Feature usage tracked');
 
         // Reload feedback list
         await loadUserFeedback();
+        console.log('✅ Feedback list reloaded');
 
         HapticFeedback.success();
         Alert.alert('Thank You!', `Your ${rating}-star rating has been recorded.`);
       } catch (error) {
-        console.error('Error submitting rating:', error);
-        Alert.alert('Error', 'Failed to submit rating. Please try again.');
+        console.error('❌ Error submitting rating:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+        // Provide detailed error message to user
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        Alert.alert(
+          'Error',
+          `Failed to submit rating. Please try again.\n\nDetails: ${errorMessage}`,
+          [{ text: 'OK' }]
+        );
       }
     };
 
@@ -1007,6 +960,33 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
         <TouchableOpacity style={styles.feedbackButton} onPress={() => setShowFeedbackModal(true)}>
           <Text style={styles.feedbackButtonText}>💬 Share Feedback</Text>
         </TouchableOpacity>
+
+        {/* Mark as Read Button - only show if there are unread responses */}
+        {unreadCount > 0 && (
+          <SettingsButton
+            title={`Mark ${unreadCount} Response${unreadCount > 1 ? 's' : ''} as Read`}
+            onPress={async () => {
+              try {
+                const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
+                await FeedbackNotificationService.markAllResponsesAsRead(deviceId, sparkId);
+
+                // Reload unread count
+                const newCount = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
+                setUnreadCount(newCount);
+
+                // Refresh feedback list to show updated status
+                await loadUserFeedback();
+
+                HapticFeedback.success();
+                Alert.alert('Success', 'All responses marked as read');
+              } catch (error) {
+                console.error('Error marking as read:', error);
+                Alert.alert('Error', 'Failed to mark responses as read');
+              }
+            }}
+            variant="secondary"
+          />
+        )}
 
         {/* Feedback List */}
         {userFeedbacks.length > 0 && (

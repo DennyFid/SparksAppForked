@@ -409,10 +409,13 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
         },
         dateText: {
             fontSize: 16,
-            color: colors.text,
+            color: colors.text, // Ensure text color is explicit
+            fontWeight: '500',
         },
         switchContainer: {
             flexDirection: 'row',

@@ -4,5 +4,6 @@
   "newArchEnabled": "true",
   "ios.useFrameworks": "static",
   "ios.forceStaticLinking": "[]",
-  "apple.privacyManifestAggregationEnabled": "true"
+  "apple.privacyManifestAggregationEnabled": "true",
+  "ios.deploymentTarget": "15.1"
 }

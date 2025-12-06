@@ -181,6 +181,28 @@ export class FirebaseService {
     }
   }
 
+  static async getGlobalAnalytics(days: number = 14): Promise<AnalyticsEvent[]> {
+    if (!this.db) {
+      console.log('⚠️ Firebase not available, returning empty analytics');
+      return [];
+    }
+
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const snapshot = await this.db
+        .collection('analytics')
+        .where('timestamp', '>=', firestore.Timestamp.fromDate(startDate))
+        .get();
+
+      return snapshot.docs.map((doc: any) => doc.data() as AnalyticsEvent);
+    } catch (error) {
+      console.error('Error getting global analytics:', error);
+      return [];
+    }
+  }
+
   static async getAnalytics(
     sparkId?: string,
     dateRange?: { start: Date; end: Date }
