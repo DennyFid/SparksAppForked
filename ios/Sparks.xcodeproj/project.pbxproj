@@ -11,9 +11,9 @@
 		31281651253C4E398545EEDE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 279EF20822A94ABFB886E112 /* GoogleService-Info.plist */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5361BE6D5E32D718789850B7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2331D92AE4BE0FE24861DDD /* ExpoModulesProvider.swift */; };
+		5A69ACB27B6FAF208D37E4F3 /* Pods_Sparks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C970D7AC83A7BE8F2E4E0F99 /* Pods_Sparks.framework */; };
 		A6FBEFE9F7B409DB5708B9D0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FB8E4D970C131576D656EE56 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		C378BB28248515E4D20F557D /* Pods_Sparks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C12CC4BA79607084F8504D34 /* Pods_Sparks.framework */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -26,7 +26,7 @@
 		96B56248C3C1E26F3569B716 /* Pods-Sparks.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Sparks.debug.xcconfig"; path = "Target Support Files/Pods-Sparks/Pods-Sparks.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Sparks/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C12CC4BA79607084F8504D34 /* Pods_Sparks.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Sparks.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C970D7AC83A7BE8F2E4E0F99 /* Pods_Sparks.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Sparks.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2331D92AE4BE0FE24861DDD /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Sparks/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Sparks/AppDelegate.swift; sourceTree = "<group>"; };
@@ -39,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C378BB28248515E4D20F557D /* Pods_Sparks.framework in Frameworks */,
+				5A69ACB27B6FAF208D37E4F3 /* Pods_Sparks.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,7 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				C12CC4BA79607084F8504D34 /* Pods_Sparks.framework */,
+				C970D7AC83A7BE8F2E4E0F99 /* Pods_Sparks.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
