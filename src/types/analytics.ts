@@ -49,7 +49,8 @@ export interface SparkFeedback {
 
 export interface AnalyticsEvent {
   id: string;
-  userId: string;
+  userId?: string | null; // Can be null for anonymous users
+  deviceId?: string; // Unique device identifier (used when userId is null)
   eventType: 'spark_opened' | 'spark_completed' | 'settings_accessed' | 'error_occurred' | 'feature_used' | 'spark_added' | 'spark_removed' | 'user_engagement';
   eventName?: string; // Alias for eventType
   sparkId?: string;

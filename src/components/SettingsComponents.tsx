@@ -961,11 +961,6 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
 
     return (
       <SettingsSection title="Feedback & Rating">
-        {/* Notification Badge */}
-        <View style={{ position: 'relative', alignSelf: 'flex-start' }}>
-          <NotificationBadge sparkId={sparkId} size="small" />
-        </View>
-
         {/* App Rating */}
         <View style={styles.appRatingContainer}>
           <Text style={styles.appRatingLabel}>Rate {sparkName}</Text>
@@ -1015,35 +1010,48 @@ export const SettingsFeedbackSection = forwardRef<SettingsFeedbackSectionRef, Se
         {/* Feedback List */}
         {userFeedbacks.length > 0 && (
           <View style={styles.feedbackList}>
-            <Text style={styles.sectionTitle}>Your Feedback</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+              <Text style={styles.sectionTitle}>Your Feedback</Text>
+              <View style={{ marginLeft: 8 }}>
+                <NotificationBadge sparkId={sparkId} size="small" />
+              </View>
+            </View>
             {userFeedbacks.map((item, index) => {
               const handleMarkAsRead = async (feedbackId: string) => {
                 try {
-                  const { ServiceFactory } = await import('../services/ServiceFactory');
-                  const FirebaseService = ServiceFactory.getFirebaseService();
-                  await (FirebaseService as any).markFeedbackAsReadByUser(feedbackId);
+                  const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
                   
-                  // Reload feedback list to show updated status
+                  // Immediately update local state to hide button
+                  setUserFeedbacks(prevFeedbacks => 
+                    prevFeedbacks.map(fb => 
+                      fb.id === feedbackId 
+                        ? { ...fb, readByUser: true }
+                        : fb
+                    )
+                  );
+                  
+                  // Mark as read in Firebase and clear from pending responses
+                  await FeedbackNotificationService.markResponseAsRead(deviceId, feedbackId);
+                  
+                  // Reload feedback list to ensure sync with Firebase
                   await loadUserFeedback();
                   
                   // Update unread count
-                  const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
                   const newCount = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
                   setUnreadCount(newCount);
-                  
-                  // Update app icon badge
-                  await FeedbackNotificationService.updateAppIconBadge();
                   
                   HapticFeedback.success();
                 } catch (error) {
                   console.error('Error marking feedback as read:', error);
+                  // Revert on error
+                  await loadUserFeedback();
                   Alert.alert('Error', 'Failed to mark response as read');
                 }
               };
               
               return (
                 <FeedbackItem
-                  key={index}
+                  key={item.id || index}
                   rating={item.rating}
                   comment={item.comment || item.text || ''}
                   response={item.response || ''}

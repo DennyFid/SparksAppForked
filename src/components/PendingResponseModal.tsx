@@ -60,18 +60,24 @@ export const PendingResponseModal: React.FC<PendingResponseModalProps> = ({
 
   const handleMarkAsRead = async (feedbackId: string) => {
     try {
-      const FirebaseService = ServiceFactory.getFirebaseService();
-      await (FirebaseService as any).markFeedbackAsReadByUser(feedbackId);
+      const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
       
-      // Reload responses
+      // Immediately remove from local state to hide button
+      setResponses(prevResponses => 
+        prevResponses.filter(r => r.id !== feedbackId && r.feedbackId !== feedbackId)
+      );
+      
+      // Mark as read in Firebase and clear from pending responses
+      await FeedbackNotificationService.markResponseAsRead(deviceId, feedbackId);
+      
+      // Reload responses to ensure sync with Firebase
       await loadPendingResponses();
-      
-      // Update app icon badge
-      await FeedbackNotificationService.updateAppIconBadge();
       
       HapticFeedback.success();
     } catch (error) {
       console.error('Error marking response as read:', error);
+      // Revert on error
+      await loadPendingResponses();
       Alert.alert('Error', 'Failed to mark response as read');
     }
   };

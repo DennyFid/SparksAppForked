@@ -12,7 +12,7 @@ import {
 import { Svg, Path, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 import { SparkProps } from '../types/spark';
-import { FirebaseService } from '../services/FirebaseService';
+import { ServiceFactory } from '../services/ServiceFactory';
 import { AnalyticsEvent } from '../types/analytics';
 import { useNavigation } from '@react-navigation/native';
 import { getSparkById } from '../components/SparkRegistry';
@@ -41,6 +41,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
     const [loading, setLoading] = useState(true);
     const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
     const [topSparks, setTopSparks] = useState<SparkTrend[]>([]);
+    const [isMockData, setIsMockData] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -50,9 +51,43 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
         try {
             setLoading(true);
             console.log('📊 SparkStats: Loading analytics data...');
+            
+            // Check if using mock or real Firebase
+            const usingMock = ServiceFactory.isUsingMock();
+            setIsMockData(usingMock);
+            
+            if (usingMock) {
+                console.log('⚠️ SparkStats: Using MOCK Firebase Service - Data is simulated');
+            } else {
+                console.log('✅ SparkStats: Using REAL Firebase Service - Data is from Firestore');
+            }
+            
+            // Ensure Firebase is initialized
+            await ServiceFactory.ensureFirebaseInitialized();
+            const FirebaseService = ServiceFactory.getFirebaseService();
+            
+            // Check if method exists
+            if (!FirebaseService || typeof FirebaseService.getGlobalAnalytics !== 'function') {
+                console.error('📊 SparkStats: getGlobalAnalytics method not available on FirebaseService');
+                console.log('📊 SparkStats: FirebaseService type:', typeof FirebaseService);
+                console.log('📊 SparkStats: Available methods:', FirebaseService ? Object.getOwnPropertyNames(FirebaseService) : 'null');
+                Alert.alert('Error', 'Analytics service not available. Please check Firebase configuration.');
+                return;
+            }
+            
+            // Check if WebFirebaseService is initialized (for real data)
+            if (!usingMock && FirebaseService.isInitialized) {
+                const isInitialized = FirebaseService.isInitialized();
+                console.log(`📊 SparkStats: Firebase initialized: ${isInitialized}`);
+                if (!isInitialized) {
+                    console.warn('⚠️ SparkStats: Firebase not initialized, data may be empty');
+                }
+            }
+            
             // Fetch last 14 days of data
             const events = await FirebaseService.getGlobalAnalytics(14);
             console.log(`📊 SparkStats: Received ${events.length} analytics events`);
+            console.log(`📊 SparkStats: Data source: ${usingMock ? 'MOCK' : 'REAL FIREBASE'}`);
 
             processStats(events);
         } catch (error) {
@@ -83,10 +118,27 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
             const dateObj = (event.timestamp as any).toDate ? (event.timestamp as any).toDate() : new Date(event.timestamp as any);
             const dateStr = dateObj.toISOString().split('T')[0];
 
-            if (usersByDay.has(dateStr) && event.userId) {
-                usersByDay.get(dateStr)?.add(event.userId);
+            // Use userId if available, otherwise fall back to deviceId for anonymous users
+            const userIdentifier = event.userId || (event as any).deviceId;
+            
+            if (usersByDay.has(dateStr) && userIdentifier) {
+                usersByDay.get(dateStr)?.add(userIdentifier);
             }
         });
+
+        // Debug logging
+        console.log('📊 SparkStats: Total events processed:', events.length);
+        console.log('📊 SparkStats: Events with userId:', events.filter(e => e.userId).length);
+        console.log('📊 SparkStats: Events with deviceId:', events.filter(e => (e as any).deviceId).length);
+        const sampleEvent = events.find(e => (e as any).deviceId);
+        if (sampleEvent) {
+            console.log('📊 SparkStats: Sample event with deviceId:', {
+                userId: sampleEvent.userId,
+                deviceId: (sampleEvent as any).deviceId,
+                sparkId: sampleEvent.sparkId,
+                eventType: sampleEvent.eventType
+            });
+        }
 
         const stats: DailyStats[] = last14Days.map(date => ({
             date,
@@ -219,10 +271,25 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
     return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>Community Stats</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                    See how the Sparks community is growing
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.title, { color: colors.text }]}>Community Stats</Text>
+                        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                            See how the Sparks community is growing
+                        </Text>
+                    </View>
+                    {isMockData && (
+                        <View style={{
+                            backgroundColor: '#FF9500',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 8,
+                            marginLeft: 8
+                        }}>
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>MOCK DATA</Text>
+                        </View>
+                    )}
+                </View>
             </View>
 
             {loading ? (

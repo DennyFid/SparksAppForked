@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     SettingsContainer,
@@ -61,6 +61,16 @@ export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose 
                         onPress={handleRefresh}
                         variant="secondary"
                         disabled={isRefreshing}
+                    />
+                    <SettingsButton
+                        title="Add Golf Wisdom"
+                        onPress={() => {
+                            Linking.openURL('https://console.firebase.google.com/project/sparkopedia-330f6/firestore/databases/-default-/data/~2FgolfWisdom~2FD2vro2RXLhdgX0qI80na').catch(err => {
+                                console.error('Failed to open URL:', err);
+                                Alert.alert('Error', 'Failed to open Firebase Console');
+                            });
+                        }}
+                        variant="primary"
                     />
                 </SettingsSection>
 

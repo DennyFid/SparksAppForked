@@ -419,7 +419,7 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
         },
         datePickerContainer: {
             marginTop: 10,
-            backgroundColor: Platform.OS === 'ios' ? colors.background : colors.surface,
+            backgroundColor: Platform.OS === 'ios' ? '#1a1a1a' : colors.surface, // Dark dark grey for iOS calendar visibility
             borderRadius: 12,
             overflow: 'hidden',
             borderWidth: Platform.OS === 'ios' ? 0 : 1,

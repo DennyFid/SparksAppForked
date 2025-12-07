@@ -277,6 +277,62 @@ export class WebFirebaseService {
     }
   }
 
+  static async getGlobalAnalytics(days: number = 14): Promise<AnalyticsEvent[]> {
+    if (!this._initialized || !this.db) {
+      console.log('⚠️ Firebase not initialized, returning empty analytics');
+      return [];
+    }
+
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      console.log(`🔥 getGlobalAnalytics: Starting query for last ${days} days`);
+      console.log(`🔥 Query start date:`, startDate.toISOString());
+      console.log(`🔥 Querying collection: 'analytics'`);
+
+      const q = query(
+        collection(this.db, 'analytics'),
+        where('timestamp', '>=', Timestamp.fromDate(startDate)),
+        orderBy('timestamp', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      console.log(`🔥 Query completed. Documents found: ${querySnapshot.docs.length}`);
+
+      if (querySnapshot.docs.length > 0) {
+        console.log(`🔥 Sample document (first):`, querySnapshot.docs[0].data());
+      } else {
+        console.log(`🔥 No documents found in 'analytics' collection`);
+      }
+
+      const events: AnalyticsEvent[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        events.push({
+          id: doc.id,
+          userId: data.userId || null,
+          deviceId: data.deviceId || undefined,
+          eventType: data.eventType || data.eventName || 'unknown',
+          eventName: data.eventName || data.eventType,
+          sparkId: data.sparkId,
+          eventData: data.eventData || data.properties || {},
+          properties: data.properties || data.eventData || {},
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp || new Date()),
+          sessionId: data.sessionId || '',
+          appVersion: data.appVersion || '1.0.0',
+          platform: data.platform || 'ios',
+        });
+      });
+
+      console.log(`🔥 Returning ${events.length} analytics events`);
+      return events;
+    } catch (error) {
+      console.error('❌ Error getting global analytics:', error);
+      console.error('❌ Error details:', (error as any).message, (error as any).code);
+      return [];
+    }
+  }
+
   static async getAnalyticsData(sparkId: string, startDate: Date, endDate: Date): Promise<AnalyticsData> {
     if (!this._initialized || !this.db) {
       throw new Error('Firebase not initialized');

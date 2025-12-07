@@ -166,6 +166,12 @@ export class FeedbackNotificationService {
       // Mark as read in Firebase
       await (FirebaseService as any).markFeedbackAsReadByUser(feedbackId);
       
+      // Remove from pending responses in AsyncStorage
+      const responses = await this.getPendingResponses(deviceId);
+      const updatedResponses = responses.filter(r => r.feedbackId !== feedbackId);
+      const key = `${this.PENDING_RESPONSES_KEY}_${deviceId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(updatedResponses));
+      
       // Update app icon badge with aggregated counts
       await this.updateAppIconBadge();
     } catch (error) {
@@ -198,6 +204,12 @@ export class FeedbackNotificationService {
         if (unreadFeedbackIds.length > 0) {
           // Mark all as read in Firebase
           await (FirebaseService as any).markMultipleFeedbackAsReadByUser(unreadFeedbackIds);
+          
+          // Remove all pending responses for this spark from AsyncStorage
+          const responses = await this.getPendingResponses(deviceId);
+          const updatedResponses = responses.filter(r => r.sparkId !== sparkId);
+          const key = `${this.PENDING_RESPONSES_KEY}_${deviceId}`;
+          await AsyncStorage.setItem(key, JSON.stringify(updatedResponses));
         }
       }
       
