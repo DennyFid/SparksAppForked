@@ -2036,15 +2036,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     </Modal>
   );
 
+
   // Initialize selectedDate when Add Activity modal opens
   useEffect(() => {
     if (showAddActivityModal && currentTrip) {
       const tripDates = getTripDates();
-      if (tripDates.length > 0 && !selectedDate) {
-        setSelectedDate(tripDates[0]);
-      }
+      // Removed auto-selection - user must explicitly select a date
 
-      // Scroll to selected date
+      // Scroll to selected date if one is already selected
       if (dateScrollViewRef.current && selectedDate) {
         const dateIndex = tripDates.indexOf(selectedDate);
         if (dateIndex >= 0) {
@@ -2059,6 +2058,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       }
     }
   }, [showAddActivityModal, currentTrip]);
+
 
   const renderAddActivityModal = () => (
     <Modal visible={showAddActivityModal} animationType="slide" presentationStyle="pageSheet">
@@ -2134,17 +2134,25 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={async () => {
+                if (!selectedDate) {
+                  Alert.alert('Date Required', 'Please select a date for this activity.');
+                  return;
+                }
                 await addActivity();
                 setShowAddActivityModal(false);
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Add</Text>
+              <Text style={styles.actionButtonText}>Add</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={async () => {
+                if (!selectedDate) {
+                  Alert.alert('Date Required', 'Please select a date for this activity.');
+                  return;
+                }
                 await addActivity();
                 // Keep modal open and clear form for next activity
                 setNewActivityName('');
@@ -2152,7 +2160,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                 // Keep selectedDate so user can add multiple activities to same day
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Add Another</Text>
+              <Text style={styles.actionButtonText}>Add Another</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2263,12 +2271,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         </ScrollView>
 
         <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: colors.primary }]}
-            onPress={saveActivitiesFromList}
-          >
-            <Text style={[styles.createButtonText, { color: colors.background }]}>Save Activities</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row' }}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
+              onPress={saveActivitiesFromList}
+            >
+              <Text style={styles.actionButtonText}>Save Activities</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -2563,18 +2573,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
-              onPress={deletePhoto}
-            >
-              <Text style={[styles.deleteButtonText, { color: 'white' }]}>Delete Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: colors.primary }]}
-              onPress={updatePhotoDetails}
-            >
-              <Text style={[styles.deleteButtonText, { color: colors.background }]}>Save Changes</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
+                onPress={deletePhoto}
+              >
+                <Text style={styles.actionButtonText}>Delete Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
+                onPress={updatePhotoDetails}
+              >
+                <Text style={styles.actionButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2736,16 +2748,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingVertical: 12 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={updateActivity}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Save</Text>
+              <Text style={styles.actionButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30', flex: 1, paddingVertical: 12 }]}
+              style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
               onPress={deleteActivity}
             >
-              <Text style={[styles.deleteButtonText, { color: 'white' }]}>Delete</Text>
+              <Text style={styles.actionButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2842,25 +2854,25 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={updateTrip}
             >
-              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Update Trip</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Update Trip</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={() => {
                 setShowEditTrip(false);
                 setShowAddActivityModal(true);
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Add Activity</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Add Activity</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30', flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
               onPress={deleteTrip}
             >
-              <Text style={[styles.deleteButtonText, { color: 'white', fontSize: 14 }]} numberOfLines={1}>Delete</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2964,43 +2976,43 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           </ScrollView>
 
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.modalFooterButton,
-                {
-                  backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
-                  opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
-                  flex: 1,
-                  marginRight: 8,
-                }
-              ]}
-              onPress={handleCustomPickerSelection}
-              disabled={selectedPickerPhotos.size === 0}
-            >
-              <Text style={[styles.modalFooterButtonText, { color: colors.background }]}>
-                Add {selectedPickerPhotos.size > 0 ? `(${selectedPickerPhotos.size})` : ''}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modalFooterButton,
-                {
-                  backgroundColor: colors.border,
-                  flex: 1,
-                  marginLeft: 8,
-                }
-              ]}
-              onPress={() => {
-                setShowCustomPhotoPicker(false);
-                setSelectedPickerPhotos(new Set());
-                setCustomPickerPhotos([]);
-                setCustomPickerPhotoUris(new Map());
-              }}
-            >
-              <Text style={[styles.modalFooterButtonText, { color: colors.textSecondary }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
+                    opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
+                    flex: 1,
+                  }
+                ]}
+                onPress={handleCustomPickerSelection}
+                disabled={selectedPickerPhotos.size === 0}
+              >
+                <Text style={styles.actionButtonText}>
+                  Add {selectedPickerPhotos.size > 0 ? `(${selectedPickerPhotos.size})` : ''}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: colors.border,
+                    flex: 1,
+                  }
+                ]}
+                onPress={() => {
+                  setShowCustomPhotoPicker(false);
+                  setSelectedPickerPhotos(new Set());
+                  setCustomPickerPhotos([]);
+                  setCustomPickerPhotoUris(new Map());
+                }}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3721,28 +3733,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       </Text>
                     )}
 
-                    {/* Snap/Add buttons above image row - only show when day is active */}
+                    {/* Add Activity/Add Photos buttons above image row - only show when day is active */}
                     {activeDayDate === date && activeTripId === currentTrip.id && (
                       <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
                         <TouchableOpacity
-                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                           onPress={() => {
                             setSelectedDate(date);
-                            setSelectedActivity(null);
-                            capturePhoto(undefined, date);
+                            setShowAddActivityModal(true);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, false);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
@@ -3778,7 +3779,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 disabled={isLoading}
                               >
                                 <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                  {isLoading ? 'Searching...' : 'Add Photos'}
                                 </Text>
                               </TouchableOpacity>
                             </Animated.View>
@@ -3794,28 +3795,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       imageHeight={screenWidth - 80}
                     />
 
-                    {/* Snap/Add buttons below image row - only show when day is active and in Record mode */}
+                    {/* Add Activity/Add Photos buttons below image row - only show when day is active and in Record mode */}
                     {activeDayDate === date && activeTripId === currentTrip.id && currentTrip.mode === 'record' && (
                       <View style={styles.activityPhotoButtons}>
                         <TouchableOpacity
-                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                           onPress={() => {
                             setSelectedDate(date);
-                            setSelectedActivity(null);
-                            capturePhoto(undefined, date);
+                            setShowAddActivityModal(true);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, false);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
@@ -3851,7 +3841,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 disabled={isLoading}
                               >
                                 <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                  {isLoading ? 'Searching...' : 'Add Photos'}
                                 </Text>
                               </TouchableOpacity>
                             </Animated.View>
@@ -3862,28 +3852,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                   </View>
                 )}
 
-                {/* Snap/Add buttons when no day photos exist yet - only show when day is active and in Record mode */}
+                {/* Add Activity/Add Photos buttons when no day photos exist yet - only show when day is active and in Record mode */}
                 {dayPhotos.filter(photo => !photo.activityId).length === 0 && activeDayDate === date && activeTripId === currentTrip.id && currentTrip.mode === 'record' && (
                   <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
                     <TouchableOpacity
-                      style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                      style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                       onPress={() => {
                         setSelectedDate(date);
-                        setSelectedActivity(null);
-                        capturePhoto(undefined, date);
+                        setShowAddActivityModal(true);
                       }}
                     >
-                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        setSelectedActivity(null);
-                        addFromGallery(undefined, date, false);
-                      }}
-                    >
-                      <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                     </TouchableOpacity>
                     {(() => {
                       const isLoading = loadingPhotosByDate === (date + '');
@@ -3908,6 +3887,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 backgroundColor: '#f5f5f5',
                                 borderWidth: 0,
                                 opacity: isLoading ? 0.7 : 1,
+                                flex: 1,
                               }
                             ]}
                             onPress={() => {
@@ -3918,7 +3898,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                             disabled={isLoading}
                           >
                             <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                              {isLoading ? 'Searching...' : 'Add Many'}
+                              {isLoading ? 'Searching...' : 'Add Photos'}
                             </Text>
                           </TouchableOpacity>
                         </Animated.View>
@@ -4264,7 +4244,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       <View style={{ padding: 20 }}>
         <SettingsButton
           title="+ Create New Trip"
-          onPress={() => setShowCreateTrip(true)}
+          onPress={() => {
+            setActivitiesListText(''); // Clear activities field for new trip
+            setShowCreateTrip(true);
+          }}
         />
       </View>
 
@@ -4560,51 +4543,27 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   modalFooter: {
-    padding: 0,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalFooterText: {
     fontSize: 14,
   },
-  modalFooterButton: {
+
+  actionButton: {
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
   },
-  modalFooterButtonText: {
-    fontSize: 16,
+  actionButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
-  },
-  createButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    marginVertical: 20,
-    width: '100%',
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
   },
   closeButton: {
     margin: 20,

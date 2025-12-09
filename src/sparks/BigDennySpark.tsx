@@ -294,12 +294,12 @@ export const BigDennySpark: React.FC<BigDennySparkProps> = ({
                     subtitle="Manage your skins game preferences"
                 />
 
-                <SettingsScrollView sparkId="big-denny">
-                    <SettingsFeedbackSection sparkId="big-denny" />
+                <SettingsScrollView>
+                    <SettingsFeedbackSection sparkName="Skins" sparkId="big-denny" />
 
                     <SettingsButton
                         title="Close"
-                        onPress={onCloseSettings}
+                        onPress={onCloseSettings || (() => { })}
                         variant="secondary"
                     />
                 </SettingsScrollView>
