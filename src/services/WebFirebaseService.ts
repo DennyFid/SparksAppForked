@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, User } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence, signInAnonymously, User } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs, orderBy, limit, Timestamp, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import {
   User as AnalyticsUser,
@@ -53,8 +53,21 @@ export class WebFirebaseService {
 
       // Try to initialize Auth (optional)
       try {
-        // Use default auth for all platforms (Web SDK works in React Native)
-        this.auth = getAuth(app);
+        // Initialize Auth with AsyncStorage persistence to prevent duplicate initialization
+        try {
+          this.auth = initializeAuth(app, {
+            persistence: getReactNativePersistence(AsyncStorage)
+          });
+          console.log('✅ Initialized Auth with AsyncStorage persistence');
+        } catch (initError: any) {
+          // If already initialized, just get the existing auth instance
+          if (initError.code === 'auth/already-initialized') {
+            this.auth = getAuth(app);
+            console.log('✅ Using existing Auth instance');
+          } else {
+            throw initError;
+          }
+        }
 
         // Try anonymous sign-in with retry logic
         let retryCount = 0;

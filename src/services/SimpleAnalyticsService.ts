@@ -96,6 +96,11 @@ export class SimpleAnalyticsService {
     await this.logEvent('feedback_submitted', sparkId, sparkName, { hasRating, hasText });
   }
 
+  // Track when app is launched
+  static async trackAppLaunch(): Promise<void> {
+    await this.logEvent('app_launched', 'app', 'App');
+  }
+
   static getDeviceId(): string | null {
     return this.deviceId;
   }

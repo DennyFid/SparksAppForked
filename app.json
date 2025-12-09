@@ -37,6 +37,7 @@
           }
         }
       ],
+      "@react-native-google-signin/google-signin",
       "@react-native-firebase/app"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",

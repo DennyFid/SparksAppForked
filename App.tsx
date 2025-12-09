@@ -49,12 +49,12 @@ function AppContent() {
       try {
         console.log('🚀 App: Initializing AuthService...');
         await AuthService.initialize();
-        
+
         // Set up auth state listener
         const unsubscribe = AuthService.onAuthStateChanged(async (user) => {
           console.log('🔐 App: Auth state changed', user ? user.email : 'signed out');
           setUser(user);
-          
+
           if (user) {
             // Load user roles
             try {
@@ -72,7 +72,7 @@ function AppContent() {
             setSparkAdminRoles([]);
           }
         });
-        
+
         return unsubscribe;
       } catch (error) {
         console.error('❌ App: Failed to initialize AuthService', error);
@@ -80,12 +80,32 @@ function AppContent() {
     };
 
     const unsubscribePromise = initializeAuth();
-    
+
     return () => {
       unsubscribePromise.then(unsubscribe => {
         if (unsubscribe) unsubscribe();
       });
     };
+  }, []);
+
+  // Initialize analytics when app starts
+  useEffect(() => {
+    const initializeAnalytics = async () => {
+      try {
+        console.log('🚀 App: Initializing Analytics...');
+        await ServiceFactory.ensureAnalyticsInitialized();
+        console.log('✅ App: Analytics initialized');
+
+        // Track app launch
+        const AnalyticsService = ServiceFactory.getAnalyticsService();
+        await AnalyticsService.trackAppLaunch();
+        console.log('📊 App: Launch tracked');
+      } catch (error) {
+        console.error('❌ App: Failed to initialize Analytics', error);
+      }
+    };
+
+    initializeAnalytics();
   }, []);
 
   // Initialize notifications when app starts

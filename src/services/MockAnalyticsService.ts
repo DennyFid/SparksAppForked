@@ -9,15 +9,15 @@ export class MockAnalyticsService {
 
   static async initialize(): Promise<void> {
     console.log('🚀 MockAnalyticsService.initialize() called (Expo Go mode)');
-    
+
     try {
       // Generate or get device ID
       this.userId = await this.getOrCreateDeviceId();
       console.log('✅ Mock Device ID set:', this.userId);
-      
+
       this.isInitialized = true;
       console.log('✅ Mock Analytics initialized:', this.isInitialized);
-      
+
       // Track app open
       await this.trackSparkOpen('app', 'Sparks App');
       console.log('✅ App open tracked (mock)');
@@ -51,9 +51,9 @@ export class MockAnalyticsService {
   }
 
   static async trackSparkComplete(
-    sparkId: string, 
+    sparkId: string,
     sparkName: string,
-    duration: number, 
+    duration: number,
     actions: string[]
   ): Promise<void> {
     if (!this.isInitialized || !this.userId) return;
@@ -81,6 +81,12 @@ export class MockAnalyticsService {
     if (!this.isInitialized || !this.userId) return;
 
     console.log('📊 Mock Analytics: Feedback submitted', { sparkId, sparkName, hasRating, hasText });
+  }
+
+  static async trackAppLaunch(): Promise<void> {
+    if (!this.isInitialized || !this.userId) return;
+
+    console.log('📊 Mock Analytics: App launched');
   }
 
   static async trackSparkAdded(sparkId: string, sparkName: string): Promise<void> {

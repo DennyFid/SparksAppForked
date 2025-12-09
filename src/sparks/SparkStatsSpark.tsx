@@ -15,7 +15,7 @@ import { SparkProps } from '../types/spark';
 import { ServiceFactory } from '../services/ServiceFactory';
 import { AnalyticsEvent } from '../types/analytics';
 import { useNavigation } from '@react-navigation/native';
-import { getSparkById } from '../components/SparkRegistry';
+import { getSparkById } from '../components/sparkRegistryData';
 import {
     SettingsHeader,
     SettingsFeedbackSection,
@@ -51,21 +51,21 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
         try {
             setLoading(true);
             console.log('📊 SparkStats: Loading analytics data...');
-            
+
             // Check if using mock or real Firebase
             const usingMock = ServiceFactory.isUsingMock();
             setIsMockData(usingMock);
-            
+
             if (usingMock) {
                 console.log('⚠️ SparkStats: Using MOCK Firebase Service - Data is simulated');
             } else {
                 console.log('✅ SparkStats: Using REAL Firebase Service - Data is from Firestore');
             }
-            
+
             // Ensure Firebase is initialized
             await ServiceFactory.ensureFirebaseInitialized();
             const FirebaseService = ServiceFactory.getFirebaseService();
-            
+
             // Check if method exists
             if (!FirebaseService || typeof FirebaseService.getGlobalAnalytics !== 'function') {
                 console.error('📊 SparkStats: getGlobalAnalytics method not available on FirebaseService');
@@ -74,7 +74,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
                 Alert.alert('Error', 'Analytics service not available. Please check Firebase configuration.');
                 return;
             }
-            
+
             // Check if WebFirebaseService is initialized (for real data)
             if (!usingMock && FirebaseService.isInitialized) {
                 const isInitialized = FirebaseService.isInitialized();
@@ -83,7 +83,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
                     console.warn('⚠️ SparkStats: Firebase not initialized, data may be empty');
                 }
             }
-            
+
             // Fetch last 14 days of data
             const events = await FirebaseService.getGlobalAnalytics(14);
             console.log(`📊 SparkStats: Received ${events.length} analytics events`);
@@ -120,7 +120,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
 
             // Use userId if available, otherwise fall back to deviceId for anonymous users
             const userIdentifier = event.userId || (event as any).deviceId;
-            
+
             if (usersByDay.has(dateStr) && userIdentifier) {
                 usersByDay.get(dateStr)?.add(userIdentifier);
             }
