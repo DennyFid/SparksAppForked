@@ -478,7 +478,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
-  const addActivity = async () => {
+  const addActivity = async (shouldClose: boolean = true) => {
     if (!currentTrip || !newActivityName || !selectedDate) {
       Alert.alert('Missing Information', 'Please select a trip, date, and enter activity name.');
       return;
@@ -489,7 +489,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       tripId: currentTrip.id,
       name: newActivityName,
       startDate: selectedDate,
-      time: newActivityTime || '12:00',
+      time: newActivityTime || '00:00', // Default to 00:00 (midnight) if not specified
       photos: [],
       createdAt: new Date().toISOString(),
     };
@@ -507,8 +507,12 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     // Reset form
     setNewActivityName('');
     setNewActivityTime('');
-    setSelectedDate('');
-    setShowAddActivity(false);
+
+    // Only close modal and clear date if requested
+    if (shouldClose) {
+      setSelectedDate('');
+      setShowAddActivityModal(false);
+    }
 
     HapticFeedback.success();
   };
@@ -1234,6 +1238,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       setActiveActivityId(null);
     }
 
+    // Parse activities from text input if provided and trip has no photos
+    let updatedActivities = currentTrip.activities;
+    if (currentTrip.photos.length === 0 && activitiesListText.trim()) {
+      const parsedActivities = parseActivitiesList(activitiesListText, currentTrip.id);
+      // Only update if we parsed something valid, or if the user explicitly cleared it (which parse would return empty)
+      // Actually, if parsedActivities is empty but text wasn't, it might be a format error.
+      // But if user cleared the text, parsedActivities is empty.
+      // Let's trust the parse.
+      updatedActivities = parsedActivities;
+    }
+
     const updatedTrip: Trip = {
       ...currentTrip,
       title: editTripTitle,
@@ -1241,6 +1256,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       endDate: editTripEndDate,
       status: newStatus,
       mode: newMode,
+      activities: updatedActivities,
       updatedAt: new Date().toISOString()
     };
 
@@ -2140,8 +2156,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                   Alert.alert('Date Required', 'Please select a date for this activity.');
                   return;
                 }
-                await addActivity();
-                setShowAddActivityModal(false);
+                await addActivity(true);
               }}
             >
               <Text style={styles.actionButtonText}>Add</Text>
@@ -2153,11 +2168,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                   Alert.alert('Date Required', 'Please select a date for this activity.');
                   return;
                 }
-                await addActivity();
-                // Keep modal open and clear form for next activity
-                setNewActivityName('');
-                setNewActivityTime('');
-                // Keep selectedDate so user can add multiple activities to same day
+                await addActivity(false);
               }}
             >
               <Text style={styles.actionButtonText}>Add Another</Text>
@@ -2177,7 +2188,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       if (parts.length >= 2) {
         const name = parts[0];
         const date = parts[1];
-        const time = parts[2] || '12:00';
+        const time = parts[2] || '00:00'; // Default to 00:00 (midnight) if not specified
 
         // Validate date format (YYYY-MM-DD)
         if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -2849,6 +2860,41 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Bulk Edit Activities - only if no photos */}
+          {currentTrip && currentTrip.photos.length === 0 && (
+            <View style={[styles.inputGroup, { marginTop: 20 }]}>
+              <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 8 }]}>
+                Edit Activities (Optional):
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surface,
+                    color: colors.text,
+                    borderColor: colors.border,
+                    minHeight: 150,
+                    textAlignVertical: 'top',
+                    paddingTop: 12,
+                  }
+                ]}
+                value={activitiesListText}
+                onChangeText={setActivitiesListText}
+                placeholder="Activity Name, 2025-11-08, 23:00-23:30"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={8}
+              />
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
+                Format: Activity Name, YYYY-MM-DD, HH:MM{'\n'}
+                Example:{'\n'}
+                Breakfast, 2025-11-08, 08:00{'\n'}
+                Museum Visit, 2025-11-08, 14:00{'\n'}
+                Dinner, 2025-11-08, 19:00-20:30
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.modalFooter}>
@@ -3952,7 +3998,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                             </TouchableOpacity>
                           )}
                         </View>
-                        {currentTrip.mode === 'record' && activity.time && (
+                        {currentTrip.mode === 'record' && activity.time && activity.time !== '00:00' && (
                           <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
                         )}
                       </View>
