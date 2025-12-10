@@ -26,7 +26,7 @@ interface CommandHistoryItem {
     targetSpark?: string;
 }
 
-export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
+export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({ showSettings, onCloseSettings, autoRecord }) => {
     const { colors } = useTheme();
     const navigation = useNavigation();
     const { getSparkData, setSparkData } = useSparkStore();
@@ -77,7 +77,7 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
 
     // Load history on mount
     useEffect(() => {
-        const savedData = getSparkData('speak');
+        const savedData = getSparkData('speak-spark');
         if (savedData?.history) {
             setHistory(savedData.history);
         }
@@ -86,14 +86,14 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
     // Save history when it changes
     useEffect(() => {
         if (history.length > 0) {
-            setSparkData('speak', { history });
+            setSparkData('speak-spark', { history });
         }
     }, [history]);
 
     // Listen to store updates for clearing (or when returning from settings)
     useEffect(() => {
         if (!showSettings) {
-            const savedData = getSparkData('speak');
+            const savedData = getSparkData('speak-spark');
             setHistory(savedData?.history || []);
         }
     }, [showSettings]);
@@ -121,7 +121,17 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
         }
     }, [isListening, showSettings]);
 
-    // -- Handlers (defined before speech events using them, or lifted) --
+    // Auto-Record Effect
+    useEffect(() => {
+        if (autoRecord && !isListening && !isProcessing) {
+            const timer = setTimeout(() => {
+                toggleListening();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [autoRecord]);
+
+    // -- Handlers --
 
     const navigateToSpark = (sparkId: string) => {
         (navigation as any).push('Spark', { sparkId });
@@ -173,8 +183,6 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
     };
 
     // -- Speech Hooks --
-    // Only handle events if not in settings, or just always update local state?
-    // Updating local state is fine.
 
     useSpeechRecognitionEvent('start', () => {
         setIsListening(true);
@@ -236,7 +244,7 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
                         title="Speak Spark Settings"
                         subtitle="Voice Control Configuration"
                         icon="🎙️"
-                        sparkId="speak"
+                        sparkId="speak-spark"
                     />
 
                     <View style={{ padding: 20 }}>
@@ -252,7 +260,7 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
                         </Text>
                     </View>
 
-                    <SettingsFeedbackSection sparkName="Speak Spark" sparkId="speak" />
+                    <SettingsFeedbackSection sparkName="Speak Spark" sparkId="speak-spark" />
 
                     <View style={{ padding: 20 }}>
                         <TouchableOpacity
@@ -273,7 +281,7 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
                                         text: 'Clear',
                                         style: 'destructive',
                                         onPress: () => {
-                                            setSparkData('speak', { history: [] });
+                                            setSparkData('speak-spark', { history: [] });
                                             // Ensure UI updates by forcing a read or relying on next effect
                                             setHistory([]);
                                             Alert.alert('Success', 'History cleared.');
@@ -333,7 +341,7 @@ export const SpeakSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings
                                     disabled={isProcessing}
                                 >
                                     <Text style={styles.micIcon}>
-                                        {isProcessing ? '⏳' : isListening ? '⏹️' : '🎤'}
+                                        {isProcessing ? '⏳' : isListening ? '⏹️' : '🎙️'}
                                     </Text>
                                 </TouchableOpacity>
                             </Animated.View>

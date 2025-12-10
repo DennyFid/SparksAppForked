@@ -25,8 +25,10 @@ interface Props {
 
 
 export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { sparkId } = route.params;
-  const { updateSparkProgress, isUserSpark, addSparkToUser, removeSparkFromUser } = useSparkStore();
+  // Destructure sparkId and any other params (like autoRecord)
+  const { sparkId, ...otherParams } = route.params;
+
+  const { updateSparkProgress, isUserSpark, addSparkToUser } = useSparkStore();
   const { setCurrentSparkId, recentSparks, addRecentSpark } = useAppStore();
   const { colors } = useTheme();
 
@@ -247,6 +249,7 @@ export const SparkScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={{ flex: 1 }}>
         <SparkComponent
           {...{
+            ...otherParams, // Pass forwarded params (e.g., autoRecord from SpeakSpark quick launch)
             showSettings: showSparkSettings,
             onCloseSettings: () => setShowSparkSettings(false),
             onStateChange: (state: any) => {

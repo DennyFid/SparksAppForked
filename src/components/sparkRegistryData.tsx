@@ -410,7 +410,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
             id: 'speak-spark',
             title: 'Speak Spark',
             description: 'Control other Sparks with your voice',
-            icon: '🎤',
+            icon: '🎙️',
             category: 'productivity',
             createdAt: '2025-12-09T00:00:00.000Z',
             rating: 4.5,
