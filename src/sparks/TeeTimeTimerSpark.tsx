@@ -172,7 +172,7 @@ const ActivityCard: React.FC<{
       fontSize: 16,
       fontWeight: '600',
       color: status === 'current' ? colors.primary :
-             status === 'completed' ? (getTimeDisplay().includes('Skipped') ? colors.warning : colors.success) : colors.text,
+        status === 'completed' ? (getTimeDisplay().includes('Skipped') ? colors.warning : colors.success) : colors.text,
       minWidth: 80,
       textAlign: 'right',
     },
@@ -649,46 +649,46 @@ const TeeTimeTimerSettings: React.FC<{
     >
       <SettingsContainer>
         <SettingsScrollView>
-            <SettingsHeader
-              title="Tee Time Timer Settings"
-              subtitle="Customize your golf preparation activities"
-              icon="⚙️"
+          <SettingsHeader
+            title="Tee Time Timer Settings"
+            subtitle="Customize your golf preparation activities"
+            icon="⚙️"
+          />
+
+          <SettingsFeedbackSection sparkName="Tee Time Timer" sparkId="tee-time-timer" />
+
+          <SettingsSection title={`Activities (${editingActivities.length})`}>
+            <Text style={settingsSubStyles.dragInstruction}>
+              Drag the ☰ handle to reorder activities
+            </Text>
+            <View style={settingsSubStyles.activitiesContainer}>
+              {editingActivities.map((activity, index) => (
+                <DraggableActivityItem
+                  key={`${activity.id}-${index}-${activity.order}`}
+                  activity={activity}
+                  index={index}
+                  onRemove={removeActivity}
+                  onMove={moveActivity}
+                  onUpdate={updateActivity}
+                  totalActivities={editingActivities.length}
+                  onDragStart={() => setIsAnyItemDragging(true)}
+                  onDragEnd={() => setIsAnyItemDragging(false)}
+                />
+              ))}
+            </View>
+            <SettingsButton
+              title="+ Add Activity"
+              onPress={addActivity}
+              variant="primary"
             />
+            <SettingsButton
+              title="Reset to Defaults"
+              onPress={resetToDefaults}
+              variant="outline"
+            />
+          </SettingsSection>
 
-            <SettingsFeedbackSection sparkName="Tee Time Timer" sparkId="tee-time-timer" />
-
-            <SettingsSection title={`Activities (${editingActivities.length})`}>
-              <Text style={settingsSubStyles.dragInstruction}>
-                Drag the ☰ handle to reorder activities
-              </Text>
-              <View style={settingsSubStyles.activitiesContainer}>
-                {editingActivities.map((activity, index) => (
-                  <DraggableActivityItem
-                    key={`${activity.id}-${index}-${activity.order}`}
-                    activity={activity}
-                    index={index}
-                    onRemove={removeActivity}
-                    onMove={moveActivity}
-                    onUpdate={updateActivity}
-                    totalActivities={editingActivities.length}
-                    onDragStart={() => setIsAnyItemDragging(true)}
-                    onDragEnd={() => setIsAnyItemDragging(false)}
-                  />
-                ))}
-              </View>
-              <SettingsButton
-                title="+ Add Activity"
-                onPress={addActivity}
-                variant="primary"
-              />
-              <SettingsButton
-                title="Reset to Defaults"
-                onPress={resetToDefaults}
-                variant="outline"
-              />
-            </SettingsSection>
-
-            <SaveCancelButtons onSave={handleSave} onCancel={onClose} />
+          <SaveCancelButtons onSave={handleSave} onCancel={onClose} />
         </SettingsScrollView>
       </SettingsContainer>
     </KeyboardAvoidingView>
@@ -749,6 +749,9 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     }
   }, [getSparkData]);
 
+  // Calculate total duration - must be before useEffect that uses it
+  const totalDuration = activities.reduce((sum, activity) => sum + activity.duration, 0);
+
   // Set default time when activities change
   useEffect(() => {
     const now = new Date();
@@ -791,8 +794,6 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     };
   }, [timerState.isActive]);
 
-  // Calculate total duration
-  const totalDuration = activities.reduce((sum, activity) => sum + activity.duration, 0);
 
   // Calculate activity start times
   const getActivityStartTime = (activityIndex: number): Date => {
@@ -900,7 +901,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   // Check if we're before the last activity starts (bottom of the list)
   const isBeforeLastActivity = (): boolean => {
     if (!timerState.isActive || !timerState.startTime) return false;
-    
+
     const lastActivityIndex = activities.length - 1;
     const lastActivityStartTime = getActivityStartTime(lastActivityIndex);
     return currentTime.getTime() < lastActivityStartTime.getTime();
@@ -909,7 +910,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   // Get time until last activity starts (bottom of the list)
   const getTimeUntilLastActivity = (): number => {
     if (!timerState.isActive || !timerState.startTime) return 0;
-    
+
     const lastActivityIndex = activities.length - 1;
     const lastActivityStartTime = getActivityStartTime(lastActivityIndex);
     return Math.max(0, Math.floor((lastActivityStartTime.getTime() - currentTime.getTime()) / 1000));
@@ -926,7 +927,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
     const today = new Date();
     const teeTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(),
-                             selectedTime.getHours(), selectedTime.getMinutes());
+      selectedTime.getHours(), selectedTime.getMinutes());
 
     // If tee time is in the past, assume tomorrow
     if (teeTime < today) {
@@ -992,47 +993,47 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       currentActivityIndex: 0,
       completedActivities: new Set(),
     });
-    
+
     // Schedule notifications for all activities
     await scheduleActivityNotifications(teeTime, startTime);
-    
+
     HapticFeedback.success();
   };
 
   const scheduleActivityNotifications = async (teeTime: Date, startTime: Date) => {
     // Cancel any existing activity notifications first
     await NotificationService.cancelAllActivityNotifications();
-    
+
     const now = new Date();
     const futureActivities: Array<{ name: string; id: string; startTime: Date }> = [];
     const pastActivities: Array<{ name: string; id: string; startTime: Date }> = [];
-    
+
     // Check tee time itself
     if (teeTime.getTime() > now.getTime()) {
       futureActivities.push({ name: 'Tee Time!', id: 'tee-time', startTime: teeTime });
     } else {
       pastActivities.push({ name: 'Tee Time!', id: 'tee-time', startTime: teeTime });
     }
-    
+
     // Categorize activities as future or past
     for (let i = 0; i < activities.length; i++) {
       const activity = activities[i];
-      
+
       // Calculate activity start time (activities are in reverse order)
       const minutesFromStart = activities
         .slice(i + 1)
         .reduce((sum, activity) => sum + activity.duration, 0);
-      
+
       // Create a new Date object for the activity start time
       const activityStartTime = new Date(startTime.getTime() + minutesFromStart * 60 * 1000);
-      
+
       if (activityStartTime.getTime() > now.getTime()) {
         futureActivities.push({ name: activity.name, id: activity.id, startTime: activityStartTime });
       } else {
         pastActivities.push({ name: activity.name, id: activity.id, startTime: activityStartTime });
       }
     }
-    
+
     // If all activities are past, ask user if they want to schedule for tomorrow
     if (futureActivities.length === 0 && pastActivities.length > 0) {
       Alert.alert(
@@ -1040,27 +1041,29 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
         'All activities have already started. Would you like to schedule reminders for tomorrow?',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Schedule for Tomorrow', onPress: async () => {
-            // Schedule all activities for tomorrow
-            for (const activity of pastActivities) {
-              const tomorrowDate = new Date(activity.startTime);
-              tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-              
-              await NotificationService.scheduleActivityNotification(
-                activity.name,
-                tomorrowDate,
-                activity.id,
-                'Tee Time Timer',
-                'tee-time-timer',
-                '⛳'
-              );
+          {
+            text: 'Schedule for Tomorrow', onPress: async () => {
+              // Schedule all activities for tomorrow
+              for (const activity of pastActivities) {
+                const tomorrowDate = new Date(activity.startTime);
+                tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+
+                await NotificationService.scheduleActivityNotification(
+                  activity.name,
+                  tomorrowDate,
+                  activity.id,
+                  'Tee Time Timer',
+                  'tee-time-timer',
+                  '⛳'
+                );
+              }
             }
-          }}
+          }
         ]
       );
       return;
     }
-    
+
     // Schedule notifications for future activities (today)
     for (const activity of futureActivities) {
       await NotificationService.scheduleActivityNotification(
@@ -1077,7 +1080,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   const stopTimer = async () => {
     // Cancel all activity notifications
     await NotificationService.cancelAllActivityNotifications();
-    
+
     setTimerState({
       teeTime: null,
       startTime: null,
@@ -1368,7 +1371,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       <TeeTimeTimerSettings
         activities={activities}
         onSave={saveActivities}
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -1464,7 +1467,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
                 activityStartTime={getActivityStartTime(index)}
               />
             ))}
-            
+
             {/* Starts In card - shown at bottom when before last activity */}
             {isBeforeLastActivity() && (
               <View style={styles.startsInActivityCard}>

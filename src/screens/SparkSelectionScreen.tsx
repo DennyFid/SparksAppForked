@@ -6,7 +6,6 @@ import { getAllSparks, getSparkById } from '../components/SparkRegistry';
 import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
 import { HapticFeedback } from '../utils/haptics';
-import { PendingResponseNotification } from '../components/PendingResponseNotification';
 import { NotificationBadge } from '../components/NotificationBadge';
 
 type SparkSelectionNavigationProp = StackNavigationProp<MySparkStackParamList, 'MySparksList'>;
@@ -125,7 +124,20 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Sparks</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.title}>My Sparks</Text>
+          {userSparkIds.includes('speak-spark') && (
+            <TouchableOpacity
+              onPress={() => {
+                HapticFeedback.light();
+                (navigation as any).navigate('Spark', { sparkId: 'speak-spark', autoRecord: true });
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={{ fontSize: 24 }}>🎙️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.subtitle}>
           {userSparks.length === 0
             ? 'No sparks yet - discover some in the marketplace!'
@@ -143,7 +155,7 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
           <TouchableOpacity
             style={[styles.discoverButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('Marketplace')}
+            onPress={() => (navigation as any).navigate('Marketplace')}
           >
             <Text style={[styles.discoverButtonText, { color: colors.background }]}>
               Discover Sparks
@@ -170,13 +182,6 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
                       <NotificationBadge sparkId={spark.metadata.id} size="small" />
                     </View>
                     <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
-                    <PendingResponseNotification
-                      sparkId={spark.metadata.id}
-                      onPress={() => {
-                        // Navigate to settings page for this spark
-                        navigation.navigate('Spark', { sparkId: spark.metadata.id });
-                      }}
-                    />
                   </View>
                 </TouchableOpacity>
               );

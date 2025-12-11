@@ -1,6 +1,6 @@
 # Sparks App - Available Sparks
 
-Sparks is a collection of 19 unique, purpose-built mini-apps designed to make your daily life easier, more productive, and more fun. Each Spark is a focused tool that does one thing exceptionally well.
+Sparks is a collection of 26 unique, purpose-built mini-apps designed to make your daily life easier, more productive, and more fun. Each Spark is a focused tool that does one thing exceptionally well.
 
 ## 🎯 Productivity
 
@@ -13,15 +13,32 @@ Never forget essentials again. Organize and track your travel or trip packing it
 ### ⏳ Minute Minder
 Track your daily activities with start times and countdown timers. Perfect for managing your daily routine and staying on schedule.
 
+### 🍳 RecAIpe
+AI-powered recipe generator with shopping and cooking modes. Describe what you want to cook and let AI create a custom recipe with inline measurements. Includes shopping list and step-by-step cooking mode with progress tracking.
+
+### 🎤 Speak Spark
+Voice-controlled command interface. Use Gemini AI to translate spoken instructions into actions like creating todos, logging weight, or adding items to your lists. Control other Sparks with just your voice.
+
 ## 🌍 Travel
 
 ### ✈️ TripStory
 Plan, remember, and share your trips with photos—lots and lots of photos. Create beautiful visual stories of your adventures.
 
+### 🧭 Trip Survey
+Plan trips with group input and collaborative decision-making. Collect preferences and make group travel planning easier.
+
 ## 🍽️ Food
 
 ### 📸 FoodCam
 Visual food diary with photo timeline and camera integration. Document your culinary journey one meal at a time.
+
+## ❤️ Health
+
+### ⚖️ Weight Tracker
+Track your weight, set goals, and visualize progress. Simple and effective weight management.
+
+### ☠️ Final Clock
+Countdown to your projected death date based on actuarial data. See how lifestyle changes can add years to your life.
 
 ## 🎓 Education
 
@@ -43,7 +60,7 @@ Track golf rounds with detailed shot analysis and course management. Improve you
 Nail your golf prep routine. Never rush to the first tee again with perfectly timed warm-up reminders.
 
 ### 📖 Golf Wisdom
-Inspirational golf wisdom from Jerry. Beautiful book-style interface with swipeable chapters of timeless golf insights.
+Inspirational golf wisdom from Tam O'Shanter. Beautiful book-style interface with swipeable chapters of timeless golf insights.
 
 ## 🎮 Games
 
@@ -75,6 +92,12 @@ Make decisions with a customizable spinning wheel. Let fate decide when you can'
 ### 💱 Quick Convert
 Currency conversion tool with configurable exchange rates and denominations. Essential for travelers and international shoppers.
 
+### ⚡️ Share Sparks
+Share the Sparks app with friends. Display QR codes for easy downloading.
+
+### 🗓️ Coming Up
+Track upcoming birthdays, anniversaries, and big days. Know exactly how many days until your next big event.
+
 ### ♠️ CardScore
 Fast, simple scorekeeping for card games. Focus on playing, not on mental math.
 
@@ -85,6 +108,6 @@ Submit your own Spark idea and become a product manager. Help shape the future o
 
 ---
 
-**Total Sparks:** 20 unique mini-apps  
-**Categories:** Productivity, Travel, Food, Education, Golf, Games, Media, Utilities, Community  
+**Total Sparks:** 26 unique mini-apps  
+**Categories:** Productivity, Travel, Food, Health, Education, Golf, Games, Media, Utilities, Community  
 **All Sparks:** Available now and ready to make your life...just a little bit better⚡️

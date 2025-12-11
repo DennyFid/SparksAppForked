@@ -15,6 +15,7 @@ The app currently uses `expo-notifications` for in-app notifications:
 - ✅ **Daily Spark Reminders** - Scheduled for 8 AM daily (works on iOS with development builds)
 - ✅ **Activity Notifications** - Used in TeeTimeTimer spark for activity reminders
 - ✅ **Feedback Response Notifications** - Notifies users when admins respond to feedback
+- ✅ **Manual Notification Clearing** - Users must explicitly "Mark as Read" in settings
 - ✅ **Notification Permissions** - Properly requested on iOS and Android
 - ✅ **Background Task Registration** - Uses `expo-task-manager` for background handling
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sparks",
     "slug": "sparks-app",
-    "version": "1.0.4",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -36,7 +36,10 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "@react-native-firebase/app",
+      "expo-speech-recognition"
     ],
     "description": "A collection of interactive micro-experiences - spin the wheel, spanish flashcards, business simulations, visual food diary, and more all in one app.",
     "keywords": [
@@ -63,7 +66,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mattdyor.sparks",
-      "buildNumber": "1.0.4",
+      "buildNumber": "1.0.10",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "requireFullScreen": false,
       "infoPlist": {
         "UIBackgroundModes": [
@@ -85,6 +89,7 @@
       "versionCode": 2,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -104,7 +109,7 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
-      "versionName": "1.0.4"
+      "versionName": "1.0.10"
     },
     "extra": {
       "eas": {

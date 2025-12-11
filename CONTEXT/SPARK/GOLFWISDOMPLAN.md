@@ -1,7 +1,7 @@
 # Golf Wisdom Implementation Plan
 
 ## Overview
-Create a silly book-style Spark displaying golf wisdom from Jerry. Each "chapter" is actually just a single page with a quote. The content is stored in Firebase Firestore with local caching for offline access and automatic updates.
+Create a silly book-style Spark displaying golf wisdom from Tam O'Shanter. Each "chapter" is actually just a single page with a quote. The content is stored in Firebase Firestore with local caching for offline access and automatic updates.
 
 ---
 
@@ -118,7 +118,7 @@ interface GolfWisdomState {
 #### 1. Title Page (Hardcoded)
 ```
 Golf Wisdom
-by Jerry
+by Tam O'Shanter
 
 [Beautiful golf-themed graphic or simple text]
 ```
@@ -196,7 +196,7 @@ Once granted admin access (device ID whitelisted):
 
 ### TitlePage
 - Large, elegant title "Golf Wisdom"
-- Subtitle "by Jerry"
+- Subtitle "by Tam O'Shanter"
 - Centered layout
 - Golf-themed accent (⛳ icon or simple graphic)
 - Tap anywhere or use arrow to continue
@@ -205,7 +205,7 @@ Once granted admin access (device ID whitelisted):
 - Large, readable quote (20-24px)
 - Centered content with generous margins
 - Quote marks for visual appeal
-- Attribution "- Jerry" at bottom
+- Attribution "- Tam O'Shanter" at bottom
 - Clean, uncluttered design
 
 ### AcknowledgementsPage
@@ -322,7 +322,7 @@ Once granted admin access (device ID whitelisted):
 ### Step 8: Register Spark
 1. Add to SparkRegistry
 2. Use icon: 📖 or ⛳
-3. Write description: "Inspirational golf wisdom from Jerry"
+3. Write description: "Inspirational golf wisdom from Tam O'Shanter"
 4. Set category to 'golf'
 
 ---

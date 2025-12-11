@@ -10,6 +10,7 @@ import {
     SettingsButton,
     SaveCancelButtons,
 } from '../../components/SettingsComponents';
+import { SuggestWisdomModal } from './SuggestWisdomModal';
 
 interface GolfWisdomSettingsProps {
     onClose: () => void;
@@ -20,6 +21,7 @@ const TIMESTAMP_KEY = 'golfWisdom_lastUpdated';
 
 export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose }) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [showSuggestModal, setShowSuggestModal] = useState(false);
 
     const handleRefresh = async () => {
         try {
@@ -62,6 +64,11 @@ export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose 
                         variant="secondary"
                         disabled={isRefreshing}
                     />
+                    <SettingsButton
+                        title="Suggest Wisdom"
+                        onPress={() => setShowSuggestModal(true)}
+                        variant="primary"
+                    />
                 </SettingsSection>
 
                 {/* Cancel Button */}
@@ -70,6 +77,12 @@ export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose 
                     onCancel={onClose}
                 />
             </SettingsScrollView>
+
+            {/* Suggest Wisdom Modal */}
+            <SuggestWisdomModal
+                visible={showSuggestModal}
+                onClose={() => setShowSuggestModal(false)}
+            />
         </SettingsContainer>
     );
 };

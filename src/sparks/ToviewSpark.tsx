@@ -16,6 +16,8 @@ import {
   SettingsRemoveButton,
   SaveCancelButtons
 } from '../components/SettingsComponents';
+import { CommonModal } from '../components/CommonModal';
+import { createCommonStyles } from '../styles/CommonStyles';
 
 interface ToviewItem {
   id: number;
@@ -68,7 +70,7 @@ const Dropdown: React.FC<{
         <Text style={textStyle}>{selectedValue || placeholder}</Text>
         <Text style={[textStyle, { fontSize: 12 }]}>{isOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
-      
+
       {isOpen && shouldUseModal ? (
         <Modal
           visible={isOpen}
@@ -127,7 +129,7 @@ const Dropdown: React.FC<{
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[textStyle, { 
+                    <Text style={[textStyle, {
                       color: selectedValue === option ? '#007AFF' : '#333',
                       fontWeight: selectedValue === option ? '600' : '400'
                     }]}>
@@ -171,7 +173,7 @@ const Dropdown: React.FC<{
               }}
               activeOpacity={0.7}
             >
-              <Text style={[textStyle, { 
+              <Text style={[textStyle, {
                 color: selectedValue === option ? '#007AFF' : '#333',
                 fontWeight: selectedValue === option ? '600' : '400'
               }]}>
@@ -229,7 +231,7 @@ const ToviewSettings: React.FC<{
 
   const addProvider = () => {
     if (!newProvider.trim() || settings.providers.includes(newProvider.trim())) return;
-    
+
     const updatedProviders = [...settings.providers, newProvider.trim()];
     const newSettings = { ...settings, providers: updatedProviders };
     setSettings(newSettings);
@@ -280,7 +282,7 @@ const ToviewSettings: React.FC<{
           <SettingsText>
             Manage which streaming services appear in the provider dropdown.
           </SettingsText>
-          
+
           {settings.providers.length > 0 && (
             <>
               {settings.providers.map((provider) => (
@@ -342,6 +344,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   const [settings, setSettings] = useState<ToviewSettings>({ providers: [] });
   const [editingProvider, setEditingProvider] = useState('');
   const [editingWatchWith, setEditingWatchWith] = useState('');
+  const [providerDropdownKey, setProviderDropdownKey] = useState(0);
   const textInputRef = useRef<TextInput>(null);
 
   // Load data on mount
@@ -391,7 +394,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         setToviews(defaultToviews);
         await saveData(defaultToviews);
       }
-      
+
       // Load settings
       if (data && data.settings) {
         setSettings(data.settings);
@@ -426,19 +429,33 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   };
 
   const parseToviewText = (text: string) => {
-    // Match any text followed by a colon and then the display text
-    // Also handle watchWith names in parentheses at the end
+    // 1. Try matching "Category: Title (Person)"
     const categoryMatch = text.match(/^([^:]+):\s*(.+?)(?:\s*\(([^)]+)\))?$/);
     if (categoryMatch) {
       const watchWithMatch = categoryMatch[3];
       const watchWith = watchWithMatch ? watchWithMatch.split(',').map(name => name.trim()) : undefined;
-      
+
       return {
         category: categoryMatch[1].trim(),
         displayText: categoryMatch[2].trim(),
         watchWith
       };
     }
+
+    // 2. Try matching "Title (Person)" without category
+    const titlePersonMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+    if (titlePersonMatch) {
+      const watchWithMatch = titlePersonMatch[2];
+      const watchWith = watchWithMatch ? watchWithMatch.split(',').map(name => name.trim()) : undefined;
+
+      return {
+        category: undefined,
+        displayText: titlePersonMatch[1].trim(),
+        watchWith
+      };
+    }
+
+    // 3. Default: Just text
     return {
       category: undefined,
       displayText: text.trim(),
@@ -468,6 +485,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
     await saveData(updatedToviews);
     setNewToviewText('');
     setSelectedProvider('');
+    setProviderDropdownKey(prev => prev + 1); // Force dropdown reset
     HapticFeedback.light();
   };
 
@@ -559,7 +577,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
     const { category, displayText, watchWith } = parseToviewText(editingText);
     const watchWithArray = editingWatchWith.trim() ? editingWatchWith.split(',').map(name => name.trim()) : undefined;
-    
+
     const updatedToviews = toviews.map(toview => {
       if (toview.id === editingItem.id) {
         return {
@@ -607,7 +625,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategoryIcon = (category?: string) => {
     if (!category) return '👁️';
-    
+
     const lowerCategory = category.toLowerCase();
     switch (lowerCategory) {
       case 'movie': return '📽️';
@@ -626,7 +644,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategoryColor = (category?: string) => {
     if (!category) return colors.primary;
-    
+
     const lowerCategory = category.toLowerCase();
     switch (lowerCategory) {
       case 'movie': return '#FF6B6B';
@@ -651,10 +669,10 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
       // Check if it's a person filter (starts with @)
       if (filterCategory.startsWith('@')) {
         const personName = filterCategory.substring(1);
-        filtered = filtered.filter(toview => 
+        filtered = filtered.filter(toview =>
           toview.watchWith && toview.watchWith.includes(personName)
         );
-      } 
+      }
       // Otherwise it's a category filter
       else {
         filtered = filtered.filter(toview => toview.category === filterCategory);
@@ -676,7 +694,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
 
   const getCategories = () => {
     const categories = new Set(toviews.map(toview => toview.category).filter(Boolean));
-    
+
     // Also include categories from the current input text
     if (newToviewText.trim()) {
       const { category } = parseToviewText(newToviewText);
@@ -684,7 +702,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         categories.add(category);
       }
     }
-    
+
     return Array.from(categories).sort();
   };
 
@@ -711,7 +729,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
   const people = getPeople();
 
   if (showSettings) {
-    return <ToviewSettings onClose={onCloseSettings || (() => {})} />;
+    return <ToviewSettings onClose={onCloseSettings || (() => { })} />;
   }
 
   return (
@@ -724,34 +742,29 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         </Text>
       </View>
 
-      {/* Add new toview */}
-      <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TextInput
-          style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-          placeholder="Add new Toview (use category: View)"
-          placeholderTextColor={colors.textSecondary}
-          value={newToviewText}
-          onChangeText={setNewToviewText}
-          onSubmitEditing={addToview}
-          returnKeyType="done"
-        />
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={addToview}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Provider dropdown */}
       <View style={[styles.providerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Dropdown
+          key={`provider-${providerDropdownKey}`}
           options={settings.providers}
           selectedValue={selectedProvider}
           onSelect={setSelectedProvider}
           placeholder="Select provider (optional)"
           style={[styles.providerDropdown, { backgroundColor: colors.background, borderColor: colors.border }]}
           textStyle={[styles.providerDropdownText, { color: colors.text }]}
+        />
+      </View>
+
+      {/* Add new toview */}
+      <View style={[styles.addContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TextInput
+          style={[styles.textInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+          placeholder="Add Toview [eg, Category: Toview (withPerson1, Person2)]"
+          placeholderTextColor={colors.textSecondary}
+          value={newToviewText}
+          onChangeText={setNewToviewText}
+          onSubmitEditing={addToview}
+          returnKeyType="done"
         />
       </View>
 
@@ -781,7 +794,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
                 { backgroundColor: filterCategory === category ? colors.primary : colors.background, borderColor: colors.border }
               ]}
               onPress={() => {
-                setFilterCategory(category);
+                setFilterCategory(category ?? null);
                 setNewToviewText(`${category}: `);
                 textInputRef.current?.focus();
               }}
@@ -796,15 +809,15 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
               key={`@${person}`}
               style={[
                 styles.filterChip,
-                styles.personChip,
-                { backgroundColor: filterCategory === `@${person}` ? '#9B59B6' : '#E8D5F2', borderColor: '#9B59B6' }
+                styles.categoryChip,
+                { backgroundColor: filterCategory === `@${person}` ? '#9B59B6' : colors.background, borderColor: colors.border }
               ]}
               onPress={() => {
                 setFilterCategory(`@${person}`);
                 setNewToviewText('');
               }}
             >
-              <Text style={[styles.filterChipText, { color: filterCategory === `@${person}` ? 'white' : '#9B59B6' }]}>
+              <Text style={[styles.filterChipText, { color: filterCategory === `@${person}` ? 'white' : colors.text }]}>
                 {person}
               </Text>
             </TouchableOpacity>
@@ -888,7 +901,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
                   </View>
                 </View>
               </TouchableOpacity>
-              
+
               {/* Edit button removed - use long tap instead */}
             </View>
           ))
@@ -905,7 +918,7 @@ const ToviewSpark: React.FC<ToviewSparkProps> = ({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Toview</Text>
-            
+
             <TextInput
               style={[styles.modalInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
               placeholder="Toview text (Category: Name supported)"
@@ -1067,31 +1080,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addContainer: {
-    flexDirection: 'row',
     padding: 16,
     borderBottomWidth: 1,
-    alignItems: 'center',
   },
   textInput: {
-    flex: 1,
     height: 44,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
-    marginRight: 12,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
   },
   filtersContainer: {
     padding: 16,
@@ -1104,8 +1101,9 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    height: 36,
+    justifyContent: 'center',
+    borderRadius: 18,
     borderWidth: 1,
   },
   filterChipText: {
@@ -1267,16 +1265,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-  modalButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
   // New styles for improved EditModal
   modalInput: {
     borderWidth: 1,
@@ -1418,7 +1406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    // marginTop: 4, // Removed to align with other pills
   },
   providerBadgeText: {
     color: 'white',
@@ -1430,11 +1418,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginTop: 4,
     gap: 4,
+    alignItems: 'center', // Ensure items don't stretch
   },
   watchWithPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start', // Consistent with other pills
   },
   watchWithPillText: {
     color: 'white',

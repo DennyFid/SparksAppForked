@@ -1,11 +1,11 @@
-import { 
-  User, 
-  SparkFeedback, 
-  AnalyticsEvent, 
-  FeatureFlag, 
-  AggregatedRating, 
+import {
+  User,
+  SparkFeedback,
+  AnalyticsEvent,
+  FeatureFlag,
+  AggregatedRating,
   AnalyticsData,
-  SessionData 
+  SessionData
 } from '../types/analytics';
 import { MockFirebaseService } from './MockFirebaseService';
 
@@ -19,7 +19,7 @@ try {
   isFirebaseAvailable = true;
   console.log('Firebase is available');
 } catch (error) {
-  console.log('Firebase not available, using mock service:', error.message);
+  console.log('Firebase not available, using mock service:', (error as any).message);
   isFirebaseAvailable = false;
 }
 
@@ -37,7 +37,7 @@ export class FirebaseService {
     if (!isFirebaseAvailable) {
       return MockFirebaseService.createUser(userData);
     }
-    
+
     try {
       const docRef = await this.db.collection('users').add({
         ...userData,
@@ -98,8 +98,8 @@ export class FirebaseService {
         .where('sparkId', '==', sparkId)
         .orderBy('timestamp', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
@@ -118,8 +118,8 @@ export class FirebaseService {
         .where('sparkId', '==', sparkId)
         .orderBy('timestamp', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
@@ -136,9 +136,9 @@ export class FirebaseService {
         .collection('feedback')
         .where('sparkId', '==', sparkId)
         .get();
-      
-      const feedbacks = snapshot.docs.map(doc => doc.data() as SparkFeedback);
-      
+
+      const feedbacks = snapshot.docs.map((doc: any) => doc.data() as SparkFeedback);
+
       if (feedbacks.length === 0) {
         return {
           averageRating: 0,
@@ -148,10 +148,10 @@ export class FirebaseService {
       }
 
       const totalRatings = feedbacks.length;
-      const sum = feedbacks.reduce((acc, feedback) => acc + feedback.rating, 0);
+      const sum = feedbacks.reduce((acc: number, feedback: any) => acc + feedback.rating, 0);
       const averageRating = sum / totalRatings;
 
-      const ratingDistribution = feedbacks.reduce((acc, feedback) => {
+      const ratingDistribution = feedbacks.reduce((acc: any, feedback: any) => {
         acc[feedback.rating] = (acc[feedback.rating] || 0) + 1;
         return acc;
       }, {} as { [rating: number]: number });
@@ -181,40 +181,80 @@ export class FirebaseService {
     }
   }
 
+  static async getGlobalAnalytics(days: number = 14): Promise<AnalyticsEvent[]> {
+    console.log(`🔥 getGlobalAnalytics: Starting query for last ${days} days`);
+    console.log(`🔥 Database available:`, !!this.db);
+
+    if (!this.db) {
+      console.log('⚠️ Firebase not available, returning empty analytics');
+      return [];
+    }
+
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      console.log(`🔥 Query start date:`, startDate.toISOString());
+      console.log(`🔥 Querying collection: 'analytics'`);
+      console.log(`🔥 Query condition: timestamp >= ${startDate.toISOString()}`);
+
+      const snapshot = await this.db
+        .collection('analytics')
+        .where('timestamp', '>=', firestore.Timestamp.fromDate(startDate))
+        .get();
+
+      console.log(`🔥 Query completed. Documents found: ${snapshot.docs.length}`);
+
+      if (snapshot.docs.length > 0) {
+        console.log(`🔥 Sample document (first):`, snapshot.docs[0].data());
+      } else {
+        console.log(`🔥 No documents found in 'analytics' collection`);
+      }
+
+      const events = snapshot.docs.map((doc: any) => doc.data() as AnalyticsEvent);
+      console.log(`🔥 Returning ${events.length} analytics events`);
+
+      return events;
+    } catch (error) {
+      console.error('❌ Error getting global analytics:', error);
+      console.error('❌ Error details:', (error as any).message, (error as any).code);
+      return [];
+    }
+  }
+
   static async getAnalytics(
-    sparkId?: string, 
+    sparkId?: string,
     dateRange?: { start: Date; end: Date }
   ): Promise<AnalyticsData> {
     try {
       let query = this.db.collection('analytics');
-      
+
       if (sparkId) {
         query = query.where('sparkId', '==', sparkId);
       }
-      
+
       if (dateRange) {
         query = query
           .where('timestamp', '>=', firestore.Timestamp.fromDate(dateRange.start))
           .where('timestamp', '<=', firestore.Timestamp.fromDate(dateRange.end));
       }
-      
+
       const snapshot = await query.get();
-      const events = snapshot.docs.map(doc => doc.data() as AnalyticsEvent);
-      
+      const events = snapshot.docs.map((doc: any) => doc.data() as AnalyticsEvent);
+
       // Calculate metrics
-      const totalSessions = events.filter(e => e.eventType === 'spark_opened').length;
-      const completedSessions = events.filter(e => e.eventType === 'spark_completed').length;
+      const totalSessions = events.filter((e: any) => e.eventType === 'spark_opened').length;
+      const completedSessions = events.filter((e: any) => e.eventType === 'spark_completed').length;
       const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
-      
-      const errorEvents = events.filter(e => e.eventType === 'error_occurred');
+
+      const errorEvents = events.filter((e: any) => e.eventType === 'error_occurred');
       const errorRate = totalSessions > 0 ? (errorEvents.length / totalSessions) * 100 : 0;
-      
+
       // Calculate average session duration
       const sessionDurations = events
-        .filter(e => e.eventData.duration)
-        .map(e => e.eventData.duration);
-      const averageSessionDuration = sessionDurations.length > 0 
-        ? sessionDurations.reduce((acc, duration) => acc + duration, 0) / sessionDurations.length 
+        .filter((e: any) => e.eventData.duration)
+        .map((e: any) => e.eventData.duration);
+      const averageSessionDuration = sessionDurations.length > 0
+        ? sessionDurations.reduce((acc: number, duration: number) => acc + duration, 0) / sessionDurations.length
         : 0;
 
       return {
@@ -268,21 +308,21 @@ export class FirebaseService {
       // Firestore doesn't support != null, so we query all feedback for this user
       // and filter in code
       let query = this.db.collection('feedback').where('userId', '==', userId);
-      
+
       if (sparkId) {
         query = query.where('sparkId', '==', sparkId);
       }
-      
+
       const snapshot = await query.get();
-      
+
       // Filter for: has response AND not read
-      const unreadCount = snapshot.docs.filter(doc => {
+      const unreadCount = snapshot.docs.filter((doc: any) => {
         const data = doc.data();
         const hasResponse = data.response && data.response.trim() !== '';
         const isUnread = data.readByUser !== true;
         return hasResponse && isUnread;
       }).length;
-      
+
       return unreadCount;
     } catch (error) {
       console.error('Error getting unread feedback count:', error);
@@ -360,8 +400,8 @@ export class FirebaseService {
         .collection('feedback')
         .orderBy('timestamp', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
@@ -379,8 +419,8 @@ export class FirebaseService {
         .where('sparkId', '==', sparkId)
         .orderBy('timestamp', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
@@ -395,13 +435,13 @@ export class FirebaseService {
   static async getFeatureFlags(userId: string): Promise<FeatureFlag[]> {
     try {
       const snapshot = await this.db.collection('featureFlags').get();
-      const flags = snapshot.docs.map(doc => ({
+      const flags = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       } as FeatureFlag));
-      
+
       // Filter flags based on user eligibility
-      return flags.filter(flag => this.isUserEligibleForFlag(flag, userId));
+      return flags.filter((flag: any) => this.isUserEligibleForFlag(flag, userId));
     } catch (error) {
       console.error('Error getting feature flags:', error);
       throw error;
@@ -412,13 +452,13 @@ export class FirebaseService {
     try {
       const flags = await this.getFeatureFlags(userId);
       const flag = flags.find(f => f.name === flagName);
-      
+
       if (!flag) return false;
-      
+
       // Check rollout percentage
       const userHash = this.hashUserId(userId);
       const rolloutThreshold = flag.rolloutPercentage;
-      
+
       return flag.enabled && (userHash % 100) < rolloutThreshold;
     } catch (error) {
       console.error('Error checking feature flag:', error);
@@ -455,9 +495,9 @@ export class FirebaseService {
   // Helper Methods
   private static isUserEligibleForFlag(flag: FeatureFlag, userId: string): boolean {
     if (!flag.targetAudience) return true;
-    
+
     const { platforms, appVersions, userSegments } = flag.targetAudience;
-    
+
     // TODO: Implement platform, app version, and user segment checks
     // For now, just return true
     return true;
@@ -478,7 +518,7 @@ export class FirebaseService {
     if (obj === null || obj === undefined) return null;
     if (typeof obj !== 'object') return obj;
     if (Array.isArray(obj)) return obj.map(item => this.cleanObject(item));
-    
+
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined) {
@@ -494,15 +534,15 @@ export class FirebaseService {
     console.log('🔥 Events:', events);
     console.log('🔥 Database available:', !!this.db);
     console.log('🔥 Firebase available:', isFirebaseAvailable);
-    
+
     if (!isFirebaseAvailable || !this.db) {
       console.log('⚠️ Firebase not available, using mock service');
       return MockFirebaseService.batchLogEvents(events);
     }
-    
+
     try {
       const batch = this.db.batch();
-      
+
       events.forEach(event => {
         const docRef = this.db.collection('analytics').doc();
         const cleanedEvent = this.cleanObject(event);
@@ -511,7 +551,7 @@ export class FirebaseService {
           timestamp: firestore.FieldValue.serverTimestamp(),
         });
       });
-      
+
       console.log('🔥 Committing batch to Firestore...');
       await batch.commit();
       console.log('✅ Batch committed successfully to Firestore');
@@ -525,31 +565,31 @@ export class FirebaseService {
   static async deleteUserData(userId: string): Promise<void> {
     try {
       const batch = this.db.batch();
-      
+
       // Delete user document
       batch.delete(this.db.collection('users').doc(userId));
-      
+
       // Delete all feedback from this user
       const feedbackSnapshot = await this.db
         .collection('feedback')
         .where('userId', '==', userId)
         .get();
-      feedbackSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-      
+      feedbackSnapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
+
       // Delete all analytics events from this user
       const analyticsSnapshot = await this.db
         .collection('analytics')
         .where('userId', '==', userId)
         .get();
-      analyticsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-      
+      analyticsSnapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
+
       // Delete all sessions from this user
       const sessionsSnapshot = await this.db
         .collection('sessions')
         .where('userId', '==', userId)
         .get();
-      sessionsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-      
+      sessionsSnapshot.docs.forEach((doc: any) => batch.delete(doc.ref));
+
       await batch.commit();
     } catch (error) {
       console.error('Error deleting user data:', error);

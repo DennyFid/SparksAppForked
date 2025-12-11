@@ -109,7 +109,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
   const [celebrationOpacity] = useState(new Animated.Value(0));
   const [bingoLines, setBingoLines] = useState<string[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
-  
+
   const accelerometerSubscription = useRef<any>(null);
   const lastShakeTime = useRef<number>(0);
 
@@ -118,7 +118,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
     const trimmed = words.filter(w => w.trim().length > 0).map(w => w.trim());
     if (trimmed.length === 0) return DEFAULT_WORDS;
     if (trimmed.length >= 24) return trimmed.slice(0, 24);
-    
+
     // Duplicate words to fill to 24
     const result = [...trimmed];
     while (result.length < 24) {
@@ -166,7 +166,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
     if (!activeWordSet) return;
 
     const words = [...activeWordSet.words];
-    
+
     // Shuffle words if randomizing
     if (randomize) {
       for (let i = words.length - 1; i > 0; i--) {
@@ -275,19 +275,19 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
     if (isNewBingo) {
       // Big celebration!
       setShowCelebration(true);
-      
+
       // Multiple haptic pulses throughout the celebration
       HapticFeedback.success();
       setTimeout(() => HapticFeedback.medium(), 200);
       setTimeout(() => HapticFeedback.medium(), 400);
       setTimeout(() => HapticFeedback.light(), 800);
       setTimeout(() => HapticFeedback.light(), 1200);
-      
+
       // Reset animation values
       celebrationScale.setValue(0);
       celebrationRotation.setValue(0);
       celebrationOpacity.setValue(0);
-      
+
       // Longer, more elaborate celebration sequence
       Animated.parallel([
         // Scale animation - grows big, then settles
@@ -557,7 +557,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
         words: wordSet.words,
       };
       const jsonString = JSON.stringify(shareData, null, 2);
-      
+
       if (await Sharing.isAvailableAsync()) {
         // For now, we'll use Alert to show the JSON - in a real app, you'd save to a file first
         Alert.alert(
@@ -611,7 +611,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
 
   const handleSaveWordSet = () => {
     if (!editingWordSet) return;
-    
+
     const trimmedWords = editingWordSet.words.filter(w => w.trim().length > 0);
     if (trimmedWords.length === 0) {
       Alert.alert('Error', 'Word set must have at least one word');
@@ -688,9 +688,9 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
                   <View style={{ width: '100%' }}>
                     <View style={{ marginBottom: 8 }}>
                       <SettingsText>{wordSet.name}</SettingsText>
-                      <SettingsText style={{ fontSize: 12, opacity: 0.7 }}>
+                      <Text style={{ fontSize: 12, opacity: 0.7, color: colors.textSecondary }}>
                         {wordSet.words.length} words {wordSet.isActive ? '• Active' : ''}
-                      </SettingsText>
+                      </Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                       {!wordSet.isActive && (
@@ -771,16 +771,17 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
                 <SettingsSection title="Words">
                   {editingWordSet.words.map((word, index) => (
                     <View key={index} style={{ flexDirection: 'row', marginBottom: 8 }}>
-                      <SettingsInput
-                        placeholder={`Word ${index + 1}`}
-                        value={word}
-                        onChangeText={(text) => {
-                          const newWords = [...editingWordSet.words];
-                          newWords[index] = text;
-                          setEditingWordSet({ ...editingWordSet, words: newWords });
-                        }}
-                        style={{ flex: 1, marginRight: 8 }}
-                      />
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <SettingsInput
+                          placeholder={`Word ${index + 1}`}
+                          value={word}
+                          onChangeText={(text) => {
+                            const newWords = [...editingWordSet.words];
+                            newWords[index] = text;
+                            setEditingWordSet({ ...editingWordSet, words: newWords });
+                          }}
+                        />
+                      </View>
                       <TouchableOpacity
                         onPress={() => {
                           const newWords = editingWordSet.words.filter((_, i) => i !== index);
@@ -831,7 +832,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
                     value={importText}
                     onChangeText={setImportText}
                     multiline
-                    style={{ minHeight: 200, textAlignVertical: 'top' }}
+                    numberOfLines={10}
                   />
                 </SettingsSection>
                 <SaveCancelButtons
@@ -897,8 +898,8 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
                         borderColor: isBingo
                           ? '#FFD700'
                           : isChecked
-                          ? colors.primary
-                          : colors.border,
+                            ? colors.primary
+                            : colors.border,
                       },
                     ]}
                     onPress={() => toggleSquare(rowIndex, colIndex)}
@@ -923,7 +924,7 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
             </View>
           ))}
         </View>
-        
+
         <TouchableOpacity
           style={[styles.resetButtonFullWidth, { backgroundColor: colors.primary }]}
           onPress={() => {

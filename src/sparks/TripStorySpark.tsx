@@ -36,6 +36,7 @@ import {
   SettingsFeedbackSection,
   SettingsButton,
 } from '../components/SettingsComponents';
+import { NotificationService } from '../utils/notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -108,53 +109,66 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const { colors } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
+  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
+  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+
+  // Form state
   const [showCreateTrip, setShowCreateTrip] = useState(false);
+  const [newTripTitle, setNewTripTitle] = useState('');
+  const [newTripStartDate, setNewTripStartDate] = useState('');
+  const [newTripEndDate, setNewTripEndDate] = useState('');
+  const [activitiesListText, setActivitiesListText] = useState('');
+
+  // Activity state
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [newActivityName, setNewActivityName] = useState('');
+  const [newActivityTime, setNewActivityTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [showManageActivities, setShowManageActivities] = useState(false);
+
+  // Photo state
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [photoCaptureMode, setPhotoCaptureMode] = useState<'camera' | 'library'>('camera');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [showTripDetail, setShowTripDetail] = useState(false);
-  const [showPhotoDetail, setShowPhotoDetail] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
-  const [showActivitySelector, setShowActivitySelector] = useState(false);
-  const [showMapView, setShowMapView] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState(false);
-  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
-  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
-  const [showCustomPhotoPicker, setShowCustomPhotoPicker] = useState(false);
-  const [customPickerPhotos, setCustomPickerPhotos] = useState<MediaLibrary.Asset[]>([]);
+
+  // Custom picker state
+  const [customPickerPhotos, setCustomPickerPhotos] = useState<any[]>([]);
   const [customPickerPhotoUris, setCustomPickerPhotoUris] = useState<Map<string, string>>(new Map());
   const [selectedPickerPhotos, setSelectedPickerPhotos] = useState<Set<string>>(new Set());
   const [customPickerDate, setCustomPickerDate] = useState<string | null>(null);
   const [customPickerAllowMultiple, setCustomPickerAllowMultiple] = useState(false);
-  const [customPickerActivity, setCustomPickerActivity] = useState<Activity | undefined>(undefined);
-  const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null); // Track which date/activity is loading
-  const borderAnimation = useRef(new Animated.Value(0)).current;
+  const [customPickerActivity, setCustomPickerActivity] = useState<Activity | null>(null);
+  const [showCustomPhotoPicker, setShowCustomPhotoPicker] = useState(false);
+  const [loadingPhotosByDate, setLoadingPhotosByDate] = useState<string | null>(null);
 
-  // Animate border color when loading
-  useEffect(() => {
-    if (loadingPhotosByDate) {
-      // Create pulsing animation
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(borderAnimation, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(borderAnimation, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
-    } else {
-      borderAnimation.setValue(0);
-    }
-  }, [loadingPhotosByDate, borderAnimation]);
+  // Detail view state
+  const [showTripDetail, setShowTripDetail] = useState(false);
+  const [selectedTripForDetail, setSelectedTripForDetail] = useState<Trip | null>(null);
+  const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
+  const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
+
+  // Map View State
+  const [showMapView, setShowMapView] = useState(false);
+  const [selectedMapDay, setSelectedMapDay] = useState<string | null>(null);
+  const [showMapDayDropdown, setShowMapDayDropdown] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
+
+  // Photo Detail State
+  const [photoName, setPhotoName] = useState('');
+  const [photoDate, setPhotoDate] = useState('');
+  const [photoLocation, setPhotoLocation] = useState('');
+  const [photoLat, setPhotoLat] = useState('');
+  const [photoLng, setPhotoLng] = useState('');
+  const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
+  const [showActivitySelector, setShowActivitySelector] = useState(false);
+  const [photoActivityId, setPhotoActivityId] = useState<string | null>(null);
+
+  // Edit Activity State
   const [showEditActivity, setShowEditActivity] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editActivityName, setEditActivityName] = useState('');
@@ -163,298 +177,132 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [editActivityLat, setEditActivityLat] = useState('');
   const [editActivityLng, setEditActivityLng] = useState('');
   const [editActivityGeoStatus, setEditActivityGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
+
+  // Edit Trip State
   const [showEditTrip, setShowEditTrip] = useState(false);
   const [editTripTitle, setEditTripTitle] = useState('');
   const [editTripStartDate, setEditTripStartDate] = useState('');
   const [editTripEndDate, setEditTripEndDate] = useState('');
   const [editTripMode, setEditTripMode] = useState<'record' | 'remember'>('record');
-  const [showAddActivityModal, setShowAddActivityModal] = useState(false);
-  const [showManageActivities, setShowManageActivities] = useState(false);
-  const [activitiesListText, setActivitiesListText] = useState('');
 
-  // New trip form
-  const [newTripTitle, setNewTripTitle] = useState('');
-  const [newTripStartDate, setNewTripStartDate] = useState('');
-  const [newTripEndDate, setNewTripEndDate] = useState('');
+  // Aliases for showAddActivity to match usage in some parts of the code
+  const showAddActivityModal = showAddActivity;
+  const setShowAddActivityModal = setShowAddActivity;
 
-  // New activity form
-  const [newActivityName, setNewActivityName] = useState('');
-  const [newActivityTime, setNewActivityTime] = useState('');
-
-  // Photo detail form
-  const [photoName, setPhotoName] = useState('');
-  const [photoDate, setPhotoDate] = useState('');
-  const [photoActivityId, setPhotoActivityId] = useState<string | null>(null);
-  const [photoLocation, setPhotoLocation] = useState('');
-  const [photoLat, setPhotoLat] = useState('');
-  const [photoLng, setPhotoLng] = useState('');
-  const [photoGeoStatus, setPhotoGeoStatus] = useState<'idle' | 'geocoding' | 'success' | 'failed'>('idle');
-
-  // Active state tracking (only one can be active at a time)
-  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
-  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
-  const [activeTripId, setActiveTripId] = useState<string | null>(null);
-
+  const scrollViewRef = useRef<ScrollView>(null);
+  const dateScrollViewRef = useRef<ScrollView>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const borderAnimation = useRef(new Animated.Value(0)).current;
   const dayPositions = useRef<Map<string, number>>(new Map());
   const activityPositions = useRef<Map<string, number>>(new Map());
-  const scrollViewRef = useRef<any>(null);
-  const currentScrollPosition = useRef<number>(0);
+  const dayPhotoScrollRefs = useRef<Map<string, React.RefObject<ScrollView | null>>>(new Map());
+  const activityPhotoScrollRefs = useRef<Map<string, React.RefObject<ScrollView | null>>>(new Map());
+  const currentScrollPosition = useRef(0);
 
-  // Refs for horizontal image scroll views (one per row)
-  const dayPhotoScrollRefs = useRef<Map<string, any>>(new Map());
-  const activityPhotoScrollRefs = useRef<Map<string, any>>(new Map());
-  const dateScrollViewRef = useRef<ScrollView>(null);
+  // Animate border for loading states
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(borderAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(borderAnimation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, []);
 
   useEffect(() => {
     loadTrips();
   }, []);
 
-  // Track if we're restoring from saved state (quick switch) vs user interaction
-  const isRestoringFromState = useRef(false);
-
-  // Restore scroll position ONLY when trip detail view opens from saved state (quick switch)
-  // NOT when user clicks + button or other interactions
-  useEffect(() => {
-    if (showTripDetail && currentTrip && scrollViewRef.current && isRestoringFromState.current) {
-      // Only scroll if we're restoring from state (quick switch)
-      if (activeActivityId && activeTripId === currentTrip.id) {
-        setTimeout(() => {
-          scrollToActivity(activeActivityId);
-        }, 300);
+  const savePhotoPermanently = async (uri: string, tripId: string, photoId: string): Promise<string> => {
+    try {
+      // If already in document directory, return as is
+      if (uri.includes(FileSystem.documentDirectory!)) {
+        return uri;
       }
-      else if (activeDayDate && activeTripId === currentTrip.id) {
-        setTimeout(() => {
-          scrollToDay(activeDayDate);
-        }, 300);
-      }
-      // Reset the flag after scrolling
-      isRestoringFromState.current = false;
-    }
-  }, [showTripDetail, currentTrip, activeActivityId, activeDayDate, activeTripId]);
 
-  useEffect(() => {
-    if (onStateChange) {
-      onStateChange({
-        trips,
-        currentTrip,
-        selectedDate,
-        selectedActivity
+      const filename = `trip_${tripId}_${photoId}.jpg`;
+      const destPath = `${FileSystem.documentDirectory}${filename}`;
+
+      await FileSystem.copyAsync({
+        from: uri,
+        to: destPath
       });
-    }
-  }, [trips, currentTrip, selectedDate, selectedActivity, onStateChange]);
 
-
-  const savePhotoPermanently = async (photoUri: string, tripId: string, photoId: string): Promise<string> => {
-    try {
-      // Get document directory
-      const documentDir = (FileSystem as any).documentDirectory;
-      if (!documentDir) {
-        console.warn('⚠️ Document directory not available (likely simulator/web), using original URI');
-        // In simulator/web, documentDirectory might not be available
-        // Return original URI as-is - it should still work for display
-        return photoUri;
-      }
-
-      // Check if source file exists (for file:// URIs)
-      if (photoUri.startsWith('file://')) {
-        try {
-          const fileInfo = await FileSystem.getInfoAsync(photoUri);
-          if (!fileInfo.exists) {
-            console.warn('⚠️ Source file does not exist, using original URI as fallback:', photoUri);
-            // Return original URI - it might still work for display if it's a data URI or external URL
-            return photoUri;
-          }
-        } catch (infoError) {
-          // If we can't check file info, continue and try to save anyway
-          console.warn('⚠️ Could not check file existence, proceeding with save attempt:', infoError);
-        }
-      }
-
-      // Create trips directory if it doesn't exist
-      const tripsDir = `${documentDir}trips/`;
-      const tripDir = `${tripsDir}${tripId}/`;
-
-      // Ensure directories exist
-      const tripsDirInfo = await FileSystem.getInfoAsync(tripsDir);
-      if (!tripsDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(tripsDir, { intermediates: true });
-      }
-      const tripDirInfo = await FileSystem.getInfoAsync(tripDir);
-      if (!tripDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(tripDir, { intermediates: true });
-      }
-
-      // Copy image to permanent location
-      const permanentUri = `${tripDir}${photoId}.jpg`;
-
-      console.log('📸 Attempting to save photo:', { photoUri, permanentUri });
-
-      // Try different methods based on URI type
-      if (photoUri.startsWith('ph://') || photoUri.startsWith('assets-library://')) {
-        // iOS photo library URI - need to use MediaLibrary to get actual file
-        // This should have been handled before calling this function, but just in case
-        console.warn('⚠️ Received photo library URI, this should have been converted to localUri');
-        // Return original URI as fallback instead of throwing
-        return photoUri;
-      }
-
-      if (photoUri.startsWith('content://')) {
-        // Android content URI - use downloadAsync
-        try {
-          const downloadResult = await FileSystem.downloadAsync(photoUri, permanentUri);
-          if (downloadResult.status === 200) {
-            console.log('✅ Photo saved permanently (from content URI):', permanentUri);
-            return permanentUri;
-          } else {
-            throw new Error(`Download failed with status ${downloadResult.status}`);
-          }
-        } catch (downloadError) {
-          console.warn('⚠️ Download failed, trying copyAsync:', downloadError);
-          // Fall through to try copyAsync
-        }
-      }
-
-      // Try copyAsync (works for file:// and most other URIs)
-      try {
-        await FileSystem.copyAsync({
-          from: photoUri,
-          to: permanentUri,
-        });
-        console.log('✅ Photo saved permanently (via copyAsync):', permanentUri);
-        return permanentUri;
-      } catch (copyError) {
-        // Only try base64 if copyAsync fails - but don't try if file doesn't exist
-        const errorMessage = copyError instanceof Error ? copyError.message : String(copyError);
-        if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
-          console.warn('⚠️ Source file does not exist, using original URI as fallback');
-          return photoUri;
-        }
-
-        console.warn('⚠️ copyAsync failed, trying base64 method:', copyError);
-        // Try reading as base64 and writing
-        try {
-          const base64 = await FileSystem.readAsStringAsync(photoUri, {
-            encoding: 'base64' as any,
-          });
-          await FileSystem.writeAsStringAsync(permanentUri, base64, {
-            encoding: 'base64' as any,
-          });
-          console.log('✅ Photo saved permanently (via base64):', permanentUri);
-          return permanentUri;
-        } catch (base64Error) {
-          const base64ErrorMessage = base64Error instanceof Error ? base64Error.message : String(base64Error);
-          if (base64ErrorMessage.includes('does not exist') || base64ErrorMessage.includes('No such file')) {
-            console.warn('⚠️ Source file does not exist, using original URI as fallback');
-            return photoUri;
-          }
-          // Only log as error if it's not a "file doesn't exist" error
-          console.warn('⚠️ All save methods failed, using original URI as fallback:', base64Error);
-          return photoUri;
-        }
-      }
+      return destPath;
     } catch (error) {
-      // Only log as error if it's not a "file doesn't exist" error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('does not exist') || errorMessage.includes('No such file')) {
-        console.warn('⚠️ Source file does not exist, using original URI as fallback');
-      } else {
-        console.warn('⚠️ Error saving photo permanently, using original URI as fallback:', error);
-      }
-      // Return original URI as fallback
-      return photoUri;
+      console.error('Error saving photo permanently:', error);
+      return uri; // Fallback to original URI if copy fails
     }
   };
 
-  const migratePhoto = async (photo: TripPhoto, tripId: string): Promise<string> => {
-    try {
-      // Get document directory
-      const documentDir = (FileSystem as any).documentDirectory;
-      if (!documentDir) {
-        console.warn('⚠️ Cannot migrate photo - document directory not available');
-        return photo.uri; // Can't migrate without document directory
-      }
-
-      // Check if photo URI is already in permanent location
-      if (photo.uri && photo.uri.startsWith(documentDir)) {
-        // Verify the file still exists (in case app was reinstalled or directory changed)
-        const fileInfo = await FileSystem.getInfoAsync(photo.uri);
-        if (fileInfo.exists) {
-          console.log('✅ Photo exists at permanent location:', photo.uri);
-          return photo.uri;
-        } else {
-          console.warn('⚠️ Photo URI points to permanent location but file does not exist:', photo.uri);
-          // File is missing, will try to re-migrate below
-        }
-      }
-
-      // Check if permanent file already exists
-      const permanentUri = `${documentDir}trips/${tripId}/${photo.id}.jpg`;
-      const fileInfo = await FileSystem.getInfoAsync(permanentUri);
-      if (fileInfo.exists) {
-        console.log('✅ Photo already exists at permanent location:', permanentUri);
-        return permanentUri;
-      }
-
-      // If original URI is a file:// or content:// URI, try to migrate it
-      if (photo.uri && (photo.uri.startsWith('file://') || photo.uri.startsWith('content://') || photo.uri.startsWith('ph://'))) {
-        console.log('🔄 Migrating photo:', photo.uri, 'to', permanentUri);
-        // Try to copy from original URI using the same robust save method
-        return await savePhotoPermanently(photo.uri, tripId, photo.id);
-      }
-
-      // If we can't migrate, return original URI (might be a data URI or external URL)
-      console.warn('⚠️ Cannot migrate photo - URI format not supported:', photo.uri);
-      return photo.uri;
-    } catch (error) {
-      console.error('❌ Error migrating photo:', error, 'Photo URI:', photo.uri);
-      // Return original URI as fallback
-      return photo.uri;
-    }
-  };
-
-  // agentToDo - I think this should be deleted. 
   const migrateAllPhotos = async (tripsToMigrate: Trip[]): Promise<Trip[]> => {
-    try {
-      console.log('🔄 Starting photo migration for', tripsToMigrate.length, 'trips');
-      const migratedTrips = await Promise.all(
-        tripsToMigrate.map(async (trip) => {
-          console.log(`🔄 Migrating photos for trip: ${trip.title} (${trip.photos.length} photos)`);
-          const migratedPhotos = await Promise.all(
-            trip.photos.map(async (photo) => {
-              const newUri = await migratePhoto(photo, trip.id);
-              // Only update if URI changed
+    const updatedTrips = [...tripsToMigrate];
+    let hasChanges = false;
+
+    for (let i = 0; i < updatedTrips.length; i++) {
+      const trip = updatedTrips[i];
+      const updatedPhotos = [...trip.photos];
+      let tripChanged = false;
+
+      for (let j = 0; j < updatedPhotos.length; j++) {
+        const photo = updatedPhotos[j];
+        // If photo has no URI but has ID (migration case) OR needs moving to permanent storage
+        if (!photo.uri || !photo.uri.includes(FileSystem.documentDirectory!)) {
+          try {
+            // If we have an ID but no URI, we might be able to recover or it's lost
+            // For this implementation, we'll assume we're migrating from a state where we have the URI
+            if (photo.uri) {
+              const newUri = await savePhotoPermanently(photo.uri, trip.id, photo.id);
               if (newUri !== photo.uri) {
-                console.log(`✅ Migrated photo ${photo.id}: ${photo.uri.substring(0, 50)}... -> ${newUri.substring(0, 50)}...`);
+                updatedPhotos[j] = { ...photo, uri: newUri };
+                tripChanged = true;
+                hasChanges = true;
               }
-              return { ...photo, uri: newUri };
-            })
-          );
-          return { ...trip, photos: migratedPhotos };
-        })
-      );
-
-      // Save migrated trips (preserve existing data) - always save to ensure URIs are updated
-      const currentData = await getSparkData('trip-story');
-      // Check if any URIs changed
-      const urisChanged = tripsToMigrate.some((trip, tripIndex) => {
-        return trip.photos.some((photo, photoIndex) => {
-          return photo.uri !== migratedTrips[tripIndex].photos[photoIndex].uri;
-        });
-      });
-
-      if (urisChanged) {
-        await setSparkData('trip-story', {
-          ...currentData,
-          trips: migratedTrips,
-        });
-        console.log('✅ Photos migrated successfully');
+            }
+          } catch (error) {
+            console.error('Error migrating photo:', error);
+          }
+        }
       }
 
-      return migratedTrips;
+      if (tripChanged) {
+        updatedTrips[i] = { ...trip, photos: updatedPhotos };
+      }
+    }
+
+    if (hasChanges) {
+      await setSparkData('trip-story', {
+        trips: updatedTrips,
+        activeDayDate,
+        activeActivityId,
+        activeTripId: currentTrip?.id || activeTripId || null
+      });
+    }
+
+    return updatedTrips;
+  };
+
+  const saveTrips = async (newTrips: Trip[]) => {
+    try {
+      await setSparkData('trip-story', {
+        trips: newTrips,
+        activeDayDate,
+        activeActivityId,
+        activeTripId: currentTrip?.id || activeTripId || null
+      });
+      setTrips(newTrips);
     } catch (error) {
-      console.error('❌ Error migrating photos:', error);
-      return tripsToMigrate;
+      console.error('Error saving trips:', error);
     }
   };
 
@@ -462,115 +310,70 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     try {
       const data = await getSparkData('trip-story');
       if (data?.trips) {
-        // Migrate photos to permanent storage
-        const migratedTrips = await migrateAllPhotos(data.trips);
+        // Check if migration is needed (if photos don't have URIs but have IDs)
+        // This is a simplified check - in production we'd check version or specific fields
+        const needsMigration = data.trips.some((t: Trip) =>
+          t.photos.some(p => !p.uri && p.id)
+        );
 
-        // Update statuses and modes based on current date
-        let hasUpdates = false;
-        const updatedTrips = migratedTrips.map(trip => {
-          const newStatus = calculateTripStatus(trip.startDate, trip.endDate);
-          if (trip.status !== newStatus) {
-            hasUpdates = true;
-            let newMode = trip.mode;
-            // Auto-switch to remember mode if trip becomes completed
-            if (trip.status !== 'completed' && newStatus === 'completed') {
-              newMode = 'remember';
-            }
-            return { ...trip, status: newStatus, mode: newMode };
-          }
-          return trip;
-        });
-
-        if (hasUpdates) {
-          await saveTrips(updatedTrips);
+        let updatedTrips = data.trips;
+        if (needsMigration) {
+          console.log('🔄 Migrating photos to permanent storage...');
+          updatedTrips = await migrateAllPhotos(data.trips);
         }
+
+        // Update trip statuses based on current date
+        updatedTrips = updatedTrips.map((trip: Trip) => ({
+          ...trip,
+          status: calculateTripStatus(trip.startDate, trip.endDate)
+        }));
 
         setTrips(updatedTrips);
 
-        // Restore active trip if we have an activeTripId
-        if (data?.activeTripId) {
-          const activeTrip = updatedTrips.find(trip => trip.id === data.activeTripId);
+        // Restore active state
+        if (data.activeTripId) {
+          const activeTrip = updatedTrips.find((t: Trip) => t.id === data.activeTripId);
           if (activeTrip) {
             setCurrentTrip(activeTrip);
-            setShowTripDetail(true);
-
-            // Restore active state only if not in remember mode
-            if (activeTrip.mode !== 'remember') {
-              if (data?.activeDayDate !== undefined) {
-                setActiveDayDate(data.activeDayDate);
-              }
-              if (data?.activeActivityId !== undefined) {
-                setActiveActivityId(data.activeActivityId);
-              }
-            }
             setActiveTripId(data.activeTripId);
-
-            // Mark that we're restoring from state so the useEffect will scroll
-            isRestoringFromState.current = true;
-            // Scroll to the active position after layout only if not in remember mode
-            if (activeTrip.mode !== 'remember') {
-              setTimeout(() => {
-                if (data?.activeActivityId && scrollViewRef.current) {
-                  // Scroll to activity if we have one
-                  scrollToActivity(data.activeActivityId);
-                } else if (data?.activeDayDate && scrollViewRef.current) {
-                  // Otherwise scroll to day
-                  scrollToDay(data.activeDayDate);
-                }
-              }, 500);
-            }
-            return; // Early return since we're opening trip detail
           }
         }
-      }
 
-      // Load active state even if no active trip (for when trip detail is already open)
-      if (data?.activeDayDate !== undefined) {
-        setActiveDayDate(data.activeDayDate);
+        if (data.activeDayDate) {
+          setActiveDayDate(data.activeDayDate);
+        }
+
+        if (data.activeActivityId) {
+          setActiveActivityId(data.activeActivityId);
+        }
       }
-      if (data?.activeActivityId !== undefined) {
-        setActiveActivityId(data.activeActivityId);
-      }
-      if (data?.activeTripId !== undefined) {
-        setActiveTripId(data.activeTripId);
-      }
+      setIsLoaded(true); // Mark as loaded
     } catch (error) {
       console.error('Error loading trips:', error);
-    }
-  };
-
-  const saveTrips = async (updatedTrips: Trip[]) => {
-    try {
-      await setSparkData('trip-story', {
-        trips: updatedTrips,
-        activeDayDate: activeDayDate,
-        activeActivityId: activeActivityId,
-        activeTripId: activeTripId,
-      });
-      setTrips(updatedTrips);
-    } catch (error) {
-      console.error('Error saving trips:', error);
+      setIsLoaded(true); // Mark as loaded even on error to allow recovery/new trips
     }
   };
 
   // Save active state whenever it changes
   useEffect(() => {
+    if (!isLoaded) return; // Prevent saving before load completes
+
     const saveActiveState = async () => {
       try {
         const currentData = await getSparkData('trip-story');
         await setSparkData('trip-story', {
           ...currentData,
-          trips: trips || currentData.trips || [],
+          trips: trips, // Use current trips state
           activeDayDate: activeDayDate,
           activeActivityId: activeActivityId,
-          activeTripId: currentTrip?.id || activeTripId || null, // Store current trip ID
+          activeTripId: currentTrip?.id || activeTripId || null,
         });
       } catch (error) {
         console.error('Error saving active state:', error);
       }
     };
     saveActiveState();
-  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips]);
+  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips, isLoaded]);
 
   const activateDay = (date: string) => {
     if (!currentTrip) return;
@@ -635,6 +438,33 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     const updatedTrips = [...trips, newTrip];
     await saveTrips(updatedTrips);
 
+    // Schedule notifications if it's a planned trip (day before and day of at 8 AM)
+    if (newTrip.status === 'planned') {
+      const tripDate = new Date(newTrip.startDate + 'T08:00:00');
+      const dayBefore = new Date(tripDate);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+
+      // Schedule day-before notification
+      await NotificationService.scheduleActivityNotification(
+        `${newTrip.title} starts tomorrow`,
+        dayBefore,
+        `trip-${newTrip.id}-before`,
+        'Upcoming Trip',
+        'trip-story',
+        '✈️'
+      );
+
+      // Schedule day-of notification
+      await NotificationService.scheduleActivityNotification(
+        `${newTrip.title} is today`,
+        tripDate,
+        `trip-${newTrip.id}-day`,
+        'Trip Today',
+        'trip-story',
+        '✈️'
+      );
+    }
+
     // Reset form
     setNewTripTitle('');
     setNewTripStartDate('');
@@ -648,7 +478,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
-  const addActivity = async () => {
+  const addActivity = async (shouldClose: boolean = true) => {
     if (!currentTrip || !newActivityName || !selectedDate) {
       Alert.alert('Missing Information', 'Please select a trip, date, and enter activity name.');
       return;
@@ -659,7 +489,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       tripId: currentTrip.id,
       name: newActivityName,
       startDate: selectedDate,
-      time: newActivityTime || '12:00',
+      time: newActivityTime || '00:00', // Default to 00:00 (midnight) if not specified
       photos: [],
       createdAt: new Date().toISOString(),
     };
@@ -677,8 +507,12 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     // Reset form
     setNewActivityName('');
     setNewActivityTime('');
-    setSelectedDate('');
-    setShowAddActivity(false);
+
+    // Only close modal and clear date if requested
+    if (shouldClose) {
+      setSelectedDate('');
+      setShowAddActivityModal(false);
+    }
 
     HapticFeedback.success();
   };
@@ -897,7 +731,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         setSelectedPickerPhotos(new Set());
         setCustomPickerDate(dateToUse);
         setCustomPickerAllowMultiple(allowMultiple);
-        setCustomPickerActivity(activity);
+        setCustomPickerActivity(activity || null);
         setShowCustomPhotoPicker(true);
         setLoadingPhotosByDate(null);
         return;
@@ -1404,6 +1238,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       setActiveActivityId(null);
     }
 
+    // Parse activities from text input if provided and trip has no photos
+    let updatedActivities = currentTrip.activities;
+    if (currentTrip.photos.length === 0 && activitiesListText.trim()) {
+      const parsedActivities = parseActivitiesList(activitiesListText, currentTrip.id);
+      // Only update if we parsed something valid, or if the user explicitly cleared it (which parse would return empty)
+      // Actually, if parsedActivities is empty but text wasn't, it might be a format error.
+      // But if user cleared the text, parsedActivities is empty.
+      // Let's trust the parse.
+      updatedActivities = parsedActivities;
+    }
+
     const updatedTrip: Trip = {
       ...currentTrip,
       title: editTripTitle,
@@ -1411,11 +1256,44 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       endDate: editTripEndDate,
       status: newStatus,
       mode: newMode,
+      activities: updatedActivities,
       updatedAt: new Date().toISOString()
     };
 
     const updatedTrips = trips.map(trip => trip.id === currentTrip.id ? updatedTrip : trip);
     await saveTrips(updatedTrips);
+
+    // Update notifications if status changes
+    if (currentTrip.status === 'planned' && newStatus !== 'planned') {
+      // Trip is no longer planned, notifications will auto-expire
+      // No explicit cancel needed
+    } else if (newStatus === 'planned') {
+      // Trip is now or still planned, schedule/reschedule notifications
+      const tripDate = new Date(updatedTrip.startDate + 'T08:00:00');
+      const dayBefore = new Date(tripDate);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+
+      // Schedule day-before notification
+      await NotificationService.scheduleActivityNotification(
+        `${updatedTrip.title} starts tomorrow`,
+        dayBefore,
+        `trip-${updatedTrip.id}-before`,
+        'Upcoming Trip',
+        'trip-story',
+        '✈️'
+      );
+
+      // Schedule day-of notification
+      await NotificationService.scheduleActivityNotification(
+        `${updatedTrip.title} is today`,
+        tripDate,
+        `trip-${updatedTrip.id}-day`,
+        'Trip Today',
+        'trip-story',
+        '✈️'
+      );
+    }
+
     setCurrentTrip(updatedTrip);
     setShowEditTrip(false);
     HapticFeedback.success();
@@ -1435,6 +1313,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           onPress: async () => {
             const updatedTrips = trips.filter(trip => trip.id !== currentTrip.id);
             await saveTrips(updatedTrips);
+
+            // Notifications will auto-expire if time has passed
+            // No explicit cancel needed
+
             setCurrentTrip(null);
             setShowTripDetail(false);
             setShowEditTrip(false);
@@ -1925,6 +1807,37 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
+  const getDaysRemaining = (targetDate: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate + 'T00:00:00');
+    const diffTime = target.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getProximityText = (days: number): string => {
+    if (days < 0) return 'Past';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days < 7) return `In ${days} days`;
+
+    const weeks = Math.round(days / 7);
+    if (days < 30) return `In ${weeks} week${weeks > 1 ? 's' : ''}`;
+
+    const months = Math.round(days / 30);
+    if (days < 365) return `In ${months} month${months > 1 ? 's' : ''}`;
+
+    return 'In 1 year+';
+  };
+
+  const getProximityColor = (days: number): string => {
+    if (days === 0) return '#FF3B30'; // Red for Today
+    if (days === 1) return '#FF9500'; // Orange for Tomorrow
+    if (days < 7) return '#FFCC00'; // Yellow for this week
+    if (days < 30) return '#34C759'; // Green for this month
+    return colors.textSecondary; // Gray for later
+  };
+
   const getSortedTrips = () => {
     try {
       if (!trips || !Array.isArray(trips)) {
@@ -2013,17 +1926,25 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.tripHeader}>
           <Text style={[styles.tripTitle, { color: colors.text }]}>{trip.title}</Text>
           <View style={styles.tripHeaderRight}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <Text style={styles.statusText}>{statusText}</Text>
-            </View>
+            {trip.status === 'planned' ? (
+              <View style={[styles.statusBadge, { backgroundColor: getProximityColor(getDaysRemaining(trip.startDate)) }]}>
+                <Text style={[styles.statusText, { color: colors.background }]}>{getProximityText(getDaysRemaining(trip.startDate))}</Text>
+              </View>
+            ) : (
+              <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                <Text style={styles.statusText}>{statusText}</Text>
+              </View>
+            )}
           </View>
         </View>
         <Text style={[styles.tripDates, { color: colors.textSecondary }]}>
           {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
         </Text>
-        <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
-          {trip.photos.length} photos • {trip.activities.length} activities
-        </Text>
+        {trip.status !== 'planned' && (
+          <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
+            {trip.photos.length} photos • {trip.activities.length} activities
+          </Text>
+        )}
       </TouchableOpacity>
     );
   };
@@ -2131,15 +2052,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     </Modal>
   );
 
+
   // Initialize selectedDate when Add Activity modal opens
   useEffect(() => {
     if (showAddActivityModal && currentTrip) {
       const tripDates = getTripDates();
-      if (tripDates.length > 0 && !selectedDate) {
-        setSelectedDate(tripDates[0]);
-      }
+      // Removed auto-selection - user must explicitly select a date
 
-      // Scroll to selected date
+      // Scroll to selected date if one is already selected
       if (dateScrollViewRef.current && selectedDate) {
         const dateIndex = tripDates.indexOf(selectedDate);
         if (dateIndex >= 0) {
@@ -2154,6 +2074,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       }
     }
   }, [showAddActivityModal, currentTrip]);
+
 
   const renderAddActivityModal = () => (
     <Modal visible={showAddActivityModal} animationType="slide" presentationStyle="pageSheet">
@@ -2229,25 +2150,28 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={async () => {
-                await addActivity();
-                setShowAddActivityModal(false);
+                if (!selectedDate) {
+                  Alert.alert('Date Required', 'Please select a date for this activity.');
+                  return;
+                }
+                await addActivity(true);
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Add</Text>
+              <Text style={styles.actionButtonText}>Add</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={async () => {
-                await addActivity();
-                // Keep modal open and clear form for next activity
-                setNewActivityName('');
-                setNewActivityTime('');
-                // Keep selectedDate so user can add multiple activities to same day
+                if (!selectedDate) {
+                  Alert.alert('Date Required', 'Please select a date for this activity.');
+                  return;
+                }
+                await addActivity(false);
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Add Another</Text>
+              <Text style={styles.actionButtonText}>Add Another</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2264,7 +2188,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       if (parts.length >= 2) {
         const name = parts[0];
         const date = parts[1];
-        const time = parts[2] || '12:00';
+        const time = parts[2] || '00:00'; // Default to 00:00 (midnight) if not specified
 
         // Validate date format (YYYY-MM-DD)
         if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -2358,12 +2282,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         </ScrollView>
 
         <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: colors.primary }]}
-            onPress={saveActivitiesFromList}
-          >
-            <Text style={[styles.createButtonText, { color: colors.background }]}>Save Activities</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row' }}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
+              onPress={saveActivitiesFromList}
+            >
+              <Text style={styles.actionButtonText}>Save Activities</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -2658,18 +2584,20 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           </ScrollView>
 
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30' }]}
-              onPress={deletePhoto}
-            >
-              <Text style={[styles.deleteButtonText, { color: 'white' }]}>Delete Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: colors.primary }]}
-              onPress={updatePhotoDetails}
-            >
-              <Text style={[styles.deleteButtonText, { color: colors.background }]}>Save Changes</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
+                onPress={deletePhoto}
+              >
+                <Text style={styles.actionButtonText}>Delete Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
+                onPress={updatePhotoDetails}
+              >
+                <Text style={styles.actionButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2831,16 +2759,16 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingVertical: 12 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={updateActivity}
             >
-              <Text style={[styles.createButtonText, { color: colors.background }]}>Save</Text>
+              <Text style={styles.actionButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30', flex: 1, paddingVertical: 12 }]}
+              style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
               onPress={deleteActivity}
             >
-              <Text style={[styles.deleteButtonText, { color: 'white' }]}>Delete</Text>
+              <Text style={styles.actionButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2932,30 +2860,65 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Bulk Edit Activities - only if no photos */}
+          {currentTrip && currentTrip.photos.length === 0 && (
+            <View style={[styles.inputGroup, { marginTop: 20 }]}>
+              <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 8 }]}>
+                Edit Activities (Optional):
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surface,
+                    color: colors.text,
+                    borderColor: colors.border,
+                    minHeight: 150,
+                    textAlignVertical: 'top',
+                    paddingTop: 12,
+                  }
+                ]}
+                value={activitiesListText}
+                onChangeText={setActivitiesListText}
+                placeholder="Activity Name, 2025-11-08, 23:00-23:30"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={8}
+              />
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontSize: 12, marginTop: 8 }]}>
+                Format: Activity Name, YYYY-MM-DD, HH:MM{'\n'}
+                Example:{'\n'}
+                Breakfast, 2025-11-08, 08:00{'\n'}
+                Museum Visit, 2025-11-08, 14:00{'\n'}
+                Dinner, 2025-11-08, 19:00-20:30
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.modalFooter}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingHorizontal: 4 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={updateTrip}
             >
-              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Update Trip</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Update Trip</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, flex: 1, paddingHorizontal: 4 }]}
+              style={[styles.actionButton, { backgroundColor: colors.primary, flex: 1 }]}
               onPress={() => {
                 setShowEditTrip(false);
                 setShowAddActivityModal(true);
               }}
             >
-              <Text style={[styles.createButtonText, { color: colors.background, fontSize: 14 }]} numberOfLines={1}>Add Activity</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Add Activity</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B30', flex: 1, paddingHorizontal: 4, marginBottom: 0 }]}
+              style={[styles.actionButton, { backgroundColor: '#FF3B30', flex: 1 }]}
               onPress={deleteTrip}
             >
-              <Text style={[styles.deleteButtonText, { color: 'white', fontSize: 14 }]} numberOfLines={1}>Delete</Text>
+              <Text style={styles.actionButtonText} numberOfLines={1}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3059,43 +3022,43 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           </ScrollView>
 
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.modalFooterButton,
-                {
-                  backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
-                  opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
-                  flex: 1,
-                  marginRight: 8,
-                }
-              ]}
-              onPress={handleCustomPickerSelection}
-              disabled={selectedPickerPhotos.size === 0}
-            >
-              <Text style={[styles.modalFooterButtonText, { color: colors.background }]}>
-                Add {selectedPickerPhotos.size > 0 ? `(${selectedPickerPhotos.size})` : ''}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modalFooterButton,
-                {
-                  backgroundColor: colors.border,
-                  flex: 1,
-                  marginLeft: 8,
-                }
-              ]}
-              onPress={() => {
-                setShowCustomPhotoPicker(false);
-                setSelectedPickerPhotos(new Set());
-                setCustomPickerPhotos([]);
-                setCustomPickerPhotoUris(new Map());
-              }}
-            >
-              <Text style={[styles.modalFooterButtonText, { color: colors.textSecondary }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: selectedPickerPhotos.size > 0 ? colors.primary : colors.border,
+                    opacity: selectedPickerPhotos.size > 0 ? 1 : 0.5,
+                    flex: 1,
+                  }
+                ]}
+                onPress={handleCustomPickerSelection}
+                disabled={selectedPickerPhotos.size === 0}
+              >
+                <Text style={styles.actionButtonText}>
+                  Add {selectedPickerPhotos.size > 0 ? `(${selectedPickerPhotos.size})` : ''}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: colors.border,
+                    flex: 1,
+                  }
+                ]}
+                onPress={() => {
+                  setShowCustomPhotoPicker(false);
+                  setSelectedPickerPhotos(new Set());
+                  setCustomPickerPhotos([]);
+                  setCustomPickerPhotoUris(new Map());
+                }}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3816,28 +3779,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       </Text>
                     )}
 
-                    {/* Snap/Add buttons above image row - only show when day is active */}
+                    {/* Add Activity/Add Photos buttons above image row - only show when day is active */}
                     {activeDayDate === date && activeTripId === currentTrip.id && (
                       <View style={[styles.activityPhotoButtons, styles.activityPhotoButtonsTop]}>
                         <TouchableOpacity
-                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                           onPress={() => {
                             setSelectedDate(date);
-                            setSelectedActivity(null);
-                            capturePhoto(undefined, date);
+                            setShowAddActivityModal(true);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, false);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
@@ -3873,7 +3825,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 disabled={isLoading}
                               >
                                 <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                  {isLoading ? 'Searching...' : 'Add Photos'}
                                 </Text>
                               </TouchableOpacity>
                             </Animated.View>
@@ -3889,28 +3841,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       imageHeight={screenWidth - 80}
                     />
 
-                    {/* Snap/Add buttons below image row - only show when day is active and in Record mode */}
+                    {/* Add Activity/Add Photos buttons below image row - only show when day is active and in Record mode */}
                     {activeDayDate === date && activeTripId === currentTrip.id && currentTrip.mode === 'record' && (
                       <View style={styles.activityPhotoButtons}>
                         <TouchableOpacity
-                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                          style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                           onPress={() => {
                             setSelectedDate(date);
-                            setSelectedActivity(null);
-                            capturePhoto(undefined, date);
+                            setShowAddActivityModal(true);
                           }}
                         >
-                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                          onPress={() => {
-                            setSelectedDate(date);
-                            setSelectedActivity(null);
-                            addFromGallery(undefined, date, false);
-                          }}
-                        >
-                          <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                          <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                         </TouchableOpacity>
                         {(() => {
                           const isLoading = loadingPhotosByDate === (date + '');
@@ -3946,7 +3887,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 disabled={isLoading}
                               >
                                 <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                                  {isLoading ? 'Searching...' : 'Add Many'}
+                                  {isLoading ? 'Searching...' : 'Add Photos'}
                                 </Text>
                               </TouchableOpacity>
                             </Animated.View>
@@ -3957,28 +3898,17 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                   </View>
                 )}
 
-                {/* Snap/Add buttons when no day photos exist yet - only show when day is active and in Record mode */}
+                {/* Add Activity/Add Photos buttons when no day photos exist yet - only show when day is active and in Record mode */}
                 {dayPhotos.filter(photo => !photo.activityId).length === 0 && activeDayDate === date && activeTripId === currentTrip.id && currentTrip.mode === 'record' && (
                   <View style={[styles.activityPhotoButtons, { marginTop: 8, marginBottom: 8 }]}>
                     <TouchableOpacity
-                      style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
+                      style={[styles.snapButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary, flex: 1 }]}
                       onPress={() => {
                         setSelectedDate(date);
-                        setSelectedActivity(null);
-                        capturePhoto(undefined, date);
+                        setShowAddActivityModal(true);
                       }}
                     >
-                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>Snap</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.addButton, { backgroundColor: '#f5f5f5', borderColor: colors.primary }]}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        setSelectedActivity(null);
-                        addFromGallery(undefined, date, false);
-                      }}
-                    >
-                      <Text style={[styles.addButtonText, { color: colors.primary }]}>Add 1</Text>
+                      <Text style={[styles.snapButtonText, { color: colors.primary }]}>Add Activity</Text>
                     </TouchableOpacity>
                     {(() => {
                       const isLoading = loadingPhotosByDate === (date + '');
@@ -4003,6 +3933,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                                 backgroundColor: '#f5f5f5',
                                 borderWidth: 0,
                                 opacity: isLoading ? 0.7 : 1,
+                                flex: 1,
                               }
                             ]}
                             onPress={() => {
@@ -4013,7 +3944,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                             disabled={isLoading}
                           >
                             <Text style={[styles.addButtonText, { color: colors.primary }]}>
-                              {isLoading ? 'Searching...' : 'Add Many'}
+                              {isLoading ? 'Searching...' : 'Add Photos'}
                             </Text>
                           </TouchableOpacity>
                         </Animated.View>
@@ -4067,7 +3998,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                             </TouchableOpacity>
                           )}
                         </View>
-                        {currentTrip.mode === 'record' && activity.time && (
+                        {currentTrip.mode === 'record' && activity.time && activity.time !== '00:00' && (
                           <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
                         )}
                       </View>
@@ -4359,7 +4290,10 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       <View style={{ padding: 20 }}>
         <SettingsButton
           title="+ Create New Trip"
-          onPress={() => setShowCreateTrip(true)}
+          onPress={() => {
+            setActivitiesListText(''); // Clear activities field for new trip
+            setShowCreateTrip(true);
+          }}
         />
       </View>
 
@@ -4655,51 +4589,27 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   modalFooter: {
-    padding: 0,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalFooterText: {
     fontSize: 14,
   },
-  modalFooterButton: {
+
+  actionButton: {
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
   },
-  modalFooterButtonText: {
-    fontSize: 16,
+  actionButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
-  },
-  createButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    marginVertical: 20,
-    width: '100%',
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
   },
   closeButton: {
     margin: 20,

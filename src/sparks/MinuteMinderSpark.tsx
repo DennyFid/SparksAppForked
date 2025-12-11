@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Animated, Dimensions } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
 import { NotificationService } from '../utils/notifications';
+import { CommonModal } from '../components/CommonModal';
+import { createCommonStyles } from '../styles/CommonStyles';
 import Svg, { Circle } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { GeminiService } from '../services/GeminiService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 import {
   SettingsContainer,
   SettingsScrollView,
   SettingsHeader,
-  SettingsSection,
   SettingsButton,
   SettingsFeedbackSection,
 } from '../components/SettingsComponents';
@@ -99,6 +103,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
+  const commonStyles = createCommonStyles(colors);
 
   const [activitiesText, setActivitiesText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -123,6 +128,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const [breakActivityName, setBreakActivityName] = useState('');
   const [breakStartTime, setBreakStartTime] = useState('');
   const [breakDuration, setBreakDuration] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
 
   // Load saved data on mount
   useEffect(() => {
@@ -140,6 +146,74 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       });
     }
   }, [getSparkData]);
+
+  // Handle Scan Schedule
+  const handleScanSchedule = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photos to scan a schedule.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].base64) {
+        setIsScanning(true);
+        HapticFeedback.light();
+
+        try {
+          const prompt = "Turn this image into todays plan using the format HH:MM, mm, Activity such as 13:30, 30, Meet with Joe.";
+
+          interface ScannedActivity {
+            originalLine: string;
+            startTime: string;
+            duration: number;
+            activity: string;
+          }
+
+          // We ask for a JSON structure to make parsing more robust
+          const jsonPrompt = `
+            Analyze this image of a schedule. Extract the activities and return them as a JSON array where each item has:
+            - "startTime": string in HH:MM format (24h)
+            - "duration": number in minutes
+            - "activity": string name of the activity
+            
+            Order them chronologically.
+          `;
+
+          const scannedData = await GeminiService.generateJSON<Array<{ startTime: string, duration: number, activity: string }>>(jsonPrompt, [result.assets[0].base64]);
+
+          if (Array.isArray(scannedData) && scannedData.length > 0) {
+            const formattedText = scannedData
+              .map(item => `${item.startTime}, ${item.duration}, ${item.activity}`)
+              .join('\n');
+
+            setActivitiesText(formattedText);
+            Alert.alert('Scan Complete', 'Schedule has been updated from the image. Please review and save.');
+            HapticFeedback.success();
+          } else {
+            Alert.alert('Scan Failed', 'Could not extract a valid schedule from the image.');
+          }
+
+        } catch (error) {
+          console.error('Scan error:', error);
+          Alert.alert('Scan Error', 'Failed to process the image. Please try again.');
+        } finally {
+          setIsScanning(false);
+        }
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      setIsScanning(false);
+      Alert.alert('Error', 'Failed to pick image.');
+    }
+  };
 
   // Timer logic
   useEffect(() => {
@@ -176,14 +250,14 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     }
 
     const secondsRemaining = getActivityTime(current.activity, 'current');
-    
+
     if (secondsRemaining <= 10 && secondsRemaining > 0) {
       setShowFlameAnimations(true);
       setCountdownSeconds(secondsRemaining);
-      
+
       // Vibrate every second
       HapticFeedback.medium();
-      
+
       // Animate flame from bottom to top
       flameAnim.setValue(0);
       Animated.sequence([
@@ -223,7 +297,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         const startTime = parts[0].trim();
         const duration = parseInt(parts[1].trim());
         const name = parts.slice(2).join(',').trim() || `Activity ${index + 1}`;
-        
+
         if (/^\d{2}:\d{2}$/.test(startTime) && !isNaN(duration) && duration > 0) {
           activities.push({ startTime, duration, name, order: index });
         }
@@ -259,7 +333,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Get activity status based on today's schedule
   const getActivityStatus = (activityIndex: number): 'completed' | 'current' | 'future' => {
     if (parsedActivities.length === 0) return 'future';
-    
+
     // When timer is not active, all activities are considered 'future' for display purposes
     // (they'll be shown as completed based on time, but we want to show them all)
     if (!timerState.isActive) {
@@ -270,7 +344,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       const activityStartDate = new Date();
       activityStartDate.setHours(hours, minutes, 0, 0);
       const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
-      
+
       if (now.getTime() >= activityEndDate.getTime()) {
         return 'completed';
       }
@@ -285,14 +359,14 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 
     const now = currentTime;
     const activity = parsedActivities[activityIndex];
-    
+
     // Parse activity start time for today
     const [hours, minutes] = activity.startTime.split(':').map(Number);
     const activityStartDate = new Date();
     activityStartDate.setHours(hours, minutes, 0, 0);
-    
+
     const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
-    
+
     // If the activity has already ended, mark as completed (and add to completed set)
     if (now.getTime() >= activityEndDate.getTime()) {
       return 'completed';
@@ -306,37 +380,37 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Get current or next activity
   const getCurrentActivity = (): { activity: Activity; status: 'current' | 'next' } | null => {
     if (parsedActivities.length === 0) return null;
-    
+
     // Find current activity
-    const currentIndex = parsedActivities.findIndex((_, index) => 
+    const currentIndex = parsedActivities.findIndex((_, index) =>
       getActivityStatus(index) === 'current'
     );
-    
+
     if (currentIndex >= 0) {
       return { activity: parsedActivities[currentIndex], status: 'current' };
     }
-    
+
     // Find next future activity
-    const nextIndex = parsedActivities.findIndex((_, index) => 
+    const nextIndex = parsedActivities.findIndex((_, index) =>
       getActivityStatus(index) === 'future'
     );
-    
+
     if (nextIndex >= 0) {
       return { activity: parsedActivities[nextIndex], status: 'next' };
     }
-    
+
     return null;
   };
 
   // Get time until activity starts or remaining time
   const getActivityTime = (activity: Activity, status: 'current' | 'next'): number => {
     const now = currentTime;
-    
+
     // Parse activity start time for today
     const [hours, minutes] = activity.startTime.split(':').map(Number);
     const activityStartDate = new Date();
     activityStartDate.setHours(hours, minutes, 0, 0);
-    
+
     if (status === 'current') {
       // Time remaining in current activity
       const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
@@ -351,7 +425,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const getCurrentActivityProgress = (): number => {
     const current = getCurrentActivity();
     if (!current || current.status !== 'current') return 0;
-    
+
     const secondsRemaining = getActivityTime(current.activity, 'current');
     const totalSeconds = current.activity.duration * 60;
     return 1 - (secondsRemaining / totalSeconds);
@@ -368,24 +442,24 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       Alert.alert('No Activities', 'Please add at least one activity before starting.');
       return;
     }
-    
+
     // Cancel any existing activity notifications first
     await NotificationService.cancelAllActivityNotifications();
-    
+
     // Determine which activities are already completed based on current time
     const now = new Date();
     const completedActivities = new Set<number>();
     const futureActivities: Array<{ index: number; startDate: Date }> = [];
     const activitiesForTomorrow: Array<{ index: number; startDate: Date }> = [];
-    
+
     // First pass: categorize activities as future (today) or candidates for tomorrow
     parsedActivities.forEach((activity, index) => {
       const [hours, minutes] = activity.startTime.split(':').map(Number);
       const activityStartDate = new Date();
       activityStartDate.setHours(hours, minutes, 0, 0);
-      
+
       const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
-      
+
       // If the activity end time has already passed, mark as completed
       if (now.getTime() >= activityEndDate.getTime()) {
         completedActivities.add(index);
@@ -411,50 +485,54 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         }
       }
     });
-    
+
     // If no future activities remain today, but there are activities that could be scheduled for tomorrow
     if (futureActivities.length === 0 && activitiesForTomorrow.length > 0) {
       Alert.alert(
         'All Activities Past',
         'All activities have already started today. Would you like to schedule reminders for tomorrow?',
         [
-          { text: 'Cancel', style: 'cancel', onPress: () => {
-            setTimerState({
-              isActive: true,
-              startDate: new Date(),
-              currentActivityIndex: 0,
-              completedActivities,
-            });
-            HapticFeedback.success();
-          }},
-          { text: 'Schedule for Tomorrow', onPress: async () => {
-            // Schedule all activities for tomorrow
-            for (const { index, startDate } of activitiesForTomorrow) {
-              NotificationService.scheduleActivityNotification(
-                parsedActivities[index].name,
-                startDate,
-                `minute-minder-${index}`,
-                'Minute Minder',
-                'minute-minder',
-                '⏳'
-              ).catch(error => {
-                console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
+          {
+            text: 'Cancel', style: 'cancel', onPress: () => {
+              setTimerState({
+                isActive: true,
+                startDate: new Date(),
+                currentActivityIndex: 0,
+                completedActivities,
               });
+              HapticFeedback.success();
             }
-            
-            setTimerState({
-              isActive: true,
-              startDate: new Date(),
-              currentActivityIndex: 0,
-              completedActivities,
-            });
-            HapticFeedback.success();
-          }}
+          },
+          {
+            text: 'Schedule for Tomorrow', onPress: async () => {
+              // Schedule all activities for tomorrow
+              for (const { index, startDate } of activitiesForTomorrow) {
+                NotificationService.scheduleActivityNotification(
+                  parsedActivities[index].name,
+                  startDate,
+                  `minute-minder-${index}`,
+                  'Minute Minder',
+                  'minute-minder',
+                  '⏳'
+                ).catch(error => {
+                  console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
+                });
+              }
+
+              setTimerState({
+                isActive: true,
+                startDate: new Date(),
+                currentActivityIndex: 0,
+                completedActivities,
+              });
+              HapticFeedback.success();
+            }
+          }
         ]
       );
       return;
     }
-    
+
     // Schedule notifications for future activities (today)
     for (const { index, startDate } of futureActivities) {
       NotificationService.scheduleActivityNotification(
@@ -468,28 +546,28 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         console.error(`Error scheduling notification for ${parsedActivities[index].name}:`, error);
       });
     }
-    
+
     setTimerState({
       isActive: true,
       startDate: new Date(), // Store when timer started (for reference)
       currentActivityIndex: 0,
       completedActivities,
     });
-    
+
     HapticFeedback.success();
   };
 
   const handleStopTimer = async () => {
     // Cancel all activity notifications
     await NotificationService.cancelAllActivityNotifications();
-    
+
     setTimerState({
       isActive: false,
       startDate: null,
       currentActivityIndex: 0,
       completedActivities: new Set(),
     });
-    
+
     HapticFeedback.medium();
   };
 
@@ -500,23 +578,23 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       return;
     }
     setIsEditing(false);
-    
+
     // If timer is active, reschedule notifications
     if (timerState.isActive) {
       await NotificationService.cancelAllActivityNotifications();
-      
+
       const now = new Date();
       const futureActivities: Array<{ index: number; startDate: Date }> = [];
       const activitiesForTomorrow: Array<{ index: number; startDate: Date }> = [];
-      
+
       // Categorize activities as future (today) or candidates for tomorrow
       parsed.forEach((activity, index) => {
         const [hours, minutes] = activity.startTime.split(':').map(Number);
         const activityStartDate = new Date();
         activityStartDate.setHours(hours, minutes, 0, 0);
-        
+
         const activityEndDate = new Date(activityStartDate.getTime() + activity.duration * 60 * 1000);
-        
+
         if (activityStartDate.getTime() > now.getTime()) {
           // Activity is in the future today
           futureActivities.push({ index, startDate: activityStartDate });
@@ -531,7 +609,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           }
         }
       });
-      
+
       // If no future activities remain today, but there are activities that could be scheduled for tomorrow
       if (futureActivities.length === 0 && activitiesForTomorrow.length > 0) {
         Alert.alert(
@@ -539,21 +617,23 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           'All activities have already started today. Would you like to schedule reminders for tomorrow?',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Schedule for Tomorrow', onPress: async () => {
-              // Schedule all activities for tomorrow
-              for (const { index, startDate } of activitiesForTomorrow) {
-                NotificationService.scheduleActivityNotification(
-                  parsed[index].name,
-                  startDate,
-                  `minute-minder-${index}`,
-                  'Minute Minder',
-                  'minute-minder',
-                  '⏳'
-                ).catch(error => {
-                  console.error(`Error scheduling notification for ${parsed[index].name}:`, error);
-                });
+            {
+              text: 'Schedule for Tomorrow', onPress: async () => {
+                // Schedule all activities for tomorrow
+                for (const { index, startDate } of activitiesForTomorrow) {
+                  NotificationService.scheduleActivityNotification(
+                    parsed[index].name,
+                    startDate,
+                    `minute-minder-${index}`,
+                    'Minute Minder',
+                    'minute-minder',
+                    '⏳'
+                  ).catch(error => {
+                    console.error(`Error scheduling notification for ${parsed[index].name}:`, error);
+                  });
+                }
               }
-            }}
+            }
           ]
         );
       } else {
@@ -572,14 +652,14 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         }
       }
     }
-    
+
     HapticFeedback.success();
   };
 
   const getActivityDisplayStatus = (activityIndex: number): string => {
     const status = getActivityStatus(activityIndex);
     const activity = parsedActivities[activityIndex];
-    
+
     if (status === 'completed') {
       return '✓ Complete';
     } else if (status === 'current') {
@@ -595,23 +675,23 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Get gap in minutes between two activities (by original index)
   const getGapBetweenActivities = (activityIndex1: number, activityIndex2: number): number | null => {
     if (activityIndex1 < 0 || activityIndex2 >= parsedActivities.length || activityIndex1 >= activityIndex2) return null;
-    
+
     const activity1 = parsedActivities[activityIndex1];
     const activity2 = parsedActivities[activityIndex2];
-    
+
     const [hours1, minutes1] = activity1.startTime.split(':').map(Number);
     const [hours2, minutes2] = activity2.startTime.split(':').map(Number);
-    
+
     const start1 = new Date();
     start1.setHours(hours1, minutes1, 0, 0);
     const end1 = new Date(start1.getTime() + activity1.duration * 60 * 1000);
-    
+
     const start2 = new Date();
     start2.setHours(hours2, minutes2, 0, 0);
-    
+
     const gapMs = start2.getTime() - end1.getTime();
     const gapMinutes = Math.floor(gapMs / (60 * 1000));
-    
+
     return gapMinutes > 0 ? gapMinutes : null;
   };
 
@@ -696,20 +776,20 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // When timer is stopped: show all including completed
   const getOrganizedActivities = (): Array<{ activity: Activity; index: number; status: 'completed' | 'current' | 'future' }> => {
     if (parsedActivities.length === 0) return [];
-    
+
     const completed: Array<{ activity: Activity; index: number; status: 'completed' }> = [];
     const currentOrNext: Array<{ activity: Activity; index: number; status: 'current' | 'future' }> = [];
     const future: Array<{ activity: Activity; index: number; status: 'future' }> = [];
-    
+
     parsedActivities.forEach((activity, index) => {
       const status = getActivityStatus(index);
       const item = { activity, index, status };
-      
+
       // While timer is active, filter out completed activities
       if (timerState.isActive && status === 'completed') {
         return; // Skip completed activities when timer is active
       }
-      
+
       if (status === 'completed') {
         completed.push(item as { activity: Activity; index: number; status: 'completed' });
       } else if (status === 'current' || (status === 'future' && currentOrNext.length === 0)) {
@@ -719,15 +799,15 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         future.push(item as { activity: Activity; index: number; status: 'future' });
       }
     });
-    
+
     // Reverse completed so most recent is at top
     completed.reverse();
-    
+
     // When timer is active, only return current/next and future (no completed)
     if (timerState.isActive) {
       return [...currentOrNext, ...future];
     }
-    
+
     // When timer is stopped, return all including completed
     return [...completed, ...currentOrNext, ...future];
   };
@@ -735,29 +815,29 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   // Auto-scroll when activity completes - keep current/next activity at top
   useEffect(() => {
     if (!timerState.isActive || !scrollViewRef.current || parsedActivities.length === 0) return;
-    
+
     const organized = getOrganizedActivities();
     if (organized.length === 0) return;
-    
+
     const currentIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'current');
     const nextIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'future');
-    
+
     const targetIndex = currentIndex >= 0 ? currentIndex : nextIndex;
-    
+
     if (targetIndex >= 0 && targetIndex !== lastCompletedIndex.current) {
       // Find the position of this activity in the organized list
       const organizedIndex = organized.findIndex(item => item.index === targetIndex);
-      
+
       if (organizedIndex >= 0) {
         // Estimate scroll position based on item height (approximately 80px per item including margins)
         // Scroll to position the current/next activity at the top of the scroll view
         const estimatedY = organizedIndex * 80;
-        
+
         setTimeout(() => {
           scrollViewRef.current?.scrollTo({ y: Math.max(0, estimatedY - 20), animated: true });
         }, 200);
       }
-      
+
       lastCompletedIndex.current = targetIndex;
     }
   }, [currentTime, timerState.isActive, parsedActivities]);
@@ -769,7 +849,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       const currentIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'current');
       const nextIndex = parsedActivities.findIndex((_, index) => getActivityStatus(index) === 'future');
       const targetIndex = currentIndex >= 0 ? currentIndex : nextIndex;
-      
+
       if (targetIndex >= 0) {
         const organizedIndex = organized.findIndex(item => item.index === targetIndex);
         if (organizedIndex >= 0) {
@@ -783,13 +863,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   }, [timerState.isActive]);
 
   const styles = StyleSheet.create({
-    fullScreenContainer: {
-      flex: 1,
-    },
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
+    ...commonStyles,
     fixedHeader: {
       backgroundColor: colors.background,
       paddingTop: 20,
@@ -798,27 +872,23 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 20,
+    // Overriding common title to be larger for this specific spark
+    header: {
+      alignItems: 'center',
+      marginBottom: 30,
     },
     scrollView: {
       flex: 1,
     },
-    header: {
-      alignItems: 'center',
-      marginBottom: 30,
+    scrollContainer: {
+      flexGrow: 1,
+      padding: 20,
     },
     title: {
       fontSize: 32,
       fontWeight: 'bold',
       color: colors.text,
       marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
     },
     editButton: {
       alignSelf: 'flex-end',
@@ -1008,14 +1078,12 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       gap: 12,
       marginTop: 20,
     },
+    // We can reuse common buttons, but might want specific overrides or just use commonStyles directly in render
     button: {
       flex: 1,
       paddingVertical: 16,
       borderRadius: 12,
       alignItems: 'center',
-    },
-    primaryButton: {
-      backgroundColor: colors.primary,
     },
     dangerButton: {
       backgroundColor: colors.error,
@@ -1053,7 +1121,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           <SettingsFeedbackSection sparkName="Minute Minder" sparkId="minute-minder" />
           <SettingsButton
             title="Close"
-            onPress={onCloseSettings || (() => {})}
+            onPress={onCloseSettings || (() => { })}
             variant="primary"
           />
         </SettingsScrollView>
@@ -1065,7 +1133,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const organizedActivities = getOrganizedActivities();
 
   return (
-    <View style={styles.fullScreenContainer}>
+    <View style={styles.container}>
       {/* Fixed header with clock */}
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
@@ -1131,9 +1199,9 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 
       {/* Scrollable activities list */}
       {!isEditing ? (
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
-          style={styles.scrollView} 
+          style={styles.scrollView}
           contentContainerStyle={styles.scrollContainer}
         >
           {!timerState.isActive && parsedActivities.length === 0 && (
@@ -1151,7 +1219,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
               {organizedActivities.map((item, organizedIndex) => {
                 const { activity, index: originalIndex, status } = item;
                 const prevItem = organizedIndex > 0 ? organizedActivities[organizedIndex - 1] : null;
-                
+
                 // Check for gap before this activity
                 // Show gap if the previous activity in the organized list ends before this one starts
                 // and they are consecutive in the original time-ordered list
@@ -1163,12 +1231,12 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
                     gap = getGapBetweenActivities(sortedIndices[0], sortedIndices[1]);
                   }
                 }
-                
+
                 return (
                   <View key={`${originalIndex}-${organizedIndex}`}>
                     {/* Show break divider if there's a gap */}
                     {gap !== null && gap > 0 && prevItem && (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.breakDivider}
                         onPress={() => handleBreakEdit(prevItem.index, originalIndex, gap!)}
                       >
@@ -1178,7 +1246,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
                         <Text style={styles.breakEditIcon}>✎</Text>
                       </TouchableOpacity>
                     )}
-                    
+
                     <View
                       ref={(ref) => {
                         activityRefs.current[originalIndex] = ref;
@@ -1216,6 +1284,27 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
               Format: HH:MM, duration (minutes), Activity Name{'\n'}
               One activity per line
             </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: colors.secondary,
+                  marginTop: 12,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8
+                }
+              ]}
+              onPress={handleScanSchedule}
+              disabled={isScanning}
+            >
+              <Text style={{ fontSize: 18 }}>📸</Text>
+              <Text style={[styles.buttonText, { color: colors.background }]}>
+                {isScanning ? 'Scanning...' : 'Scan Schedule'}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: colors.border }]}
@@ -1236,7 +1325,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
           </View>
         </ScrollView>
       )}
-      
+
       {/* Flame animation during final 10 seconds - positioned absolutely over everything */}
       {showFlameAnimations && timerState.isActive && current && (
         <Animated.View
@@ -1266,69 +1355,65 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       )}
 
       {/* Break Edit Modal */}
-      <Modal
+      <CommonModal
         visible={showBreakModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowBreakModal(false)}
-      >
-        <View style={styles.breakModalOverlay}>
-          <View style={styles.breakModalContent}>
-            <Text style={styles.breakModalTitle}>Fill Break</Text>
-            
-            <Text style={styles.breakModalLabel}>Activity Name</Text>
-            <TextInput
-              style={styles.breakModalInput}
-              value={breakActivityName}
-              onChangeText={setBreakActivityName}
-              placeholder="e.g., Coffee Break"
-              placeholderTextColor={colors.textSecondary}
-              autoFocus
-            />
-
-            <Text style={styles.breakModalLabel}>Start Time (HH:MM)</Text>
-            <TextInput
-              style={styles.breakModalInput}
-              value={breakStartTime}
-              onChangeText={setBreakStartTime}
-              placeholder="21:15"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.breakModalLabel}>Duration (minutes)</Text>
-            <TextInput
-              style={styles.breakModalInput}
-              value={breakDuration}
-              onChangeText={setBreakDuration}
-              placeholder="18"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.breakModalButtonContainer}>
-              <TouchableOpacity
-                style={[styles.breakModalButton, styles.breakModalCancelButton]}
-                onPress={() => {
-                  setShowBreakModal(false);
-                  setEditingBreak(null);
-                  setBreakActivityName('');
-                  setBreakStartTime('');
-                  setBreakDuration('');
-                }}
-              >
-                <Text style={styles.breakModalCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.breakModalButton, styles.breakModalSaveButton]}
-                onPress={handleSaveBreak}
-              >
-                <Text style={styles.breakModalButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+        title="Fill Break"
+        onClose={() => setShowBreakModal(false)}
+        footer={
+          <View style={commonStyles.modalButtons}>
+            <TouchableOpacity
+              style={[commonStyles.modalButton, { backgroundColor: colors.border }]}
+              onPress={() => {
+                setShowBreakModal(false);
+                setEditingBreak(null);
+                setBreakActivityName('');
+                setBreakStartTime('');
+                setBreakDuration('');
+              }}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[commonStyles.modalButton, { backgroundColor: colors.primary }]}
+              onPress={handleSaveBreak}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Save</Text>
+            </TouchableOpacity>
           </View>
+        }
+      >
+        <View>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8 }}>Activity Name</Text>
+          <TextInput
+            style={commonStyles.input}
+            value={breakActivityName}
+            onChangeText={setBreakActivityName}
+            placeholder="e.g., Coffee Break"
+            placeholderTextColor={colors.textSecondary}
+            autoFocus
+          />
+
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8, marginTop: 16 }}>Start Time (HH:MM)</Text>
+          <TextInput
+            style={commonStyles.input}
+            value={breakStartTime}
+            onChangeText={setBreakStartTime}
+            placeholder="21:15"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+          />
+
+          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8, marginTop: 16 }}>Duration (minutes)</Text>
+          <TextInput
+            style={commonStyles.input}
+            value={breakDuration}
+            onChangeText={setBreakDuration}
+            placeholder="18"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+          />
         </View>
-      </Modal>
+      </CommonModal>
     </View>
   );
 };

@@ -54,7 +54,7 @@ export class FeedbackService {
     this.sessionStartTime = Date.now();
     this.currentSparkId = sparkId;
     this.completedActions = [];
-    
+
     // Track session start with dynamic import
     this.trackSparkOpen(sparkId);
   }
@@ -63,7 +63,7 @@ export class FeedbackService {
     if (!this.currentSparkId) return;
 
     const sessionDuration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-    
+
     // Track session completion with dynamic import
     this.trackSparkComplete(
       this.currentSparkId,
@@ -82,7 +82,7 @@ export class FeedbackService {
     if (!this.completedActions.includes(action)) {
       this.completedActions.push(action);
     }
-    
+
     // Track user engagement with dynamic import
     this.trackUserEngagement(action, this.currentSparkId || undefined);
   }
@@ -97,7 +97,7 @@ export class FeedbackService {
     sessionId?: string;
     platform: 'ios' | 'android' | 'web';
   }): Promise<void> {
-    const sessionDuration = this.sessionStartTime > 0 
+    const sessionDuration = this.sessionStartTime > 0
       ? Math.floor((Date.now() - this.sessionStartTime) / 1000)
       : 0;
 
@@ -106,17 +106,18 @@ export class FeedbackService {
       sparkId: feedbackData.sparkId,
       sparkName: feedbackData.sparkName,
       rating: feedbackData.rating as 1 | 2 | 3 | 4 | 5,
-      comment: feedbackData.feedback || null,
+      comment: feedbackData.feedback || '',
       sessionDuration,
       completedActions: [...this.completedActions],
       feedbackType: feedbackData.feedback ? 'detailed' : 'rating',
       appVersion: '1.0.0',
       platform: feedbackData.platform,
+      createdAt: new Date(),
     };
 
     try {
       await FirebaseService.submitFeedback(feedback);
-      
+
       // Track feedback submission with dynamic import
       await this.trackFeatureUsage('feedback_submitted', feedbackData.sparkId, feedbackData.sparkName, {
         rating: feedbackData.rating,
@@ -151,7 +152,7 @@ export class FeedbackService {
     comment?: string,
     feedbackType: 'rating' | 'quick' | 'detailed' = 'rating'
   ): Promise<void> {
-    const sessionDuration = this.sessionStartTime > 0 
+    const sessionDuration = this.sessionStartTime > 0
       ? Math.floor((Date.now() - this.sessionStartTime) / 1000)
       : 0;
 
@@ -159,17 +160,19 @@ export class FeedbackService {
       userId: 'anonymous',
       sparkId,
       rating: rating as 1 | 2 | 3 | 4 | 5,
-      comment,
+      comment: comment || '',
       sessionDuration,
       completedActions: [...this.completedActions],
       feedbackType,
       appVersion: '1.0.0',
       platform: 'ios',
+      createdAt: new Date(),
+      sparkName: sparkId,
     };
 
     try {
       await FirebaseService.submitFeedback(feedback);
-      
+
       // Track feedback submission with dynamic import
       await this.trackFeatureUsage('feedback_submitted', sparkId, sparkId, {
         rating,
@@ -226,8 +229,8 @@ export class FeedbackService {
   ): Promise<void> {
     const rating = isPositive ? 5 : 1;
     const feedbackType = 'quick';
-    
-    await this.submitFeedback(sparkId, rating, undefined, feedbackType);
+
+    await this.submitFeedbackLegacy(sparkId, rating, undefined, feedbackType);
   }
 
   // Batch Operations
@@ -239,7 +242,7 @@ export class FeedbackService {
       for (const feedback of this.feedbackQueue) {
         await FirebaseService.submitFeedback(feedback);
       }
-      
+
       // Clear queue
       this.feedbackQueue = [];
     } catch (error) {
@@ -253,9 +256,9 @@ export class FeedbackService {
   }
 
   static async trackFeedbackModalClose(sparkId: string, submitted: boolean): Promise<void> {
-    await this.trackFeatureUsage('feedback_modal_closed', sparkId, 'Unknown Spark', { 
-      sparkId, 
-      submitted 
+    await this.trackFeatureUsage('feedback_modal_closed', sparkId, 'Unknown Spark', {
+      sparkId,
+      submitted
     });
   }
 

@@ -119,27 +119,56 @@ service cloud.firestore {
 
 ### 5. Environment Configuration
 
-Create environment-specific configuration:
+The app uses environment variables for Firebase configuration. These must be prefixed with `EXPO_PUBLIC_` to be available at runtime.
 
-```typescript
-// src/config/firebase.ts
-export const firebaseConfig = {
-  // Development
-  development: {
-    // Mock service will be used
-  },
-  
-  // Production
-  production: {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  }
-};
+#### For Local Development
+
+1. Create a `.env` file in the project root:
+```bash
+EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key_here
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
 ```
+
+2. Get these values from Firebase Console:
+   - Go to Firebase Console > Project Settings > General
+   - Scroll to "Your apps" section
+   - Click on your Web app (or create one if it doesn't exist)
+   - Copy the config values
+
+3. Restart your Expo dev server after creating/updating `.env`:
+```bash
+npx expo start --clear
+```
+
+#### For EAS Builds (Production/Preview/Development)
+
+**Option 1: Using EAS Secrets (Recommended)**
+
+Set secrets using EAS CLI:
+```bash
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_API_KEY --value "your_api_key"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN --value "your_auth_domain"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_PROJECT_ID --value "your_project_id"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET --value "your_storage_bucket"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "your_sender_id"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_APP_ID --value "your_app_id"
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID --value "your_measurement_id"
+```
+
+**Option 2: Using eas.json (Less Secure)**
+
+You can also set them directly in `eas.json` under the build profile's `env` section, but this is less secure as the values will be visible in your repository.
+
+**Important Notes:**
+- Environment variables MUST use the `EXPO_PUBLIC_` prefix to be available at runtime
+- For web builds, these are embedded at build time
+- For native builds, they're injected during the EAS build process
+- Never commit your `.env` file to version control (it should be in `.gitignore`)
 
 ## Testing
 

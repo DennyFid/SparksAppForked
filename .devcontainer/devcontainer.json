@@ -1,0 +1,29 @@
+{
+    "name": "React Native Expo Development",
+    "image": "mcr.microsoft.com/devcontainers/universal:latest",
+    // Install all necessary Node packages and Expo CLI
+    "postCreateCommand": "npm install && npm install -g expo-cli",
+    // Recommended VS Code extensions for RN/Expo
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "msjsdiag.vscode-react-native",
+                "expo.vscode-expo",
+                "EditorConfig.EditorConfig"
+            ],
+            "settings": {
+                // Example: set default terminal 
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+    // Forward Metro Bundler and Expo DevTools ports
+    "forwardPorts": [
+        8081,
+        19000
+    ],
+    // The user will need at least a 4-core machine for a smooth experience
+    "hostRequirements": {
+        "cpus": 4
+    }
+}

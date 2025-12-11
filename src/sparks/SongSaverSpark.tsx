@@ -4,35 +4,33 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    TextInput,
     ScrollView,
     Alert,
     Dimensions,
     Linking,
     TouchableWithoutFeedback,
     Keyboard,
-    KeyboardAvoidingView,
     Platform,
     StatusBar,
-    Modal,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { SettingsContainer, SettingsScrollView, SettingsHeader, SettingsFeedbackSection } from '../components/SettingsComponents';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { CommonModal } from '../components/CommonModal';
+import { Input, TextArea } from '../components/FormComponents';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 interface SpotifyTrack {
     id: string;
     url: string;
-    isEmbed: boolean;
     title?: string;
     addedAt: number;
     category?: string;
     name?: string;
-    color?: string;
 }
 
 interface SongSaverSparkProps {
@@ -49,6 +47,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     onComplete,
 }) => {
     const { colors } = useTheme();
+    const commonStyles = createCommonStyles(colors);
     const { getSparkData, setSparkData } = useSparkStore();
     const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
     const [newUrl, setNewUrl] = useState('');
@@ -60,9 +59,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     const [editName, setEditName] = useState('');
     const [editCategory, setEditCategory] = useState('');
     const [editUrl, setEditUrl] = useState('');
-    const [embedInput, setEmbedInput] = useState('');
-    const [embedCategory, setEmbedCategory] = useState('');
-    const [embedName, setEmbedName] = useState('');
+
     const isInitializing = useRef(true);
 
     // Load saved tracks on mount
@@ -74,12 +71,10 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             // Initialize with default track
             const defaultTrack: SpotifyTrack = {
                 id: '3w3qWhplVQcO5aGU6Ipdhq',
-                url: 'https://open.spotify.com/track/3w3qWhplVQcO5aGU6Ipdhq',
-                isEmbed: false,
+                url: '<iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/3w3qWhplVQcO5aGU6Ipdhq?utm_source=generator" width="100%" height="100%" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>',
                 addedAt: Date.now(),
                 category: 'Example',
                 name: 'Sample Song',
-                color: generateColorFromString('https://open.spotify.com/track/3w3qWhplVQcO5aGU6Ipdhq'),
             };
 
             const initialTracks = [defaultTrack];
@@ -138,32 +133,20 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
 
     // Parse category and URL/embed from input
     const parseCategoryAndInput = (input: string): { category?: string; content: string } => {
-        // Find the last ':' that is not followed by '//' or part of HTML
-        let separatorIndex = -1;
-        for (let i = input.length - 1; i >= 0; i--) {
-            if (input[i] === ':' && !input.substring(i).startsWith('://')) {
-                separatorIndex = i;
-                break;
-            }
-        }
+        // Find the FIRST ':' that is not followed by '//'
+        const firstColon = input.indexOf(':');
 
-        if (separatorIndex > 0) {
-            const potentialCategory = input.substring(0, separatorIndex).trim();
-            const remainingContent = input.substring(separatorIndex + 1).trim();
+        if (firstColon > 0) {
+            // Check if it's part of a URL (http:// or https://)
+            const isUrlScheme = input.substring(firstColon).startsWith('://');
 
-            // Check if the remaining part looks like a URL or iframe
-            if (remainingContent.startsWith('http') || remainingContent.startsWith('<iframe') ||
-                remainingContent.includes('spotify.com')) {
+            if (!isUrlScheme) {
+                // It's likely a category separator
                 return {
-                    category: potentialCategory,
-                    content: remainingContent
+                    category: input.substring(0, firstColon).trim(),
+                    content: input.substring(firstColon + 1).trim()
                 };
             }
-        }
-
-        // Fallback: check if it's just a URL/iframe without category
-        if (input.startsWith('http') || input.startsWith('<iframe') || input.includes('spotify.com')) {
-            return { content: input };
         }
 
         return { content: input };
@@ -195,6 +178,11 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
         }
     };
 
+    // Generate Spotify embed code from track ID
+    const generateSpotifyEmbed = (trackId: string): string => {
+        return `<iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/${trackId}?utm_source=generator" width="100%" height="100%" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+    };
+
     // Add new track
     const handleAddTrack = async () => {
         if (!newUrl.trim()) {
@@ -221,13 +209,14 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
         HapticFeedback.light();
 
         try {
+            // Auto-convert to embed if it's a regular URL
+            const finalContent = !isEmbed ? generateSpotifyEmbed(trackId) : content;
+
             const newTrack: SpotifyTrack = {
                 id: trackId,
-                url: content,
-                isEmbed: isEmbed,
+                url: finalContent,
                 addedAt: Date.now(),
                 category: category || 'Uncategorized',
-                color: isEmbed ? undefined : generateColorFromString(content),
             };
 
             const updatedTracks = [...tracks, newTrack];
@@ -300,22 +289,10 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     const handleSaveTrack = () => {
         if (!editingTrack) return;
 
-        const { category, content } = parseCategoryAndInput(editUrl);
-        const { trackId, isEmbed } = parseSpotifyInput(content);
-
-        if (!trackId) {
-            Alert.alert('Error', 'Please enter a valid Spotify URL or embed code');
-            return;
-        }
-
         const updatedTrack = {
             ...editingTrack,
             name: editName.trim() || undefined,
-            category: category || 'Uncategorized',
-            url: content,
-            id: trackId,
-            isEmbed: isEmbed,
-            color: isEmbed ? undefined : generateColorFromString(content),
+            category: editCategory.trim() || 'Uncategorized',
         };
 
         const updatedTracks = tracks.map(t => t.id === editingTrack.id ? updatedTrack : t);
@@ -347,94 +324,42 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
         );
     };
 
-    // Handle add embed from settings
-    const handleAddEmbed = async () => {
-        if (!embedInput.trim()) {
-            Alert.alert('Error', 'Please paste the Spotify embed code');
-            return;
-        }
 
-        const { trackId, isEmbed } = parseSpotifyInput(embedInput.trim());
 
-        if (!trackId || !isEmbed) {
-            Alert.alert('Error', 'Please paste a valid Spotify embed iframe code');
-            return;
-        }
-
-        // Check if track already exists
-        if (tracks.some(track => track.id === trackId)) {
-            Alert.alert('Error', 'This track is already saved');
-            return;
-        }
-
-        HapticFeedback.light();
-
-        try {
-            const newTrack: SpotifyTrack = {
-                id: trackId,
-                url: embedInput.trim(),
-                isEmbed: true,
-                addedAt: Date.now(),
-                category: embedCategory.trim() || 'Uncategorized',
-                name: embedName.trim() || undefined,
-            };
-
-            const updatedTracks = [...tracks, newTrack];
-            setTracks(updatedTracks);
-
-            // Clear inputs
-            setEmbedInput('');
-            setEmbedCategory('');
-            setEmbedName('');
-
-            HapticFeedback.success();
-            Alert.alert('Success', 'Embed track added successfully!');
-        } catch (error) {
-            console.error('Error adding embed:', error);
-            Alert.alert('Error', 'Failed to add embed. Please try again.');
-        }
-    };
-
-    // Track Card Component - Shows either colored card or embed
+    // Track Card Component - Shows embed
     const TrackCard: React.FC<{ track: SpotifyTrack; index: number }> = ({ track, index }) => (
         <TouchableOpacity
             style={[
-                track.isEmbed ? styles.embedTrackCard : styles.trackCard,
+                styles.embedTrackCard,
                 { backgroundColor: colors.surface, borderColor: colors.border }
             ]}
             onPress={() => handlePlayTrack(track)}
             onLongPress={() => handleTrackLongPress(track)}
             activeOpacity={0.7}
         >
-            {track.isEmbed ? (
-                <View style={styles.embedContainer}>
-                    <WebView
-                        source={{ html: track.url }}
-                        style={styles.embedWebView}
-                        scrollEnabled={false}
-                        pointerEvents="none"
-                    />
-                </View>
-            ) : (
-                <View style={[styles.coloredCard, { backgroundColor: track.color || colors.primary }]}>
-                    <Text style={styles.musicIcon}>🎵</Text>
-                </View>
-            )}
+            <View style={styles.embedContainer}>
+                <WebView
+                    source={{ html: track.url }}
+                    style={styles.embedWebView}
+                    scrollEnabled={false}
+                    pointerEvents="none"
+                />
+            </View>
 
-            {/* Name pill overlay - top */}
-            {track.name && (
-                <View style={[styles.namePill, { backgroundColor: colors.secondary }]}>
-                    <Text style={[styles.namePillText, { color: colors.background }]}>
-                        {track.name}
+            {/* Category pill overlay - Top */}
+            {track.category && track.category !== 'Uncategorized' && (
+                <View style={[styles.categoryPill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+                    <Text style={[styles.categoryPillText, { color: '#ffffff' }]}>
+                        {track.category}
                     </Text>
                 </View>
             )}
 
-            {/* Category pill overlay - bottom */}
-            {track.category && (
-                <View style={[styles.categoryPill, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.categoryPillText, { color: colors.background }]}>
-                        {track.category}
+            {/* Name pill overlay - Bottom */}
+            {track.name && (
+                <View style={[styles.namePill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+                    <Text style={[styles.namePillText, { color: '#ffffff' }]}>
+                        {track.name}
                     </Text>
                 </View>
             )}
@@ -442,44 +367,22 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
     );
 
     const styles = StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: colors.background,
-        },
+        ...commonStyles,
         header: {
             padding: 20,
             borderBottomWidth: 0,
         },
-        title: {
-            fontSize: 24,
-            fontWeight: 'bold',
-            color: colors.text,
-            marginBottom: 8,
-        },
-        subtitle: {
-            fontSize: 16,
-            color: colors.textSecondary,
-        },
         inputContainer: {
             flexDirection: 'row',
             marginTop: 16,
-            marginBottom: 20,
+            marginBottom: 12,
             gap: 12,
             backgroundColor: colors.surface,
             padding: 16,
             borderRadius: 12,
             borderWidth: 0,
         },
-        urlInput: {
-            flex: 1,
-            height: 40,
-            borderWidth: 0,
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            fontSize: 16,
-            color: colors.text,
-            backgroundColor: colors.border,
-        },
+
         addButton: {
             height: 40,
             paddingHorizontal: 16,
@@ -536,11 +439,12 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
         },
         embedTrackCard: {
             width: screenWidth - 40, // Full width with padding
-            height: 200, // Fixed height for embeds
+            height: 130, // Fixed height for embeds
             borderRadius: 12,
             borderWidth: 1,
             overflow: 'hidden',
-            marginBottom: 12,
+            marginBottom: 0,
+            padding: 0, // Add padding to show border outside iframe
         },
         coloredCard: {
             width: '100%',
@@ -564,7 +468,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             flexDirection: 'row',
             flexWrap: 'wrap',
             gap: 8,
-            marginTop: 12,
+            marginTop: 4, // Reduced from 12
             backgroundColor: colors.surface,
             padding: 16,
             borderRadius: 12,
@@ -575,9 +479,9 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             paddingVertical: 6,
             borderRadius: 16,
             position: 'absolute',
-            bottom: 8,
-            left: 8,
-            right: 8,
+            top: 12,
+            alignSelf: 'center',
+            zIndex: 10,
         },
         categoryPillText: {
             fontSize: 12,
@@ -593,16 +497,16 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             fontWeight: '600',
         },
         namePill: {
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 16,
             position: 'absolute',
-            top: 8,
-            left: 8,
-            right: 8,
+            bottom: 12,
+            alignSelf: 'center',
+            zIndex: 10,
         },
         namePillText: {
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: '600',
             textAlign: 'center',
         },
@@ -622,59 +526,6 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             fontSize: 16,
             fontWeight: '600',
         },
-        modalContainer: {
-            flex: 1,
-        },
-        modalHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: 20,
-            paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 20,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-        },
-        modalTitle: {
-            fontSize: 18,
-            fontWeight: '600',
-            flex: 1,
-            marginRight: 16,
-        },
-        closeButton: {
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            justifyContent: 'center',
-            alignItems: 'center',
-        },
-        closeButtonText: {
-            fontSize: 16,
-            fontWeight: 'bold',
-        },
-        modalContent: {
-            flex: 1,
-            padding: 20,
-        },
-        inputGroup: {
-            marginBottom: 20,
-        },
-        inputLabel: {
-            fontSize: 16,
-            fontWeight: '600',
-            marginBottom: 8,
-        },
-        modalInput: {
-            height: 50,
-            borderWidth: 1,
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            fontSize: 16,
-        },
-        multilineInput: {
-            height: 120,
-            textAlignVertical: 'top',
-            paddingTop: 12,
-        },
         trackPreview: {
             marginTop: 20,
         },
@@ -691,77 +542,6 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
             overflow: 'hidden',
             alignSelf: 'center',
         },
-        modalActions: {
-            flexDirection: 'row',
-            padding: 20,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            gap: 12,
-        },
-        modalButton: {
-            flex: 1,
-            paddingVertical: 16,
-            borderRadius: 8,
-            alignItems: 'center',
-        },
-        cancelButton: {
-            borderWidth: 1,
-            backgroundColor: 'transparent',
-        },
-        deleteButton: {
-            // Error color applied via backgroundColor
-        },
-        saveButton: {
-            // Primary color applied via backgroundColor
-        },
-        modalButtonText: {
-            fontSize: 16,
-            fontWeight: '600',
-        },
-        settingsSection: {
-            padding: 20,
-            paddingTop: 0,
-        },
-        sectionTitle: {
-            fontSize: 20,
-            fontWeight: '700',
-            marginBottom: 8,
-        },
-        sectionSubtitle: {
-            fontSize: 14,
-            marginBottom: 20,
-            lineHeight: 20,
-        },
-        settingsInputGroup: {
-            marginBottom: 16,
-        },
-        settingsInputLabel: {
-            fontSize: 14,
-            fontWeight: '600',
-            marginBottom: 8,
-        },
-        settingsInput: {
-            height: 50,
-            borderWidth: 1,
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            fontSize: 16,
-        },
-        settingsMultilineInput: {
-            height: 150,
-            textAlignVertical: 'top',
-            paddingTop: 12,
-        },
-        addEmbedButton: {
-            paddingVertical: 16,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginTop: 8,
-        },
-        addEmbedButtonText: {
-            fontSize: 16,
-            fontWeight: '600',
-        },
     });
 
     if (showSettings) {
@@ -777,78 +557,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
 
                     <SettingsFeedbackSection sparkName="Song Saver" sparkId="song-saver" />
 
-                    {/* Add Embed Section */}
-                    <View style={styles.settingsSection}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Add Song as Embed
-                        </Text>
-                        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-                            Paste the full Spotify embed iframe code below
-                        </Text>
 
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Category (Optional)
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder="e.g., Workout, Chill, etc."
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedCategory}
-                                onChangeText={setEmbedCategory}
-                            />
-                        </View>
-
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Name (Optional)
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder="Give this track a custom name"
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedName}
-                                onChangeText={setEmbedName}
-                            />
-                        </View>
-
-                        <View style={styles.settingsInputGroup}>
-                            <Text style={[styles.settingsInputLabel, { color: colors.text }]}>
-                                Embed Code *
-                            </Text>
-                            <TextInput
-                                style={[styles.settingsInput, styles.settingsMultilineInput, {
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                    backgroundColor: colors.surface
-                                }]}
-                                placeholder='<iframe src="https://open.spotify.com/embed/track/..." ...'
-                                placeholderTextColor={colors.textSecondary}
-                                value={embedInput}
-                                onChangeText={setEmbedInput}
-                                multiline
-                                numberOfLines={6}
-                                textAlignVertical="top"
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.addEmbedButton, { backgroundColor: colors.primary }]}
-                            onPress={handleAddEmbed}
-                        >
-                            <Text style={[styles.addEmbedButtonText, { color: colors.background }]}>
-                                Add Embed Track
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
 
                     <View style={styles.settingsButtonContainer}>
                         <TouchableOpacity
@@ -874,16 +583,13 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                         <Text style={styles.subtitle}>Save and organize your favorite Spotify tracks</Text>
 
                         <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.urlInput}
-                                placeholder="Category: spotify URL or embed code"
-                                placeholderTextColor={colors.textSecondary}
+                            <Input
+                                containerStyle={{ flex: 1, marginBottom: 0 }}
+                                placeholder="Category: spotify URL"
                                 value={newUrl}
                                 onChangeText={setNewUrl}
                                 autoCapitalize="none"
                                 autoCorrect={false}
-                                multiline
-                                numberOfLines={2}
                                 returnKeyType="done"
                                 onSubmitEditing={Keyboard.dismiss}
                             />
@@ -906,7 +612,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                                         styles.categoryPill,
                                         styles.categoryFilterPill,
                                         {
-                                            backgroundColor: selectedCategory === null ? colors.primary : colors.surface,
+                                            backgroundColor: selectedCategory === null ? 'rgba(30, 30, 30, 0.85)' : colors.surface,
                                             borderColor: colors.border
                                         }
                                     ]}
@@ -914,7 +620,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                                 >
                                     <Text style={[
                                         styles.categoryFilterText,
-                                        { color: selectedCategory === null ? colors.background : colors.text }
+                                        { color: selectedCategory === null ? '#ffffff' : colors.text }
                                     ]}>
                                         All
                                     </Text>
@@ -927,7 +633,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                                             styles.categoryPill,
                                             styles.categoryFilterPill,
                                             {
-                                                backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                                                backgroundColor: selectedCategory === category ? 'rgba(30, 30, 30, 0.85)' : colors.surface,
                                                 borderColor: colors.border
                                             }
                                         ]}
@@ -938,7 +644,7 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                                     >
                                         <Text style={[
                                             styles.categoryFilterText,
-                                            { color: selectedCategory === category ? colors.background : colors.text }
+                                            { color: selectedCategory === category ? '#ffffff' : colors.text }
                                         ]}>
                                             {category}
                                         </Text>
@@ -965,134 +671,77 @@ const SongSaverSpark: React.FC<SongSaverSparkProps> = ({
                             </View>
                         ) : (
                             <>
-                                {/* Embeds - Full Width at Top */}
-                                {filteredTracks.filter(track => track.isEmbed).map((track, index) => (
+                                {/* Embeds - Full Width */}
+                                {filteredTracks.map((track, index) => (
                                     <TrackCard key={track.id} track={track} index={index} />
                                 ))}
-
-                                {/* Simple Cards - 2 Column Grid */}
-                                {filteredTracks.filter(track => !track.isEmbed).length > 0 && (
-                                    <View style={styles.tracksGrid}>
-                                        {filteredTracks.filter(track => !track.isEmbed).map((track, index) => (
-                                            <TrackCard key={track.id} track={track} index={index} />
-                                        ))}
-                                    </View>
-                                )}
                             </>
                         )}
                     </View>
                 </ScrollView>
 
                 {/* Edit Modal */}
-                <Modal
+                <CommonModal
                     visible={showModal}
-                    animationType="slide"
-                    presentationStyle="pageSheet"
-                    onRequestClose={handleCloseModal}
-                >
-                    <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Track</Text>
+                    title="Edit Track"
+                    onClose={handleCloseModal}
+                    footer={
+                        <View style={commonStyles.modalButtons}>
                             <TouchableOpacity
-                                style={[styles.closeButton, { backgroundColor: colors.border }]}
-                                onPress={handleCloseModal}
-                            >
-                                <Text style={[styles.closeButtonText, { color: colors.text }]}>✕</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView style={styles.modalContent}>
-                            <View style={styles.inputGroup}>
-                                <Text style={[styles.inputLabel, { color: colors.text }]}>Name (Optional)</Text>
-                                <TextInput
-                                    style={[styles.modalInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
-                                    placeholder="Give this track a name"
-                                    placeholderTextColor={colors.textSecondary}
-                                    value={editName}
-                                    onChangeText={setEditName}
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={[styles.inputLabel, { color: colors.text }]}>URL or Embed Code</Text>
-                                <TextInput
-                                    style={[styles.modalInput, styles.multilineInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
-                                    placeholder="Category: spotify URL or embed code"
-                                    placeholderTextColor={colors.textSecondary}
-                                    value={editUrl}
-                                    onChangeText={setEditUrl}
-                                    multiline
-                                    numberOfLines={4}
-                                />
-                            </View>
-
-                            {editingTrack && (
-                                <View style={styles.trackPreview}>
-                                    <Text style={[styles.previewLabel, { color: colors.text }]}>Preview</Text>
-                                    <View style={[styles.previewCard, { borderColor: colors.border }]}>
-                                        {parseSpotifyInput(parseCategoryAndInput(editUrl).content).isEmbed ? (
-                                            <View style={styles.embedContainer}>
-                                                <WebView
-                                                    source={{ html: parseCategoryAndInput(editUrl).content }}
-                                                    style={styles.embedWebView}
-                                                    scrollEnabled={false}
-                                                    pointerEvents="none"
-                                                />
-                                            </View>
-                                        ) : (
-                                            <View style={[styles.coloredCard, {
-                                                backgroundColor: generateColorFromString(parseCategoryAndInput(editUrl).content)
-                                            }]}>
-                                                <Text style={styles.musicIcon}>🎵</Text>
-                                            </View>
-                                        )}
-
-                                        {editName && (
-                                            <View style={[styles.namePill, { backgroundColor: colors.secondary }]}>
-                                                <Text style={[styles.namePillText, { color: colors.background }]}>
-                                                    {editName}
-                                                </Text>
-                                            </View>
-                                        )}
-
-                                        {parseCategoryAndInput(editUrl).category && (
-                                            <View style={[styles.categoryPill, { backgroundColor: colors.primary }]}>
-                                                <Text style={[styles.categoryPillText, { color: colors.background }]}>
-                                                    {parseCategoryAndInput(editUrl).category}
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
-                            )}
-                        </ScrollView>
-
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
-                                onPress={handleCloseModal}
-                            >
-                                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.deleteButton, { backgroundColor: colors.error }]}
+                                style={[commonStyles.modalButton, { backgroundColor: colors.error }]}
                                 onPress={handleDeleteTrack}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Delete</Text>
+                                <Text style={{ color: '#fff', fontWeight: '600' }}>Delete</Text>
                             </TouchableOpacity>
-
                             <TouchableOpacity
-                                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.primary }]}
+                                style={[commonStyles.modalButton, { backgroundColor: colors.primary }]}
                                 onPress={handleSaveTrack}
                             >
-                                <Text style={[styles.modalButtonText, { color: colors.background }]}>Save</Text>
+                                <Text style={{ color: '#fff', fontWeight: '600' }}>Save</Text>
                             </TouchableOpacity>
                         </View>
+                    }
+                >
+                    <View>
+                        <Input
+                            label="Track Name"
+                            value={editName}
+                            onChangeText={setEditName}
+                            placeholder="Enter track name"
+                        />
+
+                        <Input
+                            label="Category"
+                            value={editCategory}
+                            onChangeText={setEditCategory}
+                            placeholder="e.g. Chill, Workout, Jazz"
+                        />
+
+                        <TextArea
+                            label="URL / Embed Code"
+                            value={editUrl}
+                            editable={false}
+                            multiline
+                        />
+
+                        {/* Preview */}
+                        {editingTrack && (
+                            <View style={styles.trackPreview}>
+                                <Text style={styles.previewLabel}>Preview</Text>
+                                <View style={styles.previewCard}>
+                                    <WebView
+                                        source={{ html: editingTrack.url }}
+                                        style={{ flex: 1, backgroundColor: 'transparent' }}
+                                        scrollEnabled={false}
+                                        pointerEvents="none"
+                                    />
+                                </View>
+                            </View>
+                        )}
                     </View>
-                </Modal>
-            </View>
-        </TouchableWithoutFeedback>
+                </CommonModal>
+            </View >
+        </TouchableWithoutFeedback >
     );
 };
 

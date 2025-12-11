@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
+import { CommonModal } from '../components/CommonModal';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -88,7 +91,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   const [showFutureTodos, setShowFutureTodos] = useState(false);
   const [showOlderDoneTodos, setShowOlderDoneTodos] = useState(false);
   const taskInputRef = useRef<TextInput>(null);
-  
+
   // Feedback system state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
@@ -100,15 +103,22 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     if (savedData.todos) {
       // Migrate existing todos to include displayText and category
       const migratedTodos = savedData.todos.map((todo: any) => {
-        if (!todo.displayText) {
-          const { category, displayText } = parseTaskText(todo.text);
-          return {
-            ...todo,
+        let newTodo = { ...todo };
+
+        // Ensure category is lowercase if present
+        if (newTodo.category) {
+          newTodo.category = newTodo.category.toLowerCase();
+        }
+
+        if (!newTodo.displayText) {
+          const { category, displayText } = parseTaskText(newTodo.text);
+          newTodo = {
+            ...newTodo,
             displayText,
-            category,
+            category: category,
           };
         }
-        return todo;
+        return newTodo;
       });
       setTodos(migratedTodos);
     }
@@ -262,21 +272,21 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     };
 
     setTodos(prev => [...prev, newTask]);
-    
+
     // Track analytics
     const AnalyticsService = ServiceFactory.getAnalyticsService();
     AnalyticsService.trackFeatureUsage('add_task', 'todo', 'Todo List', {
       category: category || 'none',
       hasDueDate: false
     });
-    
+
     // If a category is selected, pre-fill the input with the category prefix
     if (selectedCategory) {
       setNewTaskText(`${selectedCategory}: `);
     } else {
       setNewTaskText('');
     }
-    
+
     HapticFeedback.light();
 
     // Small delay to prevent rapid successive clicks
@@ -288,7 +298,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Toggle task completion
   const toggleTask = (id: number) => {
     const today = getTodayDateString();
-    
+
     setTodos(prev => prev.map(task => {
       if (task.id === id) {
         const newCompleted = !task.completed;
@@ -302,7 +312,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       }
       return task;
     }));
-    
+
     HapticFeedback.light();
   };
 
@@ -329,15 +339,15 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     setTodos(prev => prev.map(task =>
       task.id === editingTask.id
         ? {
-            ...task,
-            text: editText.trim(),
-            displayText,
-            category,
-            dueDate: selectedDate,
-            completed: editCompleted,
-            completedDate: editCompleted ? today : undefined,
-            sortTimeMs: Date.now(),
-          }
+          ...task,
+          text: editText.trim(),
+          displayText,
+          category,
+          dueDate: selectedDate,
+          completed: editCompleted,
+          completedDate: editCompleted ? today : undefined,
+          sortTimeMs: Date.now(),
+        }
         : task
     ));
 
@@ -359,15 +369,15 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     setTodos(prev => prev.map(task =>
       task.id === editingTask.id
         ? {
-            ...task,
-            text: editText.trim(),
-            displayText,
-            category,
-            dueDate: dateString,
-            completed: editCompleted,
-            completedDate: editCompleted ? today : undefined,
-            sortTimeMs: Date.now(),
-          }
+          ...task,
+          text: editText.trim(),
+          displayText,
+          category,
+          dueDate: dateString,
+          completed: editCompleted,
+          completedDate: editCompleted ? today : undefined,
+          sortTimeMs: Date.now(),
+        }
         : task
     ));
 
@@ -404,7 +414,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
     date.setDate(date.getDate() + days);
     const newDateString = date.toISOString().split('T')[0];
     setSelectedDate(newDateString);
-    
+
     // Auto-save and close modal when quick date is selected
     setTimeout(() => {
       saveEditedTaskWithDate(newDateString);
@@ -503,13 +513,13 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Check if there are future todos to show
   const hasFutureTodos = () => {
     const today = getTodayDateString();
-    
+
     return todos.some(task => {
       // First filter by category if selected
       if (selectedCategory && task.category !== selectedCategory) {
         return false;
       }
-      
+
       // Check if it's a future todo (incomplete and due date is after today)
       return !task.completed && task.dueDate > today;
     });
@@ -518,78 +528,38 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   // Check if there are older done todos to show
   const hasOlderDoneTodos = () => {
     const today = getTodayDateString();
-    
+
     return todos.some(task => {
       // First filter by category if selected
       if (selectedCategory && task.category !== selectedCategory) {
         return false;
       }
-      
+
       // Check if it's an older done todo (completed but not from today)
       return task.completed && task.completedDate !== today;
     });
   };
 
+  const commonStyles = createCommonStyles(colors);
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 20,
-    },
+    ...commonStyles,
     header: {
       alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: 20,
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xl,
     },
     addSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     addRow: {
       flexDirection: 'row',
       gap: 12,
     },
     taskInput: {
-      backgroundColor: colors.background,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: colors.text,
+      ...commonStyles.input,
     },
     categoriesSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     categoryChips: {
       flexDirection: 'row',
@@ -626,22 +596,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       color: '#fff',
     },
     todosSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    sectionTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 16,
-      textAlign: 'center',
+      ...commonStyles.card,
     },
     todoItem: {
       flexDirection: 'row',
@@ -869,7 +824,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
   if (showSettings) {
     return (
       <TodoSettings
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -886,7 +841,7 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
         <TextInput
           ref={taskInputRef}
           style={styles.taskInput}
-          placeholder="Add a new task... (use category: task format)"
+          placeholder="Add a new task (eg, category: task)"
           placeholderTextColor={colors.textSecondary}
           value={newTaskText}
           onChangeText={setNewTaskText}
@@ -899,35 +854,46 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       {getCategoryInfos().length > 0 && (
         <View style={styles.categoriesSection}>
           <View style={styles.categoryChips}>
-            {getCategoryInfos().map(({ name, status }) => (
+            {selectedCategory && (
               <TouchableOpacity
-                key={name}
-                style={[
-                  styles.categoryChip,
-                  status === 'future' && styles.categoryChipFuture,
-                  status === 'completedOnly' && styles.categoryChipCompleted,
-                  selectedCategory === name && styles.selectedCategoryChip
-                ]}
-                onPress={() => handleCategoryPress(name)}
+                style={[styles.categoryChip, styles.selectedCategoryChip]}
+                onPress={() => handleCategoryPress(selectedCategory)}
               >
-                <Text style={[
-                  styles.categoryChipText,
-                  selectedCategory === name && styles.selectedCategoryChipText
-                ]}>
-                  {name}
-                </Text>
+                <Text style={styles.selectedCategoryChipText}>Show All</Text>
               </TouchableOpacity>
-            ))}
+            )}
+            {getCategoryInfos()
+              .filter(({ name }) => !selectedCategory || name === selectedCategory)
+              .map(({ name, status }) => (
+                <TouchableOpacity
+                  key={name}
+                  style={[
+                    styles.categoryChip,
+                    status === 'future' && styles.categoryChipFuture,
+                    status === 'completedOnly' && styles.categoryChipCompleted,
+                    selectedCategory === name && styles.selectedCategoryChip
+                  ]}
+                  onPress={() => handleCategoryPress(name)}
+                >
+                  <Text style={[
+                    styles.categoryChipText,
+                    selectedCategory === name && styles.selectedCategoryChipText
+                  ]}>
+                    {name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </View>
         </View>
-      )}
+      )
+      }
 
       {/* Todos Section */}
       <View style={styles.todosSection}>
         <Text style={styles.sectionTitle}>
           Tasks ({filteredTodos.filter(t => !t.completed).length} pending)
         </Text>
-        
+
         {filteredTodos.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
@@ -944,8 +910,8 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
                 todo.dueDate === getTodayDateString()
                   ? styles.todoItemToday
                   : (todo.dueDate === getTomorrowDateString()
-                      ? styles.todoItemTomorrow
-                      : styles.todoItemFuture),
+                    ? styles.todoItemTomorrow
+                    : styles.todoItemFuture),
                 index === filteredTodos.length - 1 && styles.lastItem
               ]}
               onPress={() => toggleTask(todo.id)}
@@ -999,134 +965,125 @@ export const TodoSpark: React.FC<TodoSparkProps> = ({
       </View>
 
       {/* Edit Task Modal */}
-      <Modal
+      <CommonModal
         visible={editModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Todo</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Task text"
-              placeholderTextColor={colors.textSecondary}
-              value={editText}
-              onChangeText={setEditText}
-              multiline={true}
-              onSubmitEditing={saveEditedTask}
-              returnKeyType="done"
-              blurOnSubmit={true}
-              onKeyPress={(e) => {
-                if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                  saveEditedTask();
-                }
-              }}
-            />
-
-            {/* Done Toggle */}
-            <View style={styles.doneToggleSection}>
-              <Text style={styles.doneToggleLabel}>Done</Text>
-              <TouchableOpacity
-                style={[styles.doneToggle, editCompleted && styles.doneToggleActive]}
-                onPress={() => setEditCompleted(!editCompleted)}
-              >
-                <Text style={[styles.doneToggleText, editCompleted && styles.doneToggleTextActive]}>
-                  {editCompleted ? '✓' : ''}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.quickDateSection}>
-              <Text style={styles.quickDateTitle}>Due Date</Text>
-              <View style={styles.quickDateButtons}>
-                {(() => {
-                  const today = new Date();
-                  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-                  
-                  // Build base options
-                  const baseOptions = [
-                    { label: 'Today', days: 0 },
-                    { label: '+1 Day', days: 1 },
-                    { label: '+1 Week', days: 7 },
-                  ];
-                  
-                  // Add logical date buttons based on current day
-                  const logicalOptions: Array<{ label: string; days: number }> = [];
-                  
-                  // If Monday (1) to Thursday (4), add Saturday button
-                  if (dayOfWeek >= 1 && dayOfWeek <= 4) {
-                    const daysUntilSaturday = 6 - dayOfWeek; // Saturday is day 6
-                    logicalOptions.push({ label: 'Saturday', days: daysUntilSaturday });
-                  }
-                  // If Saturday (6), add Monday button
-                  else if (dayOfWeek === 6) {
-                    const daysUntilMonday = 8 - dayOfWeek; // Monday is day 1, so 8 - 6 = 2 days
-                    logicalOptions.push({ label: 'Monday', days: daysUntilMonday });
-                  }
-                  
-                  // Combine base options with logical options
-                  const allOptions = [...baseOptions, ...logicalOptions];
-                  
-                  return allOptions.map((option) => {
-                    const optionDate = new Date();
-                    optionDate.setDate(optionDate.getDate() + option.days);
-                    const optionDateString = optionDate.toISOString().split('T')[0];
-                    const isSelected = selectedDate === optionDateString;
-
-                    return (
-                      <TouchableOpacity
-                        key={option.label}
-                        style={[styles.quickDateButton, isSelected && styles.selectedDateButton]}
-                        onPress={() => selectQuickDate(option.days)}
-                      >
-                        <Text style={[styles.quickDateButtonText, isSelected && styles.selectedDateButtonText]}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  });
-                })()}
-              </View>
-
-              {/* Manual Date Input */}
-              <Text style={styles.manualDateLabel}>Or enter date manually (YYYY-MM-DD):</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="2024-12-25"
-                placeholderTextColor={colors.textSecondary}
-                value={selectedDate}
-                onChangeText={setSelectedDate}
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setEditModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={deleteEditedTask}
-              >
-                <Text style={styles.deleteButtonText}>✕</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={saveEditedTask}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
+        title="Edit Todo"
+        onClose={() => setEditModalVisible(false)}
+        footer={
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setEditModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: colors.error }]}
+              onPress={deleteEditedTask}
+            >
+              <Text style={styles.saveButtonText}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.saveButton]}
+              onPress={saveEditedTask}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
           </View>
+        }
+      >
+        <TextInput
+          style={styles.modalInput}
+          placeholder="Task text"
+          placeholderTextColor={colors.textSecondary}
+          value={editText}
+          onChangeText={setEditText}
+          multiline={true}
+          onSubmitEditing={saveEditedTask}
+          returnKeyType="done"
+          blurOnSubmit={true}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === 'Enter') {
+              saveEditedTask();
+            }
+          }}
+        />
+
+        {/* Done Toggle */}
+        <View style={styles.doneToggleSection}>
+          <Text style={styles.doneToggleLabel}>Done</Text>
+          <TouchableOpacity
+            style={[styles.doneToggle, editCompleted && styles.doneToggleActive]}
+            onPress={() => setEditCompleted(!editCompleted)}
+          >
+            <Text style={[styles.doneToggleText, editCompleted && styles.doneToggleTextActive]}>
+              {editCompleted ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
-    </ScrollView>
+
+        <View style={styles.quickDateSection}>
+          <Text style={styles.quickDateTitle}>Due Date</Text>
+          <View style={styles.quickDateButtons}>
+            {(() => {
+              const today = new Date();
+              const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+              // Build base options
+              const baseOptions = [
+                { label: 'Today', days: 0 },
+                { label: '+1 Day', days: 1 },
+                { label: '+2 Days', days: 2 },
+                { label: '+3 Days', days: 3 },
+                { label: '+1 Week', days: 7 },
+              ];
+
+              // Add "Next Monday" if today is not Monday
+              if (dayOfWeek !== 1) {
+                const daysUntilMonday = (8 - dayOfWeek) % 7;
+                baseOptions.push({ label: 'Next Monday', days: daysUntilMonday });
+              }
+
+              return baseOptions.map((option) => {
+                const targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() + option.days);
+                const dateString = targetDate.toISOString().split('T')[0];
+                const isSelected = selectedDate === dateString;
+
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[
+                      styles.quickDateButton,
+                      isSelected && styles.selectedDateButton,
+                    ]}
+                    onPress={() => selectQuickDate(option.days)}
+                  >
+                    <Text
+                      style={[
+                        styles.quickDateButtonText,
+                        isSelected && styles.selectedDateButtonText,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              });
+            })()}
+          </View>
+
+          {/* Manual Date Input */}
+          <Text style={styles.manualDateLabel}>Or enter date manually (YYYY-MM-DD):</Text>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="2024-12-25"
+            placeholderTextColor={colors.textSecondary}
+            value={selectedDate}
+            onChangeText={setSelectedDate}
+          />
+        </View>
+      </CommonModal>
+    </ScrollView >
   );
 };

@@ -33,12 +33,16 @@
         "resourceClass": "m-medium",
         "autoIncrement": true,
         "env": {
-          "EXPO_USE_STANDARD_ENCRYPTION": "true"
+          "EXPO_USE_STANDARD_ENCRYPTION": "true",
+          "NODE_ENV": "production"
         }
       },
       "android": {
         "resourceClass": "medium",
-        "autoIncrement": true
+        "autoIncrement": true,
+        "env": {
+          "NODE_ENV": "production"
+        }
       }
     }
   },

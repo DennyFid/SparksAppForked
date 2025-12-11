@@ -83,17 +83,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       const feedback: Omit<SparkFeedback, 'id' | 'timestamp'> = {
         userId: 'anonymous', // TODO: Get actual user ID
         sparkId,
+        sparkName: sparkId, // Use sparkId as sparkName for now
         rating: rating as 1 | 2 | 3 | 4 | 5,
-        comment: comment.trim() || undefined,
+        comment: comment.trim() || '',
         sessionDuration,
         completedActions,
         feedbackType,
         appVersion: '1.0.0', // TODO: Get from app config
         platform: Platform.OS as 'ios' | 'android' | 'web',
+        createdAt: new Date(),
       };
 
       await FirebaseService.submitFeedback(feedback);
-      
+
       if (onSubmit) {
         onSubmit(feedback as SparkFeedback);
       }

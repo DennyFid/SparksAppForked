@@ -78,12 +78,12 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
         category: 'Funny',
         name: 'Nate on fighting orangutan'
       };
-      
+
       const initialVideos = [defaultVideo];
       setVideos(initialVideos);
       setSparkData('short-saver', { videos: initialVideos });
     }
-    
+
     // Mark initialization as complete after a brief delay to ensure state is set
     setTimeout(() => {
       isInitializing.current = false;
@@ -97,12 +97,12 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     if (isInitializing.current) {
       return;
     }
-    
+
     // Skip save if videos array is empty
     if (videos.length === 0) {
       return;
     }
-    
+
     // Save to persistent storage
     setSparkData('short-saver', { videos });
   }, [videos, setSparkData]);
@@ -132,11 +132,11 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
         break;
       }
     }
-    
+
     if (separatorIndex > 0) {
       const potentialCategory = input.substring(0, separatorIndex).trim();
       const remainingUrl = input.substring(separatorIndex + 1).trim();
-      
+
       // Check if the remaining part looks like a URL
       if (remainingUrl.startsWith('http') || remainingUrl.includes('youtube.com') || remainingUrl.includes('youtu.be')) {
         return {
@@ -145,12 +145,12 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
         };
       }
     }
-    
+
     // Fallback: check if it's just a URL without category
     if (input.startsWith('http') || input.includes('youtube.com') || input.includes('youtu.be')) {
       return { url: input };
     }
-    
+
     return { url: input };
   };
 
@@ -186,7 +186,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     // Parse category and URL
     const { category, url } = parseCategoryAndUrl(newUrl.trim());
     const videoId = parseYouTubeUrl(url);
-    
+
     if (!videoId) {
       Alert.alert('Error', 'Please enter a valid YouTube URL');
       return;
@@ -214,7 +214,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       const updatedVideos = [...videos, newVideo];
       setVideos(updatedVideos);
       setNewUrl('');
-      
+
       HapticFeedback.success();
     } catch (error) {
       console.error('Error adding video:', error);
@@ -231,7 +231,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     const youtubeAppUrl = `vnd.youtube://${video.id}?autoplay=1&mute=0`;
     const youtubeWebUrl = `https://www.youtube.com/watch?v=${video.id}&autoplay=1&mute=0&enablejsapi=1`;
     const youtubeShortUrl = `https://youtube.com/shorts/${video.id}?autoplay=1&mute=0`;
-    
+
     // Try to open in YouTube app first (best experience)
     Linking.canOpenURL(youtubeAppUrl).then((supported) => {
       if (supported) {
@@ -244,7 +244,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       // Final fallback - try shorts URL format
       Linking.openURL(youtubeShortUrl);
     });
-    
+
     HapticFeedback.light();
   };
 
@@ -265,11 +265,11 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     setEditingVideo(video);
     setEditName(video.name || '');
     setEditCategory(video.category || '');
-    
+
     // Reconstruct the "Category: URL" format for editing
     const categoryUrl = video.category ? `${video.category}: ${video.url}` : video.url;
     setEditUrl(categoryUrl);
-    
+
     setShowModal(true);
     HapticFeedback.medium();
   };
@@ -289,7 +289,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
 
     const { category, url } = parseCategoryAndUrl(editUrl);
     const videoId = parseYouTubeUrl(url);
-    
+
     if (!videoId) {
       Alert.alert('Error', 'Please enter a valid YouTube URL');
       return;
@@ -356,21 +356,21 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
           </Text>
         </View>
       )}
-      
-      {/* Name pill overlay - top */}
-      {video.name && (
-        <View style={[styles.namePill, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.namePillText, { color: colors.background }]}>
-            {video.name}
+
+      {/* Category pill overlay - Top */}
+      {video.category && (
+        <View style={[styles.categoryPill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+          <Text style={[styles.categoryPillText, { color: '#ffffff' }]}>
+            {video.category}
           </Text>
         </View>
       )}
-      
-      {/* Category pill overlay - bottom */}
-      {video.category && (
-        <View style={[styles.categoryPill, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.categoryPillText, { color: colors.background }]}>
-            {video.category}
+
+      {/* Name pill overlay - Bottom */}
+      {video.name && (
+        <View style={[styles.namePill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]}>
+          <Text style={[styles.namePillText, { color: '#ffffff' }]}>
+            {video.name}
           </Text>
         </View>
       )}
@@ -466,7 +466,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     },
     videoCard: {
       width: (screenWidth - 52) / 2, // 2 columns with gap
-      aspectRatio: 9/16, // YouTube Shorts aspect ratio
+      aspectRatio: 9 / 16, // YouTube Shorts aspect ratio
       borderRadius: 12,
       borderWidth: 1,
       overflow: 'hidden',
@@ -500,9 +500,9 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       paddingVertical: 6,
       borderRadius: 16,
       position: 'absolute',
-      bottom: 8,
-      left: 8,
-      right: 8,
+      top: 12,
+      alignSelf: 'center',
+      zIndex: 10,
     },
     categoryPillText: {
       fontSize: 12,
@@ -519,16 +519,16 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
     },
     // Name pill styles
     namePill: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
       position: 'absolute',
-      top: 8,
-      left: 8,
-      right: 8,
+      bottom: 12,
+      alignSelf: 'center',
+      zIndex: 10,
     },
     namePillText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600',
       textAlign: 'center',
     },
@@ -682,10 +682,10 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
             icon="🎬"
             sparkId="short-saver"
           />
-          
-          
+
+
           <SettingsFeedbackSection sparkName="Short Saver" sparkId="short-saver" />
-          
+
           {/* Close Button */}
           <View style={styles.settingsButtonContainer}>
             <TouchableOpacity
@@ -707,83 +707,83 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
       <View style={styles.container}>
         <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-          <Text style={styles.title}>🎬 Short Saver</Text>
-          <Text style={styles.subtitle}>Save and organize your favorite YouTubes</Text>
-          
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.urlInput}
-              placeholder="Category: https://youtube.com/shorts/..."
-              placeholderTextColor={colors.textSecondary}
-              value={newUrl}
-              onChangeText={setNewUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddVideo}
-              disabled={isAdding}
-            >
-              <Text style={[styles.addButtonText, { color: colors.background }]}>
-                {isAdding ? 'Adding...' : 'Add'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.title}>🎬 Short Saver</Text>
+            <Text style={styles.subtitle}>Save and organize your favorite YouTubes</Text>
 
-          {/* Category Filter Pills */}
-          {getCategories().length > 0 && (
-            <View style={styles.categoryContainer}>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.urlInput}
+                placeholder="Category: https://youtube.com/shorts/..."
+                placeholderTextColor={colors.textSecondary}
+                value={newUrl}
+                onChangeText={setNewUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+              />
               <TouchableOpacity
-                style={[
-                  styles.categoryPill,
-                  styles.categoryFilterPill,
-                  { 
-                    backgroundColor: selectedCategory === null ? colors.primary : colors.surface,
-                    borderColor: colors.border
-                  }
-                ]}
-                onPress={() => handleCategorySelect(null)}
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddVideo}
+                disabled={isAdding}
               >
-                <Text style={[
-                  styles.categoryFilterText,
-                  { color: selectedCategory === null ? colors.background : colors.text }
-                ]}>
-                  All
+                <Text style={[styles.addButtonText, { color: colors.background }]}>
+                  {isAdding ? 'Adding...' : 'Add'}
                 </Text>
               </TouchableOpacity>
-              
-              {getCategories().map((category) => (
+            </View>
+
+            {/* Category Filter Pills */}
+            {getCategories().length > 0 && (
+              <View style={styles.categoryContainer}>
                 <TouchableOpacity
-                  key={category}
                   style={[
                     styles.categoryPill,
                     styles.categoryFilterPill,
-                    { 
-                      backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                    {
+                      backgroundColor: selectedCategory === null ? colors.primary : colors.surface,
                       borderColor: colors.border
                     }
                   ]}
-                  onPress={() => {
-                    // Always filter the category
-                    handleCategorySelect(category);
-                    // Always populate the input
-                    handleCategoryPillTap(category);
-                  }}
+                  onPress={() => handleCategorySelect(null)}
                 >
                   <Text style={[
                     styles.categoryFilterText,
-                    { color: selectedCategory === category ? colors.background : colors.text }
+                    { color: selectedCategory === null ? colors.background : colors.text }
                   ]}>
-                    {category}
+                    All
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+
+                {getCategories().map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryPill,
+                      styles.categoryFilterPill,
+                      {
+                        backgroundColor: selectedCategory === category ? colors.primary : colors.surface,
+                        borderColor: colors.border
+                      }
+                    ]}
+                    onPress={() => {
+                      // Always filter the category
+                      handleCategorySelect(category);
+                      // Always populate the input
+                      handleCategoryPillTap(category);
+                    }}
+                  >
+                    <Text style={[
+                      styles.categoryFilterText,
+                      { color: selectedCategory === category ? colors.background : colors.text }
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Videos Content */}
@@ -795,7 +795,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
                   {videos.length === 0 ? 'No Shorts Saved Yet' : 'No Videos in This Category'}
                 </Text>
                 <Text style={styles.emptySubtitle}>
-                  {videos.length === 0 
+                  {videos.length === 0
                     ? 'Add your favorite YouTube Shorts by pasting their URLs above'
                     : 'Try selecting a different category or add more videos'
                   }
@@ -810,141 +810,141 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
             )}
           </View>
         </ScrollView>
-      
-      {/* Video Edit Modal */}
-      <Modal
-        visible={showModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={handleCloseModal}
-      >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Edit Video
-            </Text>
-            <TouchableOpacity
-              style={[styles.closeButton, { backgroundColor: colors.surface }]}
-              onPress={handleCloseModal}
-            >
-              <Text style={[styles.closeButtonText, { color: colors.text }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Video Name</Text>
-              <TextInput
-                style={[styles.modalInput, { 
-                  backgroundColor: colors.surface, 
-                  borderColor: colors.border,
-                  color: colors.text 
-                }]}
-                placeholder="Enter a custom name for this video"
-                placeholderTextColor={colors.textSecondary}
-                value={editName}
-                onChangeText={setEditName}
-                autoCapitalize="words"
-                autoCorrect={true}
-                returnKeyType="next"
-              />
+
+        {/* Video Edit Modal */}
+        <Modal
+          visible={showModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={handleCloseModal}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Edit Video
+              </Text>
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: colors.surface }]}
+                onPress={handleCloseModal}
+              >
+                <Text style={[styles.closeButtonText, { color: colors.text }]}>✕</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Category & URL</Text>
-              <TextInput
-                style={[styles.modalInput, styles.multilineInput, { 
-                  backgroundColor: colors.surface, 
-                  borderColor: colors.border,
-                  color: colors.text 
-                }]}
-                placeholder="Category: https://youtube.com/shorts/..."
-                placeholderTextColor={colors.textSecondary}
-                value={editUrl}
-                onChangeText={setEditUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                multiline={true}
-                numberOfLines={2}
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-              />
-            </View>
-
-            {/* Video Preview */}
-            {editingVideo && (
-              <View style={styles.videoPreview}>
-                <Text style={[styles.previewLabel, { color: colors.text }]}>Preview</Text>
-                <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  {editingVideo.thumbnail ? (
-                    <Image
-                      source={{ uri: editingVideo.thumbnail }}
-                      style={styles.previewThumbnail}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.previewPlaceholder, { backgroundColor: colors.border }]}>
-                      <Text style={[styles.previewPlaceholderText, { color: colors.textSecondary }]}>
-                        🎬
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {/* Name pill preview */}
-                  {editName.trim() && (
-                    <View style={[styles.namePill, styles.previewNamePill, { backgroundColor: colors.secondary }]}>
-                      <Text style={[styles.namePillText, { color: colors.background }]}>
-                        {editName.trim()}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {/* Category pill preview */}
-                  {parseCategoryAndUrl(editUrl).category && (
-                    <View style={[styles.categoryPill, styles.previewCategoryPill, { backgroundColor: colors.primary }]}>
-                      <Text style={[styles.categoryPillText, { color: colors.background }]}>
-                        {parseCategoryAndUrl(editUrl).category}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+            <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Video Name</Text>
+                <TextInput
+                  style={[styles.modalInput, {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.text
+                  }]}
+                  placeholder="Enter a custom name for this video"
+                  placeholderTextColor={colors.textSecondary}
+                  value={editName}
+                  onChangeText={setEditName}
+                  autoCapitalize="words"
+                  autoCorrect={true}
+                  returnKeyType="next"
+                />
               </View>
-            )}
-          </ScrollView>
-          
-          <View style={[styles.modalActions, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
-              onPress={handleCloseModal}
-            >
-              <Text style={[styles.modalButtonText, { color: colors.text }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.modalButton, styles.deleteButton, { backgroundColor: colors.error }]}
-              onPress={handleDeleteVideo}
-            >
-              <Text style={[styles.modalButtonText, { color: colors.background }]}>
-                Delete
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={handleSaveVideo}
-            >
-              <Text style={[styles.modalButtonText, { color: colors.background }]}>
-                Save
-              </Text>
-            </TouchableOpacity>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>Category & URL</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.multilineInput, {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.text
+                  }]}
+                  placeholder="Category: https://youtube.com/shorts/..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={editUrl}
+                  onChangeText={setEditUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  multiline={true}
+                  numberOfLines={2}
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                />
+              </View>
+
+              {/* Video Preview */}
+              {editingVideo && (
+                <View style={styles.videoPreview}>
+                  <Text style={[styles.previewLabel, { color: colors.text }]}>Preview</Text>
+                  <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {editingVideo.thumbnail ? (
+                      <Image
+                        source={{ uri: editingVideo.thumbnail }}
+                        style={styles.previewThumbnail}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.previewPlaceholder, { backgroundColor: colors.border }]}>
+                        <Text style={[styles.previewPlaceholderText, { color: colors.textSecondary }]}>
+                          🎬
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Name pill preview */}
+                    {editName.trim() && (
+                      <View style={[styles.namePill, styles.previewNamePill, { backgroundColor: colors.secondary }]}>
+                        <Text style={[styles.namePillText, { color: colors.background }]}>
+                          {editName.trim()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Category pill preview */}
+                    {parseCategoryAndUrl(editUrl).category && (
+                      <View style={[styles.categoryPill, styles.previewCategoryPill, { backgroundColor: colors.primary }]}>
+                        <Text style={[styles.categoryPillText, { color: colors.background }]}>
+                          {parseCategoryAndUrl(editUrl).category}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={[styles.modalActions, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={handleCloseModal}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton, { backgroundColor: colors.error }]}
+                onPress={handleDeleteVideo}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveVideo}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
-  </TouchableWithoutFeedback>
+        </Modal>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 

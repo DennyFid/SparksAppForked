@@ -1,4 +1,4 @@
-import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, Timestamp, addDoc, limit } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WisdomQuote } from '../sparks/GolfWisdomSpark/wisdomData';
 
@@ -10,7 +10,24 @@ export interface FirestoreWisdomPage {
     content: string;
     order: number;
     updatedAt: Timestamp;
+    contributor?: string;
+    createdAt?: Timestamp;
+    status?: string; // "Suggested", "Approved", "Rejected", etc.
 }
+
+/**
+ * Fetch all wisdom pages from Firestore
+ */
+// Firebase Config with fallbacks
+const firebaseConfig = {
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "sparkopedia-330f6.firebaseapp.com",
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "sparkopedia-330f6",
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "sparkopedia-330f6.firebasestorage.app",
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "229332029977",
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:229332029977:web:401c76f507f092c24a9088",
+    measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-K5YN3D4VQ6"
+};
 
 /**
  * Fetch all wisdom pages from Firestore
@@ -26,15 +43,6 @@ export const fetchWisdomPages = async (): Promise<WisdomQuote[]> => {
         let app;
         if (getApps().length === 0) {
             console.log('🔥 Initializing Firebase app...');
-            const firebaseConfig = {
-                apiKey: "AIzaSyD6FqXdcKlaKqQtOQQYv0Mg-R5Em95vTJM",
-                authDomain: "sparkopedia-330f6.firebaseapp.com",
-                projectId: "sparkopedia-330f6",
-                storageBucket: "sparkopedia-330f6.firebasestorage.app",
-                messagingSenderId: "229332029977",
-                appId: "1:229332029977:web:401c76f507f092c24a9088",
-                measurementId: "G-K5YN3D4VQ6"
-            };
             app = initializeApp(firebaseConfig);
         } else {
             console.log('🔥 Using existing Firebase app');
@@ -64,10 +72,11 @@ export const fetchWisdomPages = async (): Promise<WisdomQuote[]> => {
         querySnapshot.forEach((doc) => {
             if (doc.id !== '_metadata') {
                 const data = doc.data() as FirestoreWisdomPage;
-                console.log(`  - Document ${doc.id}: order=${data.order}, content="${data.content.substring(0, 30)}..."`);
+                console.log(`  - Document ${doc.id}: order=${data.order}, content="${data.content.substring(0, 30)}...", contributor=${data.contributor}`);
                 pages.push({
                     id: data.order, // Use order as the id for display
                     content: data.content,
+                    contributor: data.contributor || 'Tam O\'Shanter',
                 });
             }
         });
@@ -98,15 +107,6 @@ export const checkForUpdates = async (): Promise<boolean> => {
         // Get or initialize Firebase app
         let app;
         if (getApps().length === 0) {
-            const firebaseConfig = {
-                apiKey: "AIzaSyD6FqXdcKlaKqQtOQQYv0Mg-R5Em95vTJM",
-                authDomain: "sparkopedia-330f6.firebaseapp.com",
-                projectId: "sparkopedia-330f6",
-                storageBucket: "sparkopedia-330f6.firebasestorage.app",
-                messagingSenderId: "229332029977",
-                appId: "1:229332029977:web:401c76f507f092c24a9088",
-                measurementId: "G-K5YN3D4VQ6"
-            };
             app = initializeApp(firebaseConfig);
         } else {
             app = getApps()[0];
@@ -201,5 +201,67 @@ export const loadWisdomPages = async (): Promise<{
         console.error('Error loading wisdom pages:', error);
         // Return empty array if both cache and fetch fail
         return { pages: [], fromCache: false };
+    }
+};
+
+/**
+ * Submit a wisdom suggestion to Firestore
+ */
+export const submitWisdomSuggestion = async (suggestion: {
+    content: string;
+    contributor: string;
+}): Promise<void> => {
+    try {
+        console.log('📝 Submitting wisdom suggestion...');
+        const { initializeApp, getApps } = require('firebase/app');
+        const { getFirestore } = require('firebase/firestore');
+        const { getAuth, signInAnonymously } = require('firebase/auth');
+
+        // Get or initialize Firebase app
+        let app;
+        if (getApps().length === 0) {
+            console.log('🔥 Initializing Firebase app for suggestion...');
+            app = initializeApp(firebaseConfig);
+        } else {
+            app = getApps()[0];
+        }
+
+        // Sign in anonymously if not already signed in
+        const auth = getAuth(app);
+        if (!auth.currentUser) {
+            console.log('🔐 Signing in anonymously for suggestion...');
+            await signInAnonymously(auth);
+        }
+
+        const db = getFirestore(app);
+
+        // Get the highest order value
+        const pagesCollection = collection(db, COLLECTION_NAME);
+        const orderQuery = query(pagesCollection, orderBy('order', 'desc'), limit(1));
+        const orderSnapshot = await getDocs(orderQuery);
+
+        let nextOrder = 1;
+        if (!orderSnapshot.empty) {
+            const highestDoc = orderSnapshot.docs[0];
+            const data = highestDoc.data() as FirestoreWisdomPage;
+            nextOrder = (data.order || 0) + 1;
+        }
+
+        // Create the suggestion document
+        const suggestionData = {
+            content: suggestion.content,
+            contributor: suggestion.contributor,
+            order: nextOrder,
+            status: 'Suggested',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+        };
+
+        await addDoc(collection(db, COLLECTION_NAME), suggestionData);
+
+        console.log(`✅ Successfully submitted wisdom suggestion with order ${nextOrder}`);
+    } catch (error) {
+        console.error('❌ Error submitting wisdom suggestion:', error);
+        throw error;
     }
 };

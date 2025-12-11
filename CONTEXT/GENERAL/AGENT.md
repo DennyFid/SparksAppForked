@@ -1,212 +1,96 @@
-# SparksApp Codebase Overview
+# 🤖# Agent Instructions
 
-## 🏗️ **Architecture & Technology Stack**
+> [!WARNING]
+> **NEVER USE gRPC or native Firestore** in this React Native project.
+> It introduces complex dependency conflicts ("non-modular header" errors).
+> **ALWAYS use the Firebase Web SDK (JS SDK)** for Firestore.
 
-### **Core Technologies**
-- **React Native + Expo**: Cross-platform mobile development
-- **TypeScript**: Type-safe JavaScript for better development experience
-- **React Navigation**: Navigation system with tab and stack navigators
-- **Zustand**: Lightweight state management
-- **AsyncStorage**: Local data persistence
-- **Styled Components**: CSS-in-JS styling (minimal usage)
+ & Codebase Guide
 
-### **Key Dependencies**
-- `expo-notifications`: Push notifications and scheduling
-- `expo-speech`: Text-to-speech functionality
-- `expo-haptics`: Tactile feedback
-- `react-native-safe-area-context`: Handle device safe areas
+**READ THIS FIRST**: This document is your primary instruction manual for working on the SparksApp codebase. It defines the rules, patterns, and workflows you must follow to be effective.
 
-## 📁 **Project Structure**
+## 🎯 **How to Use This Document**
 
-```
-src/
-├── components/          # Reusable UI components
-│   ├── SparkRegistry.tsx   # Central spark registration
-│   └── BaseSpark.tsx       # Base spark component
-├── contexts/            # React context providers
-│   └── ThemeContext.tsx    # Dark/light theme management
-├── navigation/          # Navigation configuration
-│   └── AppNavigator.tsx    # Main navigation setup
-├── screens/            # Main application screens
-│   ├── SparkSelectionScreen.tsx  # "My Sparks" screen
-│   ├── MarketplaceScreen.tsx     # Available sparks browser
-│   ├── SettingsScreen.tsx        # App settings
-│   └── SparkScreen.tsx           # Individual spark renderer
-├── sparks/             # Individual spark implementations
-│   ├── FlashcardsSpark.tsx      # Spanish language learning
-│   ├── TodoSpark.tsx            # Task management
-│   ├── PackingListSpark.tsx     # Travel packing lists
-│   ├── SpinnerSpark.tsx         # Decision-making wheel
-│   └── BusinessSpark.tsx        # Business simulation game
-├── store/              # State management
-│   ├── index.ts             # Store exports
-│   ├── appStore.ts          # App-wide preferences
-│   └── sparkStore.ts        # Spark data and progress
-├── types/              # TypeScript definitions
-│   ├── navigation.ts        # Navigation type definitions
-│   └── spark.ts            # Spark interface definitions
-└── utils/              # Utility functions
-    ├── haptics.ts          # Haptic feedback wrapper
-    └── notifications.ts    # Notification service
-```
+*   **When to Read**: Read this at the **start of every session**. You do not need to be reminded in every prompt if you have this context.
+*   **How to Update**: If you discover new patterns, fix recurring issues, or change architecture, **update this file** to help your future self.
+*   **Refresh Command**: Run `cat CONTEXT/GENERAL/AGENT.md` if you need to refresh your memory on specific guidelines.
 
-## 🧩 **Core Architecture Concepts**
+---
 
-### **1. Spark System**
-The app is built around **"Sparks"** - self-contained mini-applications/activities:
+## 🏗️ **Core Architecture & Patterns**
 
-```typescript
-interface BaseSpark {
-  metadata: SparkMetadata;  // Title, description, icon, category
-  component: React.ComponentType<SparkProps>;
-}
-```
+### **1. The Spark Pattern**
+Everything is a "Spark". When adding a new feature, ask: "Is this a Spark?"
+*   **Location**: `src/sparks/`
+*   **Registration**: `src/components/SparkRegistry.tsx`
+*   **Interface**: Must implement `SparkProps` (see `src/types/spark.ts`)
+*   **State**: Use `useSparkStore` for persistence. **Do not use local state for data that should persist.**
 
-**SparkRegistry.tsx** acts as the central registry where all sparks are registered and can be discovered.
+### **2. Navigation**
+*   **Tab Bar Hiding**: The tab bar automatically hides when entering a Spark. Do not fight this behavior.
+*   **Custom Navigation**: Sparks render their own navigation headers.
+*   **Back Handling**: Use the provided `onClose` or navigation props to return to the list.
 
-### **2. Navigation Architecture**
-```
-TabNavigator (AppNavigator)
-├── MySparks Tab → MySparksStack
-│   ├── MySparksList (SparkSelectionScreen)
-│   └── Spark (SparkScreen) → Renders individual spark
-├── Marketplace Tab → MarketplaceStack  
-│   ├── MarketplaceList (MarketplaceScreen)
-│   └── Spark (SparkScreen) → Same spark renderer
-└── Settings Tab (SettingsScreen)
-```
+### **3. Settings Design (CRITICAL)**
+**ALWAYS** follow the design patterns in `CONTEXT/GENERAL/SETTINGSDESIGN.md`.
+*   **Components**: Use `SettingsSection`, `SettingsRow`, `SettingsToggle`, `SettingsButton` from `src/components/SettingsComponents.tsx`.
+*   **Feedback**: Every spark MUST have a feedback section.
+*   **Consistency**: Do not invent new settings UI. Use the standard components.
 
-**Key Feature**: Custom navigation hiding - tab bar disappears when inside sparks for immersive experience.
+### **4. Notifications**
+*   **Service**: Use `FeedbackNotificationService` for feedback-related notifications.
+*   **Logic**: We use **manual clearing** for notifications. Do not auto-clear notifications on view. Users must click "Mark as Read".
+*   **Reference**: See `CONTEXT/GENERAL/NOTIFICATIONS.md` for full details.
 
-### **3. State Management Pattern**
-**Zustand stores** handle different data domains:
+---
 
-- **`appStore.ts`**: User preferences (theme, notifications, haptics)
-- **`sparkStore.ts`**: Spark data, user progress, collections
+## 🛠️ **Deployment & Builds**
 
-```typescript
-// Spark-specific data storage pattern
-const { getSparkData, setSparkData } = useSparkStore();
-const savedData = getSparkData('spark-id');
-setSparkData('spark-id', { user: 'data' });
-```
+### **1. Local Development**
+*   **Command**: `npx expo start`
+*   **Simulator**: `npx expo run:ios` (requires Xcode)
 
-### **4. Spark Implementation Pattern**
-Each spark follows a consistent interface:
+### **2. Production Builds**
+*   **Reference**: `CONTEXT/GENERAL/LOCAL_IOS_PRODUCTION_BUILD.md`
+*   **Key Command**: `npx expo run:ios --configuration Release --device`
+*   **Troubleshooting**: If build fails, check `CONTEXT/GENERAL/DEPLOYMENT.md`.
 
-```typescript
-interface SparkProps {
-  showSettings?: boolean;      // Settings modal control
-  onCloseSettings?: () => void;
-  onStateChange?: (state: any) => void;
-  onComplete?: (result: any) => void;
-}
-```
+---
 
-**Sparks are responsible for**:
-- Their own UI and logic
-- Data persistence via `useSparkStore`
-- Settings management
-- Progress tracking
-- Completion callbacks
+## ⚡ **Productivity & Best Practices**
 
-## 🔄 **Data Flow & Key Interactions**
+### **1. Code Suggestions**
+*   **Be Complete**: When suggesting code, provide the **full context** or clear markers. Don't leave ambiguous `...` in critical logic.
+*   **Imports**: Check imports carefully. We use absolute paths or consistent relative paths.
+*   **Types**: We are strict about TypeScript. Define interfaces for your data.
 
-### **Spark Lifecycle**
-1. **Discovery**: User browses sparks in Marketplace
-2. **Addition**: User adds spark to their collection
-3. **Launch**: User opens spark from "My Sparks"
-4. **Execution**: Spark renders with custom navigation
-5. **Persistence**: Spark saves progress via store
-6. **Completion**: Optional completion callback triggers
+### **2. Common Tasks**
+*   **Adding a Spark**:
+    1.  Create `src/sparks/MySpark.tsx`
+    2.  Add to `src/components/SparkRegistry.tsx`
+    3.  Add type definition in `src/types/spark.ts`
+    4.  **Initial Rating**: Set `rating: 4.5` in the metadata.
+    5.  **Update Summary**: Add the new spark to `CONTEXT/GENERAL/SUMMARY.md` in the appropriate category with a brief description.
+*   **Adding Assets**: Put images in `assets/` and run `npx expo install` if adding new native dependencies.
 
-### **Navigation Flow**
-```
-User in TabNavigator → Selects Spark → SparkScreen
-→ SparkScreen renders spark component → Custom navigation appears
-→ Tab bar hides → Immersive spark experience
-→ User exits → Returns to tab navigation
-```
+### **3. Context Management**
+*   **Archive**: Old plans and docs go to `CONTEXT/ARCHIVE/`. Keep the active context clean.
+*   **Planned Sparks**: Future ideas go to `CONTEXT/PLANNEDSPARKS/`.
 
-### **Theme System**
-- **ThemeContext** provides colors and theme state
-- **Automatic switching** between light/dark modes
-- **Safe area handling** for modern iOS devices (Dynamic Island)
+---
 
-## 📱 **Current Sparks Overview**
+## 🚨 **Known Issues & "Gotchas"**
 
-| Spark | Purpose | Key Features |
-|-------|---------|--------------|
-| **FlashcardsSpark** | Spanish learning | 50 travel phrases, TTS, session tracking, randomization |
-| **TodoSpark** | Task management | Due dates, completion tracking, relative date display |
-| **PackingListSpark** | Travel packing | Customizable items, progress tracking |
-| **SpinnerSpark** | Decision making | Customizable wheel with options |
-| **BusinessSpark** | Business simulation | Strategic decision-making game |
+*   **Firebase Keys**: Never hardcode API keys. Use `process.env.EXPO_PUBLIC_...`.
+*   **Expo Go vs Dev Build**: Some features (Notifications, Background Tasks) **do not work** in Expo Go. Always verify if a Dev Build is needed.
+*   **Directory Check**: Always ensure you are in the root (`/Users/mattdyor/SparksApp`) before running commands.
 
-## 🔧 **Key Technical Features**
+---
 
-### **Notifications System**
-- **Daily reminders** at 8 AM to check new sparks
-- **Expo Notifications** with proper permissions
-- **Cross-platform** scheduling (iOS/Android)
-- **Settings toggle** for user control
+## 📂 **Key Documentation References**
 
-### **Audio & Haptics**
-- **Text-to-speech** for Spanish pronunciation (FlashcardsSpark)
-- **Haptic feedback** throughout the app for better UX
-- **Audio settings** user can control
-
-### **Data Persistence**
-- **AsyncStorage** via Zustand persistence
-- **Per-spark data** storage pattern
-- **Settings and progress** automatically saved
-- **Export functionality** (basic implementation)
-
-## 🚀 **Getting Started as a New Developer**
-
-### **1. Key Entry Points**
-- **App.tsx**: Application root with theme and navigation setup
-- **AppNavigator.tsx**: Main navigation structure
-- **SparkRegistry.tsx**: Add new sparks here
-
-### **2. Adding a New Spark**
-1. Create component in `src/sparks/NewSpark.tsx`
-2. Implement `SparkProps` interface
-3. Add to `SparkRegistry.tsx`
-4. Test via Marketplace
-
-### **3. Common Patterns**
-- **State**: Use `useSparkStore()` for data persistence
-- **Styling**: Follow existing `StyleSheet.create()` patterns with `colors` from theme
-- **Navigation**: Sparks auto-hide tab bar, use provided navigation props
-- **Feedback**: Use `HapticFeedback.light()` for interactions
-
-### **4. Development Commands**
-```bash
-npm start          # Start development server
-npx expo start     # Expo development server
-npx expo start --ios    # iOS simulator
-npx expo start --android # Android emulator
-```
-
-## 📋 **Current Status & Known Issues**
-
-
-
-### **Important Development Reminders**
-- ⚠️ **ALWAYS CHECK CURRENT DIRECTORY**: When encountering `ConfigError: The expected package.json path: /path/to/ios/package.json does not exist`, immediately run `pwd` to verify you're in the correct directory (`/Users/mattdyor/SparksApp`). This error typically means you're in the wrong folder (often the `ios/` subdirectory instead of the project root).
-
-### **Architecture Strengths**
-- **Modular spark system** - easy to add new functionality
-- **Consistent data patterns** - predictable state management
-- **Cross-platform** - single codebase for iOS/Android
-- **Type safety** - TypeScript throughout
-
-### **Areas for Future Enhancement**
-- **Refactor Sparks** - Reduce duplicated code and increase use of Spark Components (e.g., shared notification logic like Tee Time Timer/Minute Minder, sortable lists, camera interop)
-- **Testing framework** - No tests currently implemented
-- **Performance optimization** - Large spark registry could be lazy-loaded
-- **Offline capability** - Currently requires online for notifications
-- **Analytics** - No usage tracking implemented
-
-This architecture provides a solid foundation for a mini-app ecosystem where each "spark" is a focused, useful tool or activity for users.
+*   **Settings Design**: `CONTEXT/GENERAL/SETTINGSDESIGN.md`
+*   **Deployment**: `CONTEXT/GENERAL/DEPLOYMENT.md`
+*   **iOS Build**: `CONTEXT/GENERAL/LOCAL_IOS_PRODUCTION_BUILD.md`
+*   **Notifications**: `CONTEXT/GENERAL/NOTIFICATIONS.md`
+*   **Testing**: `CONTEXT/GENERAL/TESTPLAN.md`

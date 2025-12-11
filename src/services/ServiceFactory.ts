@@ -1,11 +1,11 @@
-import { 
-  User, 
-  SparkFeedback, 
-  AnalyticsEvent, 
-  FeatureFlag, 
-  AggregatedRating, 
+import {
+  User,
+  SparkFeedback,
+  AnalyticsEvent,
+  FeatureFlag,
+  AggregatedRating,
   AnalyticsData,
-  SessionData 
+  SessionData
 } from '../types/analytics';
 import { MockFirebaseService } from './MockFirebaseService';
 import { MockAnalyticsService } from './MockAnalyticsService';
@@ -51,7 +51,7 @@ export class ServiceFactory {
       try {
         await WebFirebaseService.initialize();
         this.firebaseServiceInitialized = true;
-        
+
         // Wait a bit to ensure Firebase is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
@@ -65,28 +65,34 @@ export class ServiceFactory {
       try {
         // First ensure Firebase is initialized
         await this.ensureFirebaseInitialized();
-        
+
         // Get the Firestore database from WebFirebaseService
         const { getFirestore } = require('firebase/firestore');
         const { initializeApp, getApps } = require('firebase/app');
-        
+
         // Initialize Firebase if not already done
         let app;
         if (getApps().length === 0) {
           const firebaseConfig = {
-            apiKey: "AIzaSyD6FqXdcKlaKqQtOQQYv0Mg-R5Em95vTJM",
-            authDomain: "sparkopedia-330f6.firebaseapp.com",
-            projectId: "sparkopedia-330f6",
-            storageBucket: "sparkopedia-330f6.firebasestorage.app",
-            messagingSenderId: "229332029977",
-            appId: "1:229332029977:web:401c76f507f092c24a9088",
-            measurementId: "G-K5YN3D4VQ6"
+            apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+            authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+            projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+            storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+            appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+            measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
           };
+          
+          // Validate Firebase config
+          if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+            console.warn('⚠️ Firebase configuration is missing. Please set EXPO_PUBLIC_FIREBASE_* environment variables.');
+          }
+          
           app = initializeApp(firebaseConfig);
         } else {
           app = getApps()[0];
         }
-        
+
         const db = getFirestore(app);
         await SimpleAnalyticsService.initialize(db);
         this.analyticsServiceInitialized = true;

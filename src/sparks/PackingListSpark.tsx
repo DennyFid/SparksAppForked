@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert 
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { StyleTokens } from '../styles/StyleTokens';
 import {
   SettingsContainer,
   SettingsScrollView,
@@ -47,7 +49,16 @@ const PackingListSettings: React.FC<{
 }> = ({ items, onSave, onClose }) => {
   const { colors } = useTheme();
   const [packingItems, setPackingItems] = useState<PackingItem[]>(items);
+  const [countInputs, setCountInputs] = useState<Record<number, string>>(
+    items.reduce((acc, item) => ({ ...acc, [item.id]: item.count.toString() }), {} as Record<number, string>)
+  );
   const [newItem, setNewItem] = useState<NewItem>({ item: '', count: '1' });
+
+  // Sync countInputs when items prop changes
+  useEffect(() => {
+    setPackingItems(items);
+    setCountInputs(items.reduce((acc, item) => ({ ...acc, [item.id]: item.count.toString() }), {} as Record<number, string>));
+  }, [items]);
 
   const addNewItem = () => {
     if (!newItem.item.trim()) {
@@ -61,14 +72,16 @@ const PackingListSettings: React.FC<{
       return;
     }
 
+    const newId = Math.max(...packingItems.map(i => i.id), 0) + 1;
     const newPackingItem: PackingItem = {
-      id: Math.max(...packingItems.map(i => i.id), 0) + 1,
+      id: newId,
       item: newItem.item.trim(),
       count: count,
       packed: false,
     };
 
     setPackingItems([...packingItems, newPackingItem]);
+    setCountInputs({ ...countInputs, [newId]: count.toString() });
     setNewItem({ item: '', count: '1' });
     HapticFeedback.success();
   };
@@ -79,25 +92,123 @@ const PackingListSettings: React.FC<{
       return;
     }
     setPackingItems(packingItems.filter(item => item.id !== id));
+    const updatedCountInputs = { ...countInputs };
+    delete updatedCountInputs[id];
+    setCountInputs(updatedCountInputs);
     HapticFeedback.medium();
   };
 
   const updateItem = (id: number, field: 'item' | 'count', value: string) => {
-    setPackingItems(packingItems.map(item => {
-      if (item.id === id) {
-        if (field === 'count') {
-          const count = parseInt(value) || 1;
-          return { ...item, count: Math.max(1, count) };
-        } else {
-          return { ...item, item: value };
+    if (field === 'count') {
+      // Update the string input value (allow empty)
+      setCountInputs({ ...countInputs, [id]: value });
+      
+      // Only validate and update the actual count if we have a valid number
+      if (value.trim() !== '') {
+        const parsedValue = parseInt(value);
+        if (!isNaN(parsedValue) && parsedValue > 0) {
+          const itemToUpdate = packingItems.find(item => item.id === id);
+          if (!itemToUpdate) return;
+
+          const newCount = parsedValue;
+          const originalCount = itemToUpdate.count;
+
+          // Only prompt if original count was not 1 and we're changing to a different value
+          if (originalCount !== 1 && newCount !== originalCount) {
+            // Find all items with the same original count (excluding the current item)
+            const itemsWithSameCount = packingItems.filter(
+              item => item.id !== id && item.count === originalCount
+            );
+
+            if (itemsWithSameCount.length > 0) {
+              const itemNames = itemsWithSameCount.map(item => item.item).join(', ');
+              Alert.alert(
+                'Update Similar Items?',
+                `Do you want to change the quantity to ${newCount} for all items that currently have ${originalCount}?\n\nItems: ${itemNames}`,
+                [
+                  {
+                    text: 'No',
+                    style: 'cancel',
+                    onPress: () => {
+                      // Just update the one item
+                      setPackingItems(packingItems.map(item => {
+                        if (item.id === id) {
+                          return { ...item, count: newCount };
+                        }
+                        return item;
+                      }));
+                      setCountInputs({ ...countInputs, [id]: newCount.toString() });
+                    }
+                  },
+                  {
+                    text: 'Yes',
+                    onPress: () => {
+                      // Update all items with the same original count
+                      const updatedItems = packingItems.map(item => {
+                        if (item.count === originalCount) {
+                          return { ...item, count: newCount };
+                        }
+                        return item;
+                      });
+                      setPackingItems(updatedItems);
+                      // Update all count inputs for items that were changed
+                      const updatedCountInputs = { ...countInputs };
+                      updatedItems.forEach(item => {
+                        if (item.count === newCount) {
+                          updatedCountInputs[item.id] = newCount.toString();
+                        }
+                      });
+                      setCountInputs(updatedCountInputs);
+                      HapticFeedback.success();
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+          }
+
+          // Update just the one item (no prompt needed)
+          setPackingItems(packingItems.map(item => {
+            if (item.id === id) {
+              return { ...item, count: newCount };
+            }
+            return item;
+          }));
         }
       }
-      return item;
-    }));
+    } else {
+      // Update item name
+      setPackingItems(packingItems.map(item => {
+        if (item.id === id) {
+          return { ...item, item: value };
+        }
+        return item;
+      }));
+    }
   };
 
   const saveSettings = () => {
-    onSave(packingItems);
+    // Validate all count inputs before saving
+    const validatedItems = packingItems.map(item => {
+      const countInput = countInputs[item.id] || '';
+      const parsedCount = parseInt(countInput);
+      const validCount = (!isNaN(parsedCount) && parsedCount > 0) ? parsedCount : 1;
+      return { ...item, count: validCount };
+    });
+
+    // Check for any invalid counts and show error
+    const invalidItems = validatedItems.filter((item, index) => {
+      const countInput = countInputs[item.id] || '';
+      return countInput.trim() !== '' && (isNaN(parseInt(countInput)) || parseInt(countInput) < 1);
+    });
+
+    if (invalidItems.length > 0) {
+      Alert.alert('Invalid Quantities', 'Please enter valid quantities (1 or greater) for all items.');
+      return;
+    }
+
+    onSave(validatedItems);
     onClose();
   };
 
@@ -108,7 +219,7 @@ const PackingListSettings: React.FC<{
       marginBottom: 15,
     },
     countInput: {
-      width: 80,
+      width: 100,
       backgroundColor: colors.background,
       borderColor: colors.border,
       borderWidth: 1,
@@ -128,7 +239,7 @@ const PackingListSettings: React.FC<{
       marginRight: 10,
     },
     countInputInline: {
-      width: 60,
+      width: 80,
       fontSize: 16,
       color: colors.text,
       borderBottomWidth: 1,
@@ -158,7 +269,7 @@ const PackingListSettings: React.FC<{
             />
             <TextInput
               style={styles.countInput}
-              placeholder="1"
+              placeholder="2"
               placeholderTextColor={colors.textSecondary}
               value={newItem.count}
               onChangeText={(text) => setNewItem({ ...newItem, count: text })}
@@ -178,9 +289,11 @@ const PackingListSettings: React.FC<{
               />
               <TextInput
                 style={styles.countInputInline}
-                value={item.count.toString()}
+                value={countInputs[item.id] ?? item.count.toString()}
                 onChangeText={(text) => updateItem(item.id, 'count', text)}
                 keyboardType="numeric"
+                placeholder="1"
+                placeholderTextColor={colors.textSecondary}
               />
               <SettingsRemoveButton onPress={() => removeItem(item.id)} />
             </SettingsItem>
@@ -200,15 +313,15 @@ interface PackingListSparkProps {
   onComplete?: (result: any) => void;
 }
 
-export const PackingListSpark: React.FC<PackingListSparkProps> = ({ 
+export const PackingListSpark: React.FC<PackingListSparkProps> = ({
   showSettings = false,
   onCloseSettings,
   onStateChange,
-  onComplete 
+  onComplete
 }) => {
   const { getSparkData, setSparkData } = useSparkStore();
   const { colors } = useTheme();
-  
+
   const [items, setItems] = useState<PackingItem[]>(defaultItems);
 
   // Load saved data on mount
@@ -252,31 +365,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
   const totalCount = items.length;
   const progressPercentage = totalCount > 0 ? (packedCount / totalCount) * 100 : 0;
 
+  const commonStyles = createCommonStyles(colors);
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 20,
-    },
+    ...commonStyles,
     header: {
       alignItems: 'center',
-      marginTop: 20,
-      marginBottom: 20,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: 20,
+      marginTop: StyleTokens.spacing.xl,
+      marginBottom: StyleTokens.spacing.xl,
     },
     progressContainer: {
       alignItems: 'center',
@@ -306,21 +401,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       marginTop: 8,
     },
     listContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      ...commonStyles.card,
     },
     listTitle: {
-      fontSize: 20,
+      fontSize: StyleTokens.fontSize.xxl,
       fontWeight: '600',
       color: colors.text,
-      marginBottom: 16,
+      marginBottom: StyleTokens.spacing.lg,
       textAlign: 'center',
     },
     listItem: {
@@ -401,7 +488,7 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       <PackingListSettings
         items={items}
         onSave={saveCustomItems}
-        onClose={onCloseSettings}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }
@@ -411,14 +498,14 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       <View style={styles.header}>
         <Text style={styles.title}>🎒 Packing List</Text>
         <Text style={styles.subtitle}>Tap items to mark as packed</Text>
-        
+
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
             {packedCount} of {totalCount} items packed
           </Text>
           <View style={styles.progressBar}>
-            <View 
-              style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
+            <View
+              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
             />
           </View>
           <Text style={styles.progressLabel}>
@@ -435,16 +522,16 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
             style={[styles.listItem, index === items.length - 1 && styles.lastItem]}
             onPress={() => toggleItemPacked(item.id)}
           >
-            <Text 
+            <Text
               style={[
-                styles.itemText, 
+                styles.itemText,
                 item.packed && styles.itemTextPacked
               ]}
             >
               {item.item}
             </Text>
             <View style={[
-              styles.countBadge, 
+              styles.countBadge,
               item.packed && styles.countBadgePacked
             ]}>
               <Text style={styles.countText}>{item.count}</Text>
@@ -457,13 +544,13 @@ export const PackingListSpark: React.FC<PackingListSparkProps> = ({
       </View>
 
       <View style={styles.bottomButtons}>
-        <TouchableOpacity 
-          style={styles.uncheckAllButton} 
+        <TouchableOpacity
+          style={styles.uncheckAllButton}
           onPress={uncheckAll}
         >
           <Text style={styles.uncheckAllButtonText}>Uncheck All Items</Text>
         </TouchableOpacity>
-        
+
       </View>
     </ScrollView>
   );

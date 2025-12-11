@@ -24,7 +24,7 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
     try {
       setIsLoading(true);
       const allFeedback = await AdminResponseService.getAllFeedback();
-      
+
       // Mark all unread reviews as viewed when modal opens
       const unreadReviews = allFeedback.filter(
         item => (!item.comment || item.comment.trim() === '') && item.rating && !item.viewedByAdmin && item.id
@@ -38,21 +38,13 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
           await Promise.all(unreadIds.map(id => AdminResponseService.markFeedbackAsViewed(id)));
         }
       }
-      
+
       // Filter to show only ratings without comments (pure reviews)
       const ratingsOnly = allFeedback.filter(
         item => (!item.comment || item.comment.trim() === '') && item.rating
       );
-      // Sort: unread first, then by rating (lowest first), then by date (newest first)
+      // Sort: by date (newest first)
       ratingsOnly.sort((a, b) => {
-        const aUnread = !a.viewedByAdmin;
-        const bUnread = !b.viewedByAdmin;
-        if (aUnread !== bUnread) {
-          return aUnread ? -1 : 1; // Unread first
-        }
-        if (a.rating !== b.rating) {
-          return a.rating - b.rating; // Lower ratings first
-        }
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Newest first
@@ -70,7 +62,7 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
     if (!dateValue) return 'Unknown date';
     try {
       let date: Date;
-      
+
       // Handle Firestore Timestamp objects
       if (dateValue && typeof dateValue.toDate === 'function') {
         date = dateValue.toDate();
@@ -91,16 +83,16 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
       else {
         date = new Date(dateValue);
       }
-      
+
       // Validate the date
       if (!date || isNaN(date.getTime())) {
         return 'Invalid date';
       }
-      
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
     } catch (error) {
       console.error('Error formatting date:', error, 'dateValue:', dateValue);
@@ -214,8 +206,8 @@ export const AdminReviewsManager: React.FC<AdminReviewsManagerProps> = ({ visibl
 
         <ScrollView style={styles.content}>
           {reviews.map((item) => (
-            <View 
-              key={item.id} 
+            <View
+              key={item.id}
               style={[
                 styles.reviewItem,
                 !item.viewedByAdmin && { borderLeftWidth: 4, borderLeftColor: colors.error }

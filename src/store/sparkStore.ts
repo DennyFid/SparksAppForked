@@ -1,6 +1,9 @@
+
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SparkMetadata } from '../types/spark';
+import { sparkRegistry } from '../components/SparkRegistry';
 
 interface SparkProgress {
   sparkId: string;
@@ -16,23 +19,23 @@ interface SparkState {
   sparkProgress: Record<string, SparkProgress>;
   updateSparkProgress: (sparkId: string, progress: Partial<SparkProgress>) => void;
   getSparkProgress: (sparkId: string) => SparkProgress | undefined;
-  
+
   // Spark data persistence
   sparkData: Record<string, Record<string, any>>;
   setSparkData: (sparkId: string, data: Record<string, any>) => void;
   getSparkData: (sparkId: string) => Record<string, any>;
-  
+
   // User's spark collection
   userSparkIds: string[];
   addSparkToUser: (sparkId: string) => void;
   removeSparkFromUser: (sparkId: string) => void;
   getUserSparks: () => string[];
   isUserSpark: (sparkId: string) => boolean;
-  
+
   // Custom ordering
   reorderUserSparks: (fromIndex: number, toIndex: number) => void;
   moveSparkToPosition: (sparkId: string, newPosition: number) => void;
-  
+
   // Favorites
   favoriteSparkIds: string[];
   addToFavorites: (sparkId: string) => void;
@@ -48,7 +51,7 @@ export const useSparkStore = create<SparkState>()(
       sparkData: {},
       userSparkIds: [], // No default sparks - user starts with empty collection
       favoriteSparkIds: [],
-      
+
       // Actions
       updateSparkProgress: (sparkId, progress) =>
         set((state) => {
@@ -57,7 +60,7 @@ export const useSparkStore = create<SparkState>()(
             lastPlayed: new Date(),
             timesPlayed: 0,
           };
-          
+
           return {
             sparkProgress: {
               ...state.sparkProgress,
@@ -70,9 +73,9 @@ export const useSparkStore = create<SparkState>()(
             },
           };
         }),
-      
+
       getSparkProgress: (sparkId) => get().sparkProgress[sparkId],
-      
+
       setSparkData: (sparkId, data) =>
         set((state) => ({
           sparkData: {
@@ -80,15 +83,15 @@ export const useSparkStore = create<SparkState>()(
             [sparkId]: { ...(state.sparkData[sparkId] || {}), ...data },
           },
         })),
-      
+
       getSparkData: (sparkId) => get().sparkData[sparkId] || {},
-      
+
       // User spark collection methods
       addSparkToUser: (sparkId) => {
         set((state) => ({
           userSparkIds: [...new Set([...state.userSparkIds, sparkId])],
         }));
-        
+
         // Track analytics
         import('../services/ServiceFactory').then(({ ServiceFactory }) => {
           ServiceFactory.ensureAnalyticsInitialized().then(() => {
@@ -100,12 +103,12 @@ export const useSparkStore = create<SparkState>()(
           });
         });
       },
-      
+
       removeSparkFromUser: (sparkId) => {
         set((state) => ({
           userSparkIds: state.userSparkIds.filter(id => id !== sparkId),
         }));
-        
+
         // Track analytics
         import('../services/ServiceFactory').then(({ ServiceFactory }) => {
           ServiceFactory.ensureAnalyticsInitialized().then(() => {
@@ -117,11 +120,11 @@ export const useSparkStore = create<SparkState>()(
           });
         });
       },
-      
+
       getUserSparks: () => get().userSparkIds,
-      
+
       isUserSpark: (sparkId) => get().userSparkIds.includes(sparkId),
-      
+
       // Custom ordering methods
       reorderUserSparks: (fromIndex, toIndex) =>
         set((state) => {
@@ -130,28 +133,28 @@ export const useSparkStore = create<SparkState>()(
           newUserSparkIds.splice(toIndex, 0, movedItem);
           return { userSparkIds: newUserSparkIds };
         }),
-      
+
       moveSparkToPosition: (sparkId, newPosition) =>
         set((state) => {
           const currentIndex = state.userSparkIds.indexOf(sparkId);
           if (currentIndex === -1) return state;
-          
+
           const newUserSparkIds = [...state.userSparkIds];
           const [movedItem] = newUserSparkIds.splice(currentIndex, 1);
           newUserSparkIds.splice(newPosition, 0, movedItem);
           return { userSparkIds: newUserSparkIds };
         }),
-      
+
       addToFavorites: (sparkId) =>
         set((state) => ({
           favoriteSparkIds: [...new Set([...state.favoriteSparkIds, sparkId])],
         })),
-      
+
       removeFromFavorites: (sparkId) =>
         set((state) => ({
           favoriteSparkIds: state.favoriteSparkIds.filter(id => id !== sparkId),
         })),
-      
+
       isFavorite: (sparkId) => get().favoriteSparkIds.includes(sparkId),
     }),
     {

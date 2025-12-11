@@ -146,7 +146,7 @@ const SoundboardSettings: React.FC<{
         const status = await sound.getStatusAsync();
         duration = (status as any).durationMillis ? ((status as any).durationMillis / 1000) : 0;
         await sound.unloadAsync();
-      } catch {}
+      } catch { }
 
       const newChip: SoundChip = {
         id,
@@ -240,9 +240,9 @@ const SoundboardSettings: React.FC<{
         <SettingsSection title="Import">
           <View style={{ padding: 16 }}>
             <SettingsButton title="Import" onPress={importAudioFile} />
-            <SettingsText variant="caption" style={{ marginTop: 8 }}>
-              Uses the system file picker. To import an emailed file, save the attachment to Files first, then choose it here.
-            </SettingsText>
+            <View style={{ paddingTop: 8 }}>
+              <SettingsText variant="caption">Tap a name to edit, then use Save below.</SettingsText>
+            </View>
           </View>
         </SettingsSection>
 
@@ -598,11 +598,11 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     try {
       const { category, displayText } = parseTaskText(newSoundName.trim());
       const id = Date.now().toString();
-      
+
       // Create soundboard directory for better organization
       const soundboardDir = `${FileSystem.documentDirectory}soundboard/`;
       await FileSystem.makeDirectoryAsync(soundboardDir, { intermediates: true });
-      
+
       const fileName = `sound_${Date.now()}_${id}.m4a`;
       const newPath = `${soundboardDir}${fileName}`;
 
@@ -772,7 +772,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       const soundboardDir = `${FileSystem.documentDirectory}soundboard/`;
       const dirInfo = await FileSystem.getInfoAsync(soundboardDir);
       console.log('Soundboard directory exists:', dirInfo.exists);
-      
+
       if (dirInfo.exists) {
         const files = await FileSystem.readDirectoryAsync(soundboardDir);
         console.log('Soundboard files count:', files.length);
@@ -1133,7 +1133,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       <SoundboardSettings
         soundChips={soundChips}
         onSave={saveSoundChips}
-        onClose={onCloseSettings || (() => {})}
+        onClose={onCloseSettings || (() => { })}
       />
     );
   }

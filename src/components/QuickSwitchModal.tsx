@@ -55,12 +55,12 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
   const handleSelectSpark = (sparkId: string) => {
     console.log('QuickSwitchModal: Selecting spark ID:', sparkId);
     console.log('QuickSwitchModal: Available recent sparks:', recentSparks);
-    
+
     if (!sparkId) {
       console.error('QuickSwitchModal: Invalid sparkId:', sparkId);
       return;
     }
-    
+
     HapticFeedback.light();
     onSelectSpark(sparkId);
     onClose();
@@ -82,21 +82,41 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
       justifyContent: 'flex-end',
     },
     modalContent: {
+      maxHeight: height * 0.9,
+      minHeight: height * 0.6,
+    },
+    card: {
       backgroundColor: colors.surface,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
-      maxHeight: height * 0.75, // Increased from 0.6 to 0.75 for more space
-      minHeight: height * 0.4, // Added minimum height
       paddingBottom: 20,
+      flex: 1,
     },
-    handle: {
-      width: 40,
-      height: 4,
-      backgroundColor: colors.border,
-      borderRadius: 2,
+    closePill: {
       alignSelf: 'center',
-      marginTop: 12,
-      marginBottom: 20,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 20,
+      marginBottom: 16,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    closePillText: {
+      color: colors.text,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    headerContainer: {
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      marginTop: 20,
     },
     title: {
       fontSize: 20,
@@ -104,7 +124,6 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
       color: colors.text,
       textAlign: 'center',
       marginBottom: 20,
-      paddingHorizontal: 20,
     },
     sparkList: {
       paddingHorizontal: 20,
@@ -210,7 +229,7 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
           activeOpacity={1}
           onPress={onClose}
         />
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalContent,
             {
@@ -218,69 +237,85 @@ export const QuickSwitchModal: React.FC<QuickSwitchModalProps> = ({
             }
           ]}
         >
-          <View style={styles.handle} />
-          <Text style={styles.title}>∞ Quick Switch</Text>
-          
-          {availableSparks.length > 0 ? (
-            <ScrollView style={styles.sparkList} showsVerticalScrollIndicator={false}>
-              {availableSparks.map((spark, index) => (
+          <TouchableOpacity
+            style={styles.closePill}
+            onPress={() => {
+              HapticFeedback.light();
+              onClose();
+            }}
+          >
+            <Text style={styles.closePillText}>Close ✕</Text>
+          </TouchableOpacity>
+
+          <View style={styles.card}>
+            <View style={styles.headerContainer}>
+              <Text style={styles.title}>∞ Quick Switch</Text>
+            </View>
+
+            {availableSparks.length > 0 ? (
+              <ScrollView style={styles.sparkList} showsVerticalScrollIndicator={false}>
+                {availableSparks.map((spark, index) => {
+                  if (!spark || !spark.metadata) return null;
+                  return (
+                    <TouchableOpacity
+                      key={spark.metadata.id}
+                      style={styles.sparkItem}
+                      onPress={() => handleSelectSpark(spark.metadata.id)}
+                    >
+                      <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                      <View style={styles.sparkInfo}>
+                        <Text style={styles.sparkTitle}>{spark.metadata.title}</Text>
+                        <Text style={styles.sparkDescription}>
+                          {spark.metadata.description}
+                        </Text>
+                      </View>
+                      {index === 0 && (
+                        <View style={styles.recentBadge}>
+                          <Text style={styles.recentBadgeText}>Recent</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* My Sparks Link */}
                 <TouchableOpacity
-                  key={spark.metadata.id}
-                  style={styles.sparkItem}
-                  onPress={() => handleSelectSpark(spark.metadata.id)}
+                  style={styles.mySparksItem}
+                  onPress={handleMySparks}
                 >
-                  <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                  <Text style={styles.mySparksIcon}>⚡️</Text>
                   <View style={styles.sparkInfo}>
-                    <Text style={styles.sparkTitle}>{spark.metadata.title}</Text>
-                    <Text style={styles.sparkDescription}>
-                      {spark.metadata.description}
+                    <Text style={styles.mySparksTitle}>My Sparks</Text>
+                    <Text style={styles.mySparksDescription}>
+                      Browse all available sparks
                     </Text>
                   </View>
-                  {index === 0 && (
-                    <View style={styles.recentBadge}>
-                      <Text style={styles.recentBadgeText}>Recent</Text>
-                    </View>
-                  )}
+                  <Text style={styles.mySparksArrow}>→</Text>
                 </TouchableOpacity>
-              ))}
-              
-              {/* My Sparks Link */}
-              <TouchableOpacity
-                style={styles.mySparksItem}
-                onPress={handleMySparks}
-              >
-                <Text style={styles.mySparksIcon}>⚡️</Text>
-                <View style={styles.sparkInfo}>
-                  <Text style={styles.mySparksTitle}>My Sparks</Text>
-                  <Text style={styles.mySparksDescription}>
-                    Browse all available sparks
-                  </Text>
-                </View>
-                <Text style={styles.mySparksArrow}>→</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                No recent sparks to switch to
-              </Text>
-              
-              {/* My Sparks Link for empty state */}
-              <TouchableOpacity
-                style={styles.mySparksItem}
-                onPress={handleMySparks}
-              >
-                <Text style={styles.mySparksIcon}>⚡️</Text>
-                <View style={styles.sparkInfo}>
-                  <Text style={styles.mySparksTitle}>My Sparks</Text>
-                  <Text style={styles.mySparksDescription}>
-                    Browse all available sparks
-                  </Text>
-                </View>
-                <Text style={styles.mySparksArrow}>→</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>
+                  No recent sparks to switch to
+                </Text>
+
+                {/* My Sparks Link for empty state */}
+                <TouchableOpacity
+                  style={styles.mySparksItem}
+                  onPress={handleMySparks}
+                >
+                  <Text style={styles.mySparksIcon}>⚡️</Text>
+                  <View style={styles.sparkInfo}>
+                    <Text style={styles.mySparksTitle}>My Sparks</Text>
+                    <Text style={styles.mySparksDescription}>
+                      Browse all available sparks
+                    </Text>
+                  </View>
+                  <Text style={styles.mySparksArrow}>→</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </Animated.View>
       </View>
     </Modal>

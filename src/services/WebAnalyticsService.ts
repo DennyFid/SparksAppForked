@@ -7,14 +7,19 @@ import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, ge
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyD6FqXdcKlaKqQtOQQYv0Mg-R5Em95vTJM",
-  authDomain: "sparkopedia-330f6.firebaseapp.com",
-  projectId: "sparkopedia-330f6",
-  storageBucket: "sparkopedia-330f6.firebasestorage.app",
-  messagingSenderId: "229332029977",
-  appId: "1:229332029977:web:401c76f507f092c24a9088",
-  measurementId: "G-K5YN3D4VQ6"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+// Validate Firebase config
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.warn('⚠️ Firebase configuration is missing. Please set EXPO_PUBLIC_FIREBASE_* environment variables.');
+}
 
 export class WebAnalyticsService {
   private static sessionId: string = WebAnalyticsService.generateSessionId();
@@ -26,7 +31,7 @@ export class WebAnalyticsService {
 
   static async initialize(): Promise<void> {
     console.log('🚀 WebAnalyticsService.initialize() called');
-    
+
     try {
       // Check if we're in a web environment
       if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -53,13 +58,13 @@ export class WebAnalyticsService {
         console.log('⚠️ Firebase Analytics not available, continuing without analytics:', analyticsError.message);
         this.analytics = null;
       }
-      
+
       // Initialize Firestore
       this.db = getFirestore(app);
 
       // Get or create user ID
       this.userId = await this.getOrCreateDeviceId();
-      
+
       // Try to initialize Auth (optional for analytics)
       try {
         this.auth = getAuth(app);
@@ -69,15 +74,15 @@ export class WebAnalyticsService {
         console.log('⚠️ Firebase Auth not available, continuing without auth:', authError.message);
         // Continue without auth - analytics will still work
       }
-      
+
       // Set user ID for analytics
       if (this.analytics && this.userId) {
         setUserId(this.analytics, this.userId);
       }
-      
+
       this.isInitialized = true;
       console.log('✅ Web Analytics initialized with userId:', this.userId);
-      
+
       // Track app open
       await this.trackSparkOpen('app', 'Sparks App');
     } catch (error: any) {
@@ -198,7 +203,7 @@ export class WebAnalyticsService {
     }
 
     try {
-      setUserProperties(this.analytics, properties);
+      setUserProperties(this.analytics, properties as any);
       console.log(`[Web Analytics] User Properties Set: ${JSON.stringify(properties)}`);
     } catch (error) {
       console.error('Error setting user properties:', error);
@@ -261,10 +266,10 @@ export class WebAnalyticsService {
     return `web_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private static safeLogEvent(eventName: string, parameters: any): void {
+  private static async safeLogEvent(eventName: string, params: any): Promise<void> {
     if (this.analytics) {
       try {
-        logEvent(this.analytics, eventName, parameters);
+        await logEvent(this.analytics, eventName, params as any);
       } catch (error) {
         console.error(`Error logging event ${eventName}:`, error);
       }
