@@ -3,6 +3,7 @@ import { BaseSpark } from '../types/spark';
 // Import actual spark components
 import React from 'react';
 import { BaseSpark as BaseSparkComponent } from './BaseSpark';
+import { IdeasSpark } from '../sparks/IdeasSpark';
 import { SpinnerSpark } from '../sparks/SpinnerSpark';
 import { FlashcardsSpark } from '../sparks/FlashcardsSpark';
 import { BusinessSpark } from '../sparks/BusinessSpark';
@@ -57,6 +58,18 @@ const PlaceholderSpark: React.FC = () => (
 
 // Registry of all available sparks
 export const sparkRegistry: Record<string, BaseSpark> = {
+    ideas: {
+        metadata: {
+            id: 'ideas',
+            title: 'Ideas',
+            description: 'Capture and organize your brilliant ideas',
+            icon: '💡',
+            category: 'productivity',
+            createdAt: '2025-12-10T00:00:00.000Z',
+            rating: 4.5,
+        },
+        component: IdeasSpark,
+    },
     spinner: {
         metadata: {
             id: 'spinner',

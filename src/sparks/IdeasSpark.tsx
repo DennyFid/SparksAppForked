@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useSparkStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
-import styled from 'styled-components/native';
+import { createCommonStyles } from '../styles/CommonStyles';
+import { Input } from '../components/FormComponents';
+import { SettingsContainer, SettingsScrollView, SettingsHeader, SettingsFeedbackSection } from '../components/SettingsComponents';
 
 interface Idea {
     id: string;
@@ -10,95 +12,15 @@ interface Idea {
     createdAt: string; // ISO string
 }
 
-const Container = styled.View`
-  flex: 1;
-  background-color: ${props => props.theme.colors.background};
-  padding: 16px;
-`;
+interface IdeasSparkProps {
+    showSettings?: boolean;
+    onCloseSettings?: () => void;
+}
 
-const Header = styled.Text`
-  font-size: 24px;
-  font-weight: bold;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: 16px;
-  text-align: center;
-`;
-
-const InputContainer = styled.View`
-  flex-direction: row;
-  margin-bottom: 16px;
-`;
-
-const StyledInput = styled.TextInput`
-  flex: 1;
-  background-color: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  border-radius: 8px;
-  padding: 12px;
-  margin-right: 8px;
-  border: 1px solid ${props => props.theme.colors.border};
-`;
-
-const AddButton = styled.TouchableOpacity`
-  background-color: ${props => props.theme.colors.primary};
-  justify-content: center;
-  align-items: center;
-  padding: 12px 20px;
-  border-radius: 8px;
-`;
-
-const AddButtonText = styled.Text`
-  color: white;
-  font-weight: bold;
-`;
-
-const SearchContainer = styled.View`
-  margin-bottom: 16px;
-  background-color: ${props => props.theme.colors.surface};
-  padding: 12px;
-  border-radius: 8px;
-`;
-
-const SearchLabel = styled.Text`
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: 12px;
-  margin-bottom: 4px;
-`;
-
-const IdeasList = styled.ScrollView`
-  flex: 1;
-`;
-
-const IdeaCard = styled.View`
-  background-color: ${props => props.theme.colors.surface};
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  border-left-width: 4px;
-  border-left-color: ${props => props.theme.colors.primary};
-`;
-
-const IdeaDate = styled.Text`
-  font-size: 12px;
-  color: ${props => props.theme.colors.textSecondary};
-  margin-bottom: 4px;
-`;
-
-const IdeaText = styled.Text`
-  font-size: 16px;
-  color: ${props => props.theme.colors.text};
-  line-height: 22px;
-`;
-
-const HighlightedText = styled.Text`
-  text-decoration-line: underline;
-  font-weight: bold;
-  background-color: rgba(255, 255, 0, 0.2);
-`;
-
-export const IdeasSpark: React.FC = () => {
+export const IdeasSpark: React.FC<IdeasSparkProps> = ({ showSettings, onCloseSettings }) => {
     const { getSparkData, setSparkData } = useSparkStore();
     const { colors } = useTheme();
+    const commonStyles = createCommonStyles(colors);
 
     const [ideas, setIdeas] = useState<Idea[]>([]);
     const [newIdea, setNewIdea] = useState('');
@@ -134,18 +56,18 @@ export const IdeasSpark: React.FC = () => {
     };
 
     const formatDate = (isoString: string) => {
-        return new Date(isoString).toLocaleString();
+        return isoString.split('T')[0];
     };
 
     const renderContentWithHighlight = (content: string, keyword: string) => {
-        if (!keyword) return <Text>{content}</Text>;
+        if (!keyword) return <Text style={{ color: colors.text }}>{content}</Text>;
 
         const parts = content.split(new RegExp(`(${keyword})`, 'gi'));
         return (
-            <Text>
+            <Text style={{ color: colors.text }}>
                 {parts.map((part, index) =>
                     part.toLowerCase() === keyword.toLowerCase() ? (
-                        <HighlightedText key={index}>{part}</HighlightedText>
+                        <Text key={index} style={styles.highlightedText}>{part}</Text>
                     ) : (
                         <Text key={index}>{part}</Text>
                     )
@@ -165,74 +87,179 @@ export const IdeasSpark: React.FC = () => {
         return matchKeyword && afterStart && beforeEnd;
     });
 
-    return (
-        <Container theme={{ colors }}>
-            <Header theme={{ colors }}>Ideas 💡</Header>
+    const styles = StyleSheet.create({
+        ...commonStyles,
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+            padding: 16,
+        },
+        header: {
+            fontSize: 24,
+            fontWeight: 'bold',
+            color: colors.text,
+            marginBottom: 16,
+            textAlign: 'center',
+        },
+        inputContainer: {
+            flexDirection: 'row',
+            marginBottom: 16,
+            gap: 8,
+        },
+        addButton: {
+            backgroundColor: colors.primary,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderRadius: 8,
+            height: 50, // Match typical input height
+            marginTop: 22, // Align with input field (below label spacer)
+        },
+        addButtonText: {
+            color: 'white',
+            fontWeight: 'bold',
+        },
+        searchContainer: {
+            marginBottom: 16,
+            backgroundColor: colors.surface,
+            padding: 12,
+            borderRadius: 8,
+        },
+        ideasList: {
+            flex: 1,
+        },
+        ideaCard: {
+            backgroundColor: colors.surface,
+            padding: 16,
+            borderRadius: 8,
+            marginBottom: 12,
+            borderLeftWidth: 4,
+            borderLeftColor: colors.primary,
+        },
+        ideaDate: {
+            fontSize: 12,
+            color: colors.textSecondary,
+            marginBottom: 4,
+        },
+        ideaText: {
+            fontSize: 16,
+            color: colors.text,
+            lineHeight: 22,
+        },
+        highlightedText: {
+            textDecorationLine: 'underline',
+            fontWeight: 'bold',
+            backgroundColor: 'rgba(255, 255, 0, 0.2)',
+            color: colors.text,
+        },
+        emptyText: {
+            textAlign: 'center',
+            color: colors.textSecondary,
+            marginTop: 20,
+        },
+        settingsCloseButton: {
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+            borderWidth: 1,
+            backgroundColor: 'transparent',
+            marginTop: 20,
+            alignSelf: 'center',
+        },
+    });
 
-            <InputContainer>
-                <StyledInput
-                    theme={{ colors }}
+    if (showSettings) {
+        return (
+            <SettingsContainer>
+                <SettingsScrollView>
+                    <SettingsHeader
+                        title="Ideas Settings"
+                        subtitle="Manage your ideas spark"
+                        icon="💡"
+                        sparkId="ideas"
+                    />
+
+                    <SettingsFeedbackSection sparkName="Ideas" sparkId="ideas" />
+
+                    <TouchableOpacity
+                        style={[styles.settingsCloseButton, { borderColor: colors.border }]}
+                        onPress={() => onCloseSettings?.()}
+                    >
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+                            Close
+                        </Text>
+                    </TouchableOpacity>
+                </SettingsScrollView>
+            </SettingsContainer>
+        );
+    }
+
+    return (
+        <View style={styles.container}>
+            <Text style={styles.header}>Ideas 💡</Text>
+
+            <View style={styles.inputContainer}>
+                <Input
+                    containerStyle={{ flex: 1, marginBottom: 0 }}
                     placeholder="New Idea..."
-                    placeholderTextColor={colors.textSecondary}
                     value={newIdea}
                     onChangeText={setNewIdea}
+                    label="Capture Idea"
                 />
-                <AddButton theme={{ colors }} onPress={handleAddIdea}>
-                    <AddButtonText>Add</AddButtonText>
-                </AddButton>
-            </InputContainer>
+                <TouchableOpacity style={styles.addButton} onPress={handleAddIdea}>
+                    <Text style={styles.addButtonText}>Add</Text>
+                </TouchableOpacity>
+            </View>
 
-            <SearchContainer theme={{ colors }}>
-                <SearchLabel theme={{ colors }}>Search Keywords</SearchLabel>
-                <StyledInput
-                    theme={{ colors }}
+            <View style={styles.searchContainer}>
+                <Input
+                    label="Search Keywords"
                     placeholder="Search..."
-                    placeholderTextColor={colors.textSecondary}
                     value={searchKeyword}
                     onChangeText={setSearchKeyword}
-                    style={{ marginBottom: 8 }}
+                    containerStyle={{ marginBottom: 12 }}
                 />
 
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                     <View style={{ flex: 1 }}>
-                        <SearchLabel theme={{ colors }}>Start Value (YYYY-MM-DD)</SearchLabel>
-                        <StyledInput
-                            theme={{ colors }}
+                        <Input
+                            label="Start Date"
                             placeholder="2024-01-01"
-                            placeholderTextColor={colors.textSecondary}
                             value={startDate}
                             onChangeText={setStartDate}
+                            containerStyle={{ marginBottom: 0 }}
                         />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <SearchLabel theme={{ colors }}>End Date (YYYY-MM-DD)</SearchLabel>
-                        <StyledInput
-                            theme={{ colors }}
+                        <Input
+                            label="End Date"
                             placeholder="2024-12-31"
-                            placeholderTextColor={colors.textSecondary}
                             value={endDate}
                             onChangeText={setEndDate}
+                            containerStyle={{ marginBottom: 0 }}
                         />
                     </View>
                 </View>
-            </SearchContainer>
+            </View>
 
-            <IdeasList>
+            <ScrollView style={styles.ideasList}>
                 {filteredIdeas.map(idea => (
-                    <IdeaCard key={idea.id} theme={{ colors }}>
-                        <IdeaDate theme={{ colors }}>{formatDate(idea.createdAt)}</IdeaDate>
-                        <IdeaText theme={{ colors }}>
+                    <View key={idea.id} style={styles.ideaCard}>
+                        <Text style={styles.ideaDate}>{formatDate(idea.createdAt)}</Text>
+                        <Text style={styles.ideaText}>
                             {renderContentWithHighlight(idea.content, searchKeyword)}
-                        </IdeaText>
-                    </IdeaCard>
+                        </Text>
+                    </View>
                 ))}
                 {filteredIdeas.length === 0 && (
-                    <Text style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 20 }}>
+                    <Text style={styles.emptyText}>
                         No ideas found
                     </Text>
                 )}
-            </IdeasList>
-        </Container>
+            </ScrollView>
+        </View>
     );
 };
 
