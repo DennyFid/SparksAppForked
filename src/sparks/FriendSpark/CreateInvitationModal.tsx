@@ -3,7 +3,7 @@ import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, TouchableO
 import { useTheme } from '../../contexts/ThemeContext';
 import { createCommonStyles } from '../../styles/CommonStyles';
 import { CommonModal } from '../../components/CommonModal';
-import { FriendService } from '../../services/FriendService';
+import FriendService from '../../services/FriendService';
 import { HapticFeedback } from '../../utils/haptics';
 
 interface CreateInvitationModalProps {
@@ -23,6 +23,8 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async () => {
+        console.log('📧 CreateInvitationModal: handleSubmit called');
+        
         if (!email.trim()) {
             Alert.alert('Error', 'Please enter an email address');
             return;
@@ -32,7 +34,15 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
             setIsSubmitting(true);
             HapticFeedback.impact('light');
 
-            await FriendService.createInvitation(email.trim());
+            console.log('📧 CreateInvitationModal: Calling FriendService.createInvitation with:', email.trim());
+            
+            // Check if FriendService is available
+            if (!FriendService || typeof FriendService.createInvitation !== 'function') {
+                throw new Error('FriendService is not available. Please ensure you are signed in.');
+            }
+
+            const invitationId = await FriendService.createInvitation(email.trim());
+            console.log('📧 CreateInvitationModal: Invitation created successfully:', invitationId);
             
             HapticFeedback.notification('success');
             Alert.alert('Success', 'Invitation sent!');
@@ -40,9 +50,17 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
             setEmail('');
             onInvitationCreated();
         } catch (error: any) {
-            console.error('Error creating invitation:', error);
+            console.error('❌ CreateInvitationModal: Error creating invitation:', error);
+            console.error('❌ Error details:', {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name,
+            });
             HapticFeedback.notification('error');
-            Alert.alert('Error', error.message || 'Failed to send invitation');
+            Alert.alert(
+                'Error', 
+                error?.message || 'Failed to send invitation. Please check the console for details.'
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -66,9 +84,17 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
                     <Text style={commonStyles.secondaryButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[commonStyles.primaryButton, styles.button, isSubmitting && { opacity: 0.6 }]}
-                    onPress={handleSubmit}
+                    style={[
+                        commonStyles.primaryButton, 
+                        styles.button, 
+                        (isSubmitting || !email.trim()) && { opacity: 0.6 }
+                    ]}
+                    onPress={() => {
+                        console.log('📧 CreateInvitationModal: Send button pressed');
+                        handleSubmit();
+                    }}
                     disabled={isSubmitting || !email.trim()}
+                    activeOpacity={0.7}
                 >
                     {isSubmitting ? (
                         <ActivityIndicator size="small" color="#fff" />

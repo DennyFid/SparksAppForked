@@ -6,6 +6,25 @@ This document outlines the setup and configuration for developing SparksApp in G
 
 ## Current State
 
+### ✅ What's Working
+
+As of the latest update, Codespaces is functional for web-based development:
+
+1. **Codespace Creation**: Users can create a Codespace via direct URL:
+   ```
+   https://github.com/codespaces/new?skip_quickstart=true&machine=standardLinux32gb&repo=1048220194&ref=main&devcontainer_path=.devcontainer%2Fdevcontainer.json&geo=UsWest
+   ```
+
+2. **AI-Assisted Development**: GitHub Copilot/Chat can be used to make code changes within the Codespace
+
+3. **Web Development**: Expo can be run in web mode:
+   ```bash
+   npx expo start --web
+   ```
+   This allows testing the app in a browser within the Codespace
+
+4. **Git Workflow**: Changes can be committed and merged directly from the Codespace
+
 ### Existing Configuration
 
 **[.devcontainer/devcontainer.json](file:///Users/mattdyor/SparksApp/.devcontainer/devcontainer.json)**:
@@ -15,15 +34,29 @@ This document outlines the setup and configuration for developing SparksApp in G
 - Port forwarding: 8081 (Metro), 19000 (Expo DevTools)
 - CPU requirement: 4 cores
 
-### Issues with Current Setup
+### Known Issues
 
-1. **Deprecated Expo CLI**: The command `npm install -g expo-cli` installs the deprecated standalone CLI. Modern Expo uses `npx expo` instead.
+1. **Expo Go Tunneling Not Working**: 
+   - Tunneling to Android and iOS devices via Expo Go does not appear to be functioning
+   - Users cannot connect physical devices to test native features
+   - This limits development to web-only mode currently
 
-2. **Missing Environment Variables**: No automated setup for required Firebase and Gemini API keys
+2. **Command Execution UX**:
+   - Users must manually open a terminal, know the exact command (`npx expo start --web`), paste it, and run it
+   - No prominent UI element (like a big button) to start the development server
+   - This creates friction for new users who may not know the command
 
-3. **No Setup Instructions**: Missing documentation for first-time Codespace users
+3. **Git Merge Conflicts on Codespace Creation**:
+   - Each new Codespace creation requires resolving merge conflicts
+   - This happens even when no changes have been made to the main codebase
+   - May require a git sync step immediately after Codespace creation
+   - Creates unnecessary friction in the onboarding process
 
-4. **Incomplete Port Configuration**: May need additional ports for Expo tunneling
+4. **Pull Request Workflow**:
+   - No simple way for users to submit Pull Requests from Codespaces
+   - Users need to understand git commands and PR creation process
+   - Would benefit from a simplified flow (e.g., a big button) to create PRs
+   - This is especially important for contributors who may not be familiar with git workflows
 
 ## Development Model: Expo Go
 
@@ -738,6 +771,195 @@ GitHub Codespaces has usage limits:
 - Use "Auto-sleep" settings (30 min idle time)
 - Delete old Codespaces you're not using
 
+## Proposed Resolutions
+
+### Issue 1: Expo Go Tunneling Not Working
+
+**Problem**: Cannot connect Android/iOS devices via Expo Go tunnel
+
+**Proposed Solutions**:
+
+1. **Verify Tunnel Configuration**:
+   - Ensure `@expo/ngrok` is installed: `npm install --save-dev @expo/ngrok --legacy-peer-deps`
+   - Check that port 8081 is properly forwarded in Codespace settings
+   - Verify tunnel service is available: `npx expo start --tunnel --tunnel-service ngrok`
+
+2. **Alternative: Use Expo Dev Client**:
+   - Create a development build that can be installed on devices
+   - Use EAS Build to create a dev client build
+   - Install the dev client on physical devices
+   - Connect to Codespace via tunnel URL
+
+3. **Network Configuration Check**:
+   - Verify Codespace firewall rules allow tunnel connections
+   - Check if corporate networks are blocking tunnel services
+   - Consider using Expo's cloud tunnel service instead of ngrok
+
+4. **Documentation Update**:
+   - Add troubleshooting section specifically for tunnel issues in Codespaces
+   - Document fallback to web-only development mode
+   - Provide clear error messages when tunnel fails
+
+### Issue 2: Command Execution UX
+
+**Problem**: Users must manually run commands in terminal
+
+**Proposed Solutions**:
+
+1. **VS Code Tasks**:
+   - Create `.vscode/tasks.json` with predefined tasks:
+     ```json
+     {
+       "version": "2.0.0",
+       "tasks": [
+         {
+           "label": "Start Expo (Web)",
+           "type": "shell",
+           "command": "npx expo start --web",
+           "problemMatcher": []
+         },
+         {
+           "label": "Start Expo (Tunnel)",
+           "type": "shell",
+           "command": "npx expo start --tunnel --go",
+           "problemMatcher": []
+         }
+       ]
+     }
+     ```
+   - Users can run via Command Palette (Cmd/Ctrl+Shift+P) → "Tasks: Run Task"
+
+2. **VS Code Launch Configuration**:
+   - Add `.vscode/launch.json` for one-click debugging
+   - Create launch configurations for different Expo modes
+
+3. **Custom Codespace Commands**:
+   - Add custom commands to `.devcontainer/devcontainer.json`:
+     ```json
+     "customizations": {
+       "codespaces": {
+         "commands": {
+           "start-web": "npx expo start --web",
+           "start-tunnel": "npx expo start --tunnel --go"
+         }
+       }
+     }
+     ```
+
+4. **Welcome Script**:
+   - Create a post-create script that displays a welcome message with clickable commands
+   - Use VS Code's terminal link feature to make commands clickable
+   - Add a README.md in Codespace root with quick start commands
+
+5. **GitHub Codespaces Custom Button** (Future):
+   - GitHub may add support for custom action buttons in Codespaces
+   - Could create a simple web interface for common commands
+
+### Issue 3: Git Merge Conflicts on Creation
+
+**Problem**: Merge conflicts appear when creating new Codespace
+
+**Proposed Solutions**:
+
+1. **Pre-Creation Git Sync Script**:
+   - Add to `.devcontainer/setup.sh`:
+     ```bash
+     # Sync git state
+     echo "🔄 Syncing git repository..."
+     git fetch origin
+     git reset --hard origin/main
+     git clean -fd
+     ```
+   - Ensures Codespace starts with clean, up-to-date state
+
+2. **Branch Strategy**:
+   - Always create Codespaces from `main` branch (or specific branch)
+   - Avoid creating from feature branches that may be out of sync
+   - Document recommended branch for Codespace creation
+
+3. **Git Configuration**:
+   - Set up git config in setup script:
+     ```bash
+     git config --global pull.rebase false
+     git config --global init.defaultBranch main
+     ```
+
+4. **Pre-Create Hook** (if supported):
+   - Check if GitHub Codespaces supports pre-create hooks
+   - Run git sync before container build starts
+
+5. **Documentation**:
+   - Add clear instructions: "If you see merge conflicts, run: `git reset --hard origin/main`"
+   - Include this in the welcome message shown after Codespace creation
+
+### Issue 4: Pull Request Workflow
+
+**Problem**: No simple way to create Pull Requests from Codespaces
+
+**Proposed Solutions**:
+
+1. **GitHub CLI Integration**:
+   - Install `gh` CLI in devcontainer: `ghcr.io/devcontainers/features/github-cli:1`
+   - Create a helper script `scripts/create-pr.sh`:
+     ```bash
+     #!/bin/bash
+     BRANCH_NAME="codespace-$(date +%s)"
+     git checkout -b $BRANCH_NAME
+     git add .
+     git commit -m "$1"
+     git push -u origin $BRANCH_NAME
+     gh pr create --title "$1" --body "Created from Codespace"
+     ```
+   - Make executable and add to PATH
+
+2. **VS Code GitHub Extension**:
+   - Ensure GitHub Pull Requests extension is installed
+   - Users can create PRs directly from VS Code UI
+   - Extension provides GUI for PR creation
+
+3. **Custom VS Code Task**:
+   - Add task to `.vscode/tasks.json`:
+     ```json
+     {
+       "label": "Create Pull Request",
+       "type": "shell",
+       "command": "${workspaceFolder}/scripts/create-pr.sh",
+       "problemMatcher": []
+     }
+     ```
+   - Users run via Command Palette
+
+4. **GitHub Codespaces Custom Button** (Future):
+   - If GitHub adds support, create a "Create PR" button
+   - Could use GitHub API to create PRs programmatically
+
+5. **Simplified Workflow Documentation**:
+   - Create a step-by-step guide with screenshots
+   - Add a "Quick PR" section to README
+   - Include common PR templates
+
+6. **Automated PR Creation Script**:
+   - Create `scripts/quick-pr.sh` that:
+     - Prompts for PR title and description
+     - Creates branch, commits changes, pushes, creates PR
+     - Uses `gh` CLI for PR creation
+   - Make it executable: `chmod +x scripts/quick-pr.sh`
+   - Users can run: `./scripts/quick-pr.sh "My PR Title"`
+
+## Implementation Priority
+
+1. **High Priority**:
+   - Fix git merge conflicts (Issue 3) - blocks smooth onboarding
+   - Improve command UX (Issue 2) - improves developer experience
+
+2. **Medium Priority**:
+   - PR workflow simplification (Issue 4) - improves contribution flow
+   - Tunnel troubleshooting (Issue 1) - enables native testing
+
+3. **Low Priority**:
+   - Advanced features (custom buttons, web interfaces)
+   - Enhanced documentation
+
 ## Future Enhancements
 
 Potential improvements to the Codespace setup:
@@ -749,10 +971,13 @@ Potential improvements to the Codespace setup:
 - [ ] Automated testing setup with Jest
 - [ ] GitHub Actions integration for automated checks
 - [ ] Documentation for using React DevTools with Expo Go
+- [ ] Custom GitHub Codespaces action buttons (when available)
+- [ ] Web-based command runner interface
+- [ ] Automated PR template generation
 
 ---
 
-**Status**: Draft  
+**Status**: Active Development  
 **Created**: 2025-12-13  
-**Last Updated**: 2025-12-13  
+**Last Updated**: 2025-12-15  
 **Owner**: Matt Dyor
