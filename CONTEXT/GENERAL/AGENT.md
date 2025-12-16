@@ -84,6 +84,7 @@ Everything is a "Spark". When adding a new feature, ask: "Is this a Spark?"
 *   **Firebase Keys**: Never hardcode API keys. Use `process.env.EXPO_PUBLIC_...`.
 *   **Expo Go vs Dev Build**: Some features (Notifications, Background Tasks) **do not work** in Expo Go. Always verify if a Dev Build is needed.
 *   **Directory Check**: Always ensure you are in the root (`/Users/mattdyor/SparksApp`) before running commands.
+*   **Gemini API**: **ALWAYS use `GeminiService`** from `src/services/GeminiService.ts` for any Gemini API calls. Never make direct fetch calls to Gemini API or use different model versions. The service handles the correct model (`gemini-2.5-flash`), API version, and error handling.
 
 ---
 

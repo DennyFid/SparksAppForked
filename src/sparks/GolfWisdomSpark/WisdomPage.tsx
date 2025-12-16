@@ -1,38 +1,97 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { WisdomQuote } from './wisdomData';
+import { HapticFeedback } from '../../utils/haptics';
 
 interface WisdomPageProps {
     quote: WisdomQuote;
+    onShare?: () => void;
 }
 
-export const WisdomPage: React.FC<WisdomPageProps> = ({ quote }) => {
+export const WisdomPage: React.FC<WisdomPageProps> = ({ quote, onShare }) => {
+    const viewRef = useRef<View>(null);
+
+    const handleShare = async () => {
+        if (!viewRef.current) {
+            Alert.alert('Error', 'Unable to capture image');
+            return;
+        }
+
+        try {
+            HapticFeedback.light();
+            
+            // Capture the view as an image
+            const uri = await captureRef(viewRef.current, {
+                format: 'png',
+                quality: 1.0,
+            });
+
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (!isAvailable) {
+                Alert.alert(
+                    'Sharing Not Available',
+                    'Sharing is not available on this device.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Share the image
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: 'Share Golf Wisdom',
+            });
+
+            HapticFeedback.success();
+            onShare?.();
+        } catch (error: any) {
+            console.error('Error sharing wisdom:', error);
+            HapticFeedback.error();
+            Alert.alert('Error', error.message || 'Failed to share wisdom');
+        }
+    };
+
     return (
         <View style={styles.container}>
-            {/* Top decorative flourish */}
-            <View style={styles.topFlourish}>
-                <Text style={styles.flourishText}>✦ ✦ ✦</Text>
-                <View style={styles.dividerLine} />
-            </View>
+            {/* Share Button - positioned absolutely, won't be captured */}
+            <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.shareButtonText}>share</Text>
+            </TouchableOpacity>
 
-            <View style={styles.quoteContainer}>
-                {/* Opening quote mark */}
-                <Text style={styles.openQuote}>"</Text>
+            {/* Content to capture (everything except arrows and share button) */}
+            <View ref={viewRef} collapsable={false} style={styles.captureContainer}>
+                {/* Top decorative flourish */}
+                <View style={styles.topFlourish}>
+                    <Text style={styles.flourishText}>✦ ✦ ✦</Text>
+                    <View style={styles.dividerLine} />
+                </View>
 
-                {/* Quote content */}
-                <Text style={styles.quoteText}>{quote.content}</Text>
+                <View style={styles.quoteContainer}>
+                    {/* Opening quote mark */}
+                    <Text style={styles.openQuote}>"</Text>
 
-                {/* Closing quote mark */}
-                <Text style={styles.closeQuote}>"</Text>
-            </View>
+                    {/* Quote content */}
+                    <Text style={styles.quoteText}>{quote.content}</Text>
 
-            {/* Attribution */}
-            <Text style={styles.attribution}>— {quote.contributor || 'Tam O\'Shanter'}</Text>
+                    {/* Closing quote mark */}
+                    <Text style={styles.closeQuote}>"</Text>
+                </View>
 
-            {/* Bottom decorative flourish */}
-            <View style={styles.bottomFlourish}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.flourishText}>✦ ✦ ✦</Text>
+                {/* Attribution */}
+                <Text style={styles.attribution}>— {quote.contributor || 'Tam O\'Shanter'}</Text>
+
+                {/* Bottom decorative flourish */}
+                <View style={styles.bottomFlourish}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.flourishText}>✦ ✦ ✦</Text>
+                </View>
             </View>
         </View>
     );
@@ -45,6 +104,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 40,
         paddingVertical: 80,
+        position: 'relative',
+    },
+    captureContainer: {
+        flex: 1,
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    shareButton: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        backgroundColor: '#5C4A3A', // Dark brown, subtle
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20, // Pill shape
+        zIndex: 10,
+        opacity: 0.8, // Make it more subtle
+    },
+    shareButtonText: {
+        color: '#F5F1E8',
+        fontSize: 14,
+        fontWeight: '500',
+        fontFamily: 'American Typewriter',
+        letterSpacing: 0.5,
     },
     topFlourish: {
         alignItems: 'center',

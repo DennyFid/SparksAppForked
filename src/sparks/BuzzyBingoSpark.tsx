@@ -38,8 +38,7 @@ import {
   SettingsRemoveButton,
   SaveCancelButtons,
 } from "../components/SettingsComponents";
-
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+import { GeminiService } from '../services/GeminiService';
 
 const { width: screenWidth } = Dimensions.get("window");
 const GRID_SIZE = 5;
@@ -160,16 +159,6 @@ export const BuzzyBingoSpark: React.FC<BuzzyBingoSparkProps> = ({
   // Generate words with Gemini
   const generateWordsWithGemini = async (prompt: string) => {
     console.log("generateWordsWithGemini called with prompt:", prompt);
-    console.log("GEMINI_API_KEY available:", !!GEMINI_API_KEY);
-
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === "your_gemini_api_key") {
-      console.error("Gemini API key not properly configured:", GEMINI_API_KEY);
-      Alert.alert(
-        "Error",
-        "Gemini API key not configured. Please add EXPO_PUBLIC_GEMINI_API_KEY to your .env file."
-      );
-      return;
-    }
 
     setIsGeneratingWords(true);
     try {
@@ -190,32 +179,8 @@ Cherry Tart
 Chocolate Cake
 ...`;
 
-      console.log("Making API request...");
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: systemPrompt }],
-              },
-            ],
-          }),
-        }
-      );
-
-      console.log("Response status:", response.status);
-      const responseData = await response.json();
-      console.log("Response data:", responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData.error?.message || "API request failed");
-      }
-
-      const generatedText =
-        responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+      console.log("Making API request via GeminiService...");
+      const generatedText = await GeminiService.generateContent(systemPrompt);
       console.log("Generated text:", generatedText);
 
       if (generatedText) {
@@ -237,12 +202,18 @@ Chocolate Cake
       } else {
         Alert.alert("Error", "Failed to generate words. Please try again.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini generation error:", error);
-      Alert.alert(
-        "Error",
-        "Failed to generate words. Please check your internet connection and try again."
-      );
+      const errorMessage = error?.message || "Failed to generate words. Please check your internet connection and try again.";
+      
+      if (errorMessage.includes("Missing EXPO_PUBLIC_GEMINI_API_KEY")) {
+        Alert.alert(
+          "Configuration Error",
+          "Gemini API key not configured. Please add EXPO_PUBLIC_GEMINI_API_KEY to your .env file."
+        );
+      } else {
+        Alert.alert("Error", errorMessage);
+      }
     } finally {
       setIsGeneratingWords(false);
     }

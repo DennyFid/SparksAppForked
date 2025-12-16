@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Alert, View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     SettingsContainer,
@@ -11,6 +11,10 @@ import {
     SaveCancelButtons,
 } from '../../components/SettingsComponents';
 import { SuggestWisdomModal } from './SuggestWisdomModal';
+import { AdminSuggestionsModal } from './AdminSuggestionsModal';
+import { GolfWisdomAdminService } from '../../services/GolfWisdomAdminService';
+import { GolfWisdomNotificationService } from '../../services/GolfWisdomNotificationService';
+import { NotificationBadge } from '../../components/NotificationBadge';
 
 interface GolfWisdomSettingsProps {
     onClose: () => void;
@@ -22,6 +26,39 @@ const TIMESTAMP_KEY = 'golfWisdom_lastUpdated';
 export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose }) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showSuggestModal, setShowSuggestModal] = useState(false);
+    const [showAdminModal, setShowAdminModal] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [pendingCount, setPendingCount] = useState(0);
+
+    useEffect(() => {
+        checkAdminStatus();
+    }, []);
+
+    useEffect(() => {
+        if (isAdmin) {
+            loadPendingCount();
+            const interval = setInterval(loadPendingCount, 5000);
+            return () => clearInterval(interval);
+        }
+    }, [isAdmin]);
+
+    const checkAdminStatus = async () => {
+        try {
+            const admin = await GolfWisdomAdminService.isAdmin();
+            setIsAdmin(admin);
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+        }
+    };
+
+    const loadPendingCount = async () => {
+        try {
+            const count = await GolfWisdomNotificationService.getUnreadCount();
+            setPendingCount(count);
+        } catch (error) {
+            console.error('Error loading pending count:', error);
+        }
+    };
 
     const handleRefresh = async () => {
         try {
@@ -56,6 +93,32 @@ export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose 
                 {/* Feedback Section - Required First */}
                 <SettingsFeedbackSection sparkId="golfWisdom" sparkName="Golf Wisdom" />
 
+                {/* Admin Section */}
+                {isAdmin && (
+                    <SettingsSection title="Admin">
+                        <View style={{ position: 'relative' }}>
+                            <SettingsButton
+                                title="Review Suggestions"
+                                onPress={() => {
+                                    setShowAdminModal(true);
+                                    loadPendingCount(); // Refresh count when opening
+                                }}
+                                variant="primary"
+                            />
+                            {pendingCount > 0 && (
+                                <View style={{ position: 'absolute', top: -4, right: -4 }}>
+                                    <NotificationBadge sparkId="golfWisdom" size="small" />
+                                </View>
+                            )}
+                        </View>
+                        {pendingCount > 0 && (
+                            <Text style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                                {pendingCount} pending suggestion{pendingCount !== 1 ? 's' : ''}
+                            </Text>
+                        )}
+                    </SettingsSection>
+                )}
+
                 {/* Refresh Section */}
                 <SettingsSection title="Content Management">
                     <SettingsButton
@@ -83,6 +146,17 @@ export const GolfWisdomSettings: React.FC<GolfWisdomSettingsProps> = ({ onClose 
                 visible={showSuggestModal}
                 onClose={() => setShowSuggestModal(false)}
             />
+
+            {/* Admin Suggestions Modal */}
+            {isAdmin && (
+                <AdminSuggestionsModal
+                    visible={showAdminModal}
+                    onClose={async () => {
+                        setShowAdminModal(false);
+                        await loadPendingCount(); // Refresh count when closing
+                    }}
+                />
+            )}
         </SettingsContainer>
     );
 };

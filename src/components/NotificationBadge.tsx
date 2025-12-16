@@ -21,9 +21,22 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
-        // Use persistent device ID from AsyncStorage - this ensures consistency
-        const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
-        const count = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
+        let count = 0;
+        
+        // For golfWisdom spark, check GolfWisdomNotificationService
+        if (sparkId === 'golfWisdom') {
+          try {
+            const { GolfWisdomNotificationService } = await import('../services/GolfWisdomNotificationService');
+            count = await GolfWisdomNotificationService.getUnreadCount();
+          } catch (error) {
+            console.error('Error loading GolfWisdom notification count:', error);
+          }
+        } else {
+          // For other sparks, use FeedbackNotificationService
+          const deviceId = await FeedbackNotificationService.getPersistentDeviceId();
+          count = await FeedbackNotificationService.getUnreadCount(deviceId, sparkId);
+        }
+        
         setUnreadCount(count);
       } catch (error) {
         console.error('Error loading unread count:', error);

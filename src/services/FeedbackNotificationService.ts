@@ -339,6 +339,7 @@ export class FeedbackNotificationService {
       
       // Check if user is admin and get unread feedback count
       let totalUnreadFeedback = 0;
+      let totalUnreadSuggestions = 0;
       try {
         const { AdminResponseService } = await import('./AdminResponseService');
         const isAdmin = await AdminResponseService.isAdmin();
@@ -346,13 +347,26 @@ export class FeedbackNotificationService {
           // For admins, count both feedback (with comments) and reviews (ratings only)
           totalUnreadFeedback = await AdminResponseService.getTotalUnreadCount();
         }
+        
+        // Check for GolfWisdom admin suggestions
+        try {
+          const { GolfWisdomAdminService } = await import('./GolfWisdomAdminService');
+          const { GolfWisdomNotificationService } = await import('./GolfWisdomNotificationService');
+          const isGolfWisdomAdmin = await GolfWisdomAdminService.isAdmin();
+          if (isGolfWisdomAdmin) {
+            totalUnreadSuggestions = await GolfWisdomNotificationService.getUnreadCount();
+          }
+        } catch (error) {
+          // If GolfWisdom admin check fails, ignore
+          console.log('GolfWisdom admin check failed:', error);
+        }
       } catch (error) {
         // If admin check fails, assume not admin
         console.log('Admin check failed, assuming not admin:', error);
       }
       
       // Aggregate total unread count
-      const totalUnread = totalUnreadReplies + totalUnreadFeedback;
+      const totalUnread = totalUnreadReplies + totalUnreadFeedback + totalUnreadSuggestions;
       
       // Update app icon badge
       await Notifications.setBadgeCountAsync(totalUnread);

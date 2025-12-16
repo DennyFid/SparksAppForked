@@ -72,12 +72,19 @@ export const fetchWisdomPages = async (): Promise<WisdomQuote[]> => {
         querySnapshot.forEach((doc) => {
             if (doc.id !== '_metadata') {
                 const data = doc.data() as FirestoreWisdomPage;
-                console.log(`  - Document ${doc.id}: order=${data.order}, content="${data.content.substring(0, 30)}...", contributor=${data.contributor}`);
-                pages.push({
-                    id: data.order, // Use order as the id for display
-                    content: data.content,
-                    contributor: data.contributor || 'Tam O\'Shanter',
-                });
+                // Only include approved items or items with no status (for backward compatibility)
+                // Exclude "Suggested" and "Rejected" items
+                const status = data.status;
+                if (!status || status === 'Approved') {
+                    console.log(`  - Document ${doc.id}: order=${data.order}, content="${data.content.substring(0, 30)}...", contributor=${data.contributor}, status=${status || 'none'}`);
+                    pages.push({
+                        id: data.order, // Use order as the id for display
+                        content: data.content,
+                        contributor: data.contributor || 'Tam O\'Shanter',
+                    });
+                } else {
+                    console.log(`  - Skipping document ${doc.id} with status: ${status}`);
+                }
             }
         });
 
