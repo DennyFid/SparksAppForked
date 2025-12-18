@@ -3,6 +3,7 @@ import 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { useAppStore } from './src/store';
@@ -11,6 +12,13 @@ import { NotificationService } from './src/utils/notifications';
 import { FeedbackNotificationService } from './src/services/FeedbackNotificationService';
 import { ServiceFactory } from './src/services/ServiceFactory';
 import AuthService from './src/services/AuthService';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might trigger some race conditions, ignore them */
+});
+
+console.log('🚀 [App.tsx] JS Bundle executing...');
 
 // Initialize Firebase
 try {
@@ -108,6 +116,20 @@ function AppContent() {
     };
 
     initializeAnalytics();
+  }, []);
+
+  // Hide splash screen when the root view has mounted
+  useEffect(() => {
+    const hideSplash = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Short delay to ensure render
+        await SplashScreen.hideAsync();
+        console.log('✅ [App.tsx] Splash screen hidden');
+      } catch (e) {
+        console.warn('⚠️ [App.tsx] Error hiding splash screen:', e);
+      }
+    };
+    hideSplash();
   }, []);
 
   // Initialize notifications when app starts

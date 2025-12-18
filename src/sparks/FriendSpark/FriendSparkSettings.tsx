@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import {
     SettingsContainer,
     SettingsScrollView,
@@ -46,12 +46,12 @@ export const FriendSparkSettings: React.FC<FriendSparkSettingsProps> = ({ onClos
                 FriendService.getSentInvitations(),
                 FriendService.getAcceptedInvitations(),
             ]);
-            
+
             setInvitations(pending);
             // Limit to most recent 10
             setSentInvitations(sent.slice(0, 10));
             setAcceptedInvitations(accepted.slice(0, 10));
-            
+
             // Mark invitations as viewed when settings opens
             if (pending.length > 0) {
                 await FriendInvitationNotificationService.markInvitationsAsViewed(
@@ -83,11 +83,11 @@ export const FriendSparkSettings: React.FC<FriendSparkSettingsProps> = ({ onClos
             console.log('📧 FriendSparkSettings: Calling FriendService.acceptInvitation...');
             await FriendService.acceptInvitation(invitationId);
             console.log('✅ FriendSparkSettings: Invitation accepted successfully');
-            
+
             // Reload all invitations
             await loadAllInvitations();
             await loadPendingCount();
-            
+
             HapticFeedback.success();
             Alert.alert('Success', 'Friend request accepted!');
         } catch (error: any) {
@@ -109,11 +109,11 @@ export const FriendSparkSettings: React.FC<FriendSparkSettingsProps> = ({ onClos
             console.log('📧 FriendSparkSettings: Calling FriendService.rejectInvitation...');
             await FriendService.rejectInvitation(invitationId);
             console.log('✅ FriendSparkSettings: Invitation rejected successfully');
-            
+
             // Reload all invitations
             await loadAllInvitations();
             await loadPendingCount();
-            
+
             HapticFeedback.success();
         } catch (error: any) {
             console.error('❌ FriendSparkSettings: Error rejecting invitation:', error);
@@ -289,7 +289,7 @@ export const FriendSparkSettings: React.FC<FriendSparkSettingsProps> = ({ onClos
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     emptyText: {
         fontSize: 14,
         fontStyle: 'italic',
