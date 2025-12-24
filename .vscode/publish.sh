@@ -16,9 +16,20 @@ git add .
 # Commit changes
 if ! git diff-index --quiet HEAD --; then
     echo "💾 Committing changes..."
-    git commit -m "Publishing changes"
+    
+    # Prompt for commit message
+    echo "Please enter a brief description of your changes (press Enter for default):"
+    read -r MESSAGE
+    
+    if [ -z "$MESSAGE" ]; then
+        MESSAGE="Publishing changes"
+    fi
+    
+    git commit -m "$MESSAGE"
 else
     echo "ℹ️ No changes to commit."
+    # Try to grab the last commit message for the PR title
+    MESSAGE=$(git log -1 --pretty=%s)
 fi
 
 # Push changes
@@ -57,8 +68,8 @@ FORK_OWNER=$(echo "$ORIGIN_REPO" | cut -d'/' -f1)
 HEAD_REF="$FORK_OWNER:$BRANCH"
 
 # Attempt to create PR against upstream explicitly to avoid requiring a default gh repo
-# Use --fill to populate title/body from commits; if PR exists, warn but continue
-if gh pr create --repo "$UPSTREAM_REPO" --base main --head "$HEAD_REF" --fill; then
+# Use the custom message for title and body
+if gh pr create --repo "$UPSTREAM_REPO" --base main --head "$HEAD_REF" --title "$MESSAGE" --body "Automated PR created from Codespaces via Sparks Publish workflow."; then
     echo "✅ Pull Request created."
 else
     echo "⚠️ Could not create PR (it may already exist or there was an error)."
