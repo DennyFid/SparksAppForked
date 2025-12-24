@@ -23,7 +23,7 @@ Check out https://sparks.febak.com/check-out-the-sparks-app for details.
 *   **Persistence**: Data saved locally via AsyncStorage.
 *   **Settings System**: Comprehensive settings for each spark with feedback integration.
 *   **Cross-platform**: iOS, Android, and Web support via Expo.
-> <img src="SparksSummary.png" width="400" alt="Sparks Marketplace">
+> <img src="SparksSummary.png" width="200" alt="Sparks Marketplace">
 
 # Contributing New Sparks
 
@@ -40,7 +40,7 @@ The most user-friendly way to contribute is directly through the interface of th
 4.  **Submit:** Submit your spark for review directly through the app.
 
 > **Note:** The Spark Wizard is designed for a seamless, no-code experience.
-> <img src="SparkWizard.png" width="400" alt="Spark Wizard">
+> <img src="SparkWizard.png" width="200" alt="Spark Wizard">
 
 ## 2. Using GitHub Codespaces
 Use a pre-configured cloud environment to add sparks via the codebase without any local setup.
@@ -69,6 +69,9 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
     * Open the **Source Control** tab in the sidebar.
     * Commit your changes.
     * Click **"Create Pull Request"** to submit your changes to the main repository.
+
+**Note:** The Sparks Codespace has pre-configured controls at the bottom of the screen to help you preview changes (via a web page) and publish your changes (via a GitHub pull request or PR). 
+
 > <img src="CodespacesControls.png" width="400" alt="Codespaces Controls">
 
 ## 3. Forking the Repository
