@@ -31,7 +31,8 @@
                     "**/.expo": true,
                     "**/.expo-shared": true,
                     "**/node_modules": true
-                }
+                },
+                "workbench.activityBar.location": "top"
             }
         }
     },
