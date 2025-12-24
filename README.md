@@ -60,8 +60,10 @@ Use a pre-configured cloud environment to add sparks via the codebase without an
       the hangman. Make the Spark Settings page just have the basic CONTEXT/GENERAL/SETTINGSDESIGN.md 
       with feedback and ratings and a cancel button.
       ```
-3.  **Preview Your Change:** In the terminal, run:
+3.  **Preview Your Change:** Use the VS Code task **Start Expo Web** (recommended) to start the Expo web server and preview the app.
+
     ```bash
+    # If needed, you can still run the CLI manually from a terminal:
     npx expo start --web --tunnel
     ```
     This will provide a web-based preview of the app so you can verify your spark looks correct.
