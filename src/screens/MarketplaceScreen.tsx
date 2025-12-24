@@ -106,7 +106,6 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       color: colors.textSecondary,
     },
     grid: {
-      flex: 1,
       padding: 24,
       flexDirection: 'row',
       flexWrap: 'wrap',
