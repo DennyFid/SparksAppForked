@@ -2,7 +2,7 @@
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
     "workbench.sideBar.location": "right",
-    "workbench.activityBar.location": "hidden",
+    "workbench.activityBar.location": "top",
     "workbench.statusBar.visible": true,
     "actionButtons": {
         "defaultColor": "#ff0034",
