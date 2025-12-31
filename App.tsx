@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useSparkStore } from "./src/store";
 import 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -41,6 +42,11 @@ try {
 }
 
 export default function App() {
+  // Ensure 'scorecard' spark is in user collection for debugging
+  const addSparkToUser = useSparkStore((s) => s.addSparkToUser);
+  useEffect(() => {
+    addSparkToUser("scorecard");
+  }, [addSparkToUser]);
   return (
     <SafeAreaProvider>
       <ThemeProvider>

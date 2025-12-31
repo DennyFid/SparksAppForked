@@ -37,6 +37,7 @@ import { SpeakSpark } from "../sparks/SpeakSpark";
 import FriendSpark from "../sparks/FriendSpark";
 import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
+import ScorecardSpark from "../sparks/ScorecardSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -318,6 +319,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.0,
     },
     component: CardScoreSpark,
+  },
+  scorecard: {
+    metadata: {
+      id: "scorecard",
+      title: "Scorecard",
+      description: "Hole-by-hole round scoring with voice entry",
+      icon: "⛳",
+      category: "golf",
+      createdAt: "2025-12-27T00:00:00.000Z",
+      rating: 4.5,
+    },
+    component: ScorecardSpark,
   },
   golfWisdom: {
     metadata: {
