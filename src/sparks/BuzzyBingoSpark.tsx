@@ -39,6 +39,7 @@ import {
   SettingsRemoveButton,
   SaveCancelButtons,
 } from "../components/SettingsComponents";
+import { AISettingsNote } from '../components/AISettingsNote';
 import { GeminiService } from '../services/GeminiService';
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -733,6 +734,10 @@ Chocolate Cake
               sparkName="Buzzy Bingo"
               sparkId="buzzy-bingo"
             />
+
+            <View style={{ padding: 20 }}>
+              <AISettingsNote sparkName="Buzzy Bingo" />
+            </View>
 
             {/* Active Word Set */}
             <SettingsSection title="Active Word Set">

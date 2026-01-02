@@ -19,6 +19,7 @@ import {
     SettingsFeedbackSection,
     SaveCancelButtons,
 } from '../components/SettingsComponents';
+import { AISettingsNote } from '../components/AISettingsNote';
 import { HapticFeedback } from '../utils/haptics';
 
 interface Recipe {
@@ -486,6 +487,10 @@ Generate the recipe now:`;
                         icon="🍳"
                         sparkId="recaipe"
                     />
+
+                    <View style={{ padding: 20 }}>
+                        <AISettingsNote sparkName="RecAIpe" />
+                    </View>
 
                     <View style={{ padding: 20 }}>
                         <Text style={{ fontSize: 16, color: colors.text, marginBottom: 8, fontWeight: '600' }}>

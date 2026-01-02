@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,6 +17,7 @@ import { SparkSubmissionAdminService } from '../services/SparkSubmissionAdminSer
 import { ServiceFactory } from '../services/ServiceFactory';
 import { FeedbackService } from '../services/FeedbackService';
 import { getSparkById } from '../components/SparkRegistry';
+import { GeminiService } from '../services/GeminiService';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -83,6 +84,11 @@ export const SettingsScreen: React.FC = () => {
   // Debug state
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
 
+  // Gemini API Key state
+  const [customApiKey, setCustomApiKey] = useState<string>('');
+  const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
+  const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
+
   // Initialize analytics service
   useEffect(() => {
     const initializeAnalytics = async () => {
@@ -120,26 +126,27 @@ export const SettingsScreen: React.FC = () => {
         console.log('🔍 Session ID:', sessionInfo.sessionId);
         console.log('🔍 Analytics initialized:', sessionInfo.isInitialized);
         console.log('🔍 Analytics service type:', AnalyticsService.constructor.name);
-
-        // Fallback: Get device ID directly from AsyncStorage
-        let deviceId: string | null = sessionInfo.userId || sessionInfo.sessionId;
-        if (!deviceId || deviceId === 'unknown') {
-          try {
-            deviceId = await AsyncStorage.getItem('analytics_device_id');
-            console.log('🔍 Device ID from AsyncStorage:', deviceId);
-          } catch (error) {
-            console.error('❌ Error getting device ID from AsyncStorage:', error);
-          }
-        }
-
-        setCurrentDeviceId(deviceId || 'Unknown');
       } catch (error) {
-        console.error('❌ SettingsScreen: Error initializing analytics:', error);
-        setIsInitialized(false);
+        console.error('❌ SettingsScreen: Analytics initialization failed:', error);
       }
     };
 
     initializeAnalytics();
+  }, [isAdmin]);
+
+  // Load custom API key
+  useEffect(() => {
+    const loadCustomApiKey = async () => {
+      try {
+        const key = await AsyncStorage.getItem(CUSTOM_API_KEY_STORAGE_KEY);
+        setCustomApiKey(key || '');
+      } catch (error) {
+        console.error('Error loading custom API key:', error);
+      } finally {
+        setIsLoadingApiKey(false);
+      }
+    };
+    loadCustomApiKey();
   }, []);
 
 
@@ -276,6 +283,98 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Account Section */}
         <AccountSettingsSection />
+
+        {/* Gemini API Key Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🤖 AI Settings</Text>
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+            Some Sparks use AI powered by Google's Gemini. You can use your own API key for better control and usage limits.
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.linkButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => Linking.openURL('https://aistudio.google.com/app/api-keys')}
+          >
+            <Text style={[styles.linkButtonText, { color: colors.primary }]}>
+              🔗 Create Your Own API Key
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.apiKeyContainer}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Custom Gemini API Key (Optional)</Text>
+            <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
+              Leave empty to use the default key. Your custom key takes priority.
+            </Text>
+            {isLoadingApiKey ? (
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
+            ) : (
+              <TextInput
+                style={[styles.apiKeyInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                placeholder="Enter your Gemini API key"
+                placeholderTextColor={colors.textSecondary}
+                value={customApiKey}
+                onChangeText={setCustomApiKey}
+                secureTextEntry={true}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
+            <View style={styles.apiKeyActions}>
+              <TouchableOpacity
+                style={[styles.apiKeyButton, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  try {
+                    if (customApiKey.trim()) {
+                      await AsyncStorage.setItem(CUSTOM_API_KEY_STORAGE_KEY, customApiKey.trim());
+                      HapticFeedback.success();
+                      Alert.alert('Success', 'API key saved successfully!');
+                    } else {
+                      await AsyncStorage.removeItem(CUSTOM_API_KEY_STORAGE_KEY);
+                      HapticFeedback.success();
+                      Alert.alert('Success', 'API key removed. Using default key.');
+                    }
+                  } catch (error) {
+                    HapticFeedback.error();
+                    Alert.alert('Error', 'Failed to save API key.');
+                  }
+                }}
+              >
+                <Text style={styles.apiKeyButtonText}>Save</Text>
+              </TouchableOpacity>
+              {customApiKey && (
+                <TouchableOpacity
+                  style={[styles.apiKeyButton, { backgroundColor: colors.error }]}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Remove API Key',
+                      'Are you sure you want to remove your custom API key?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Remove',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await AsyncStorage.removeItem(CUSTOM_API_KEY_STORAGE_KEY);
+                              setCustomApiKey('');
+                              HapticFeedback.success();
+                              Alert.alert('Success', 'API key removed.');
+                            } catch (error) {
+                              HapticFeedback.error();
+                              Alert.alert('Error', 'Failed to remove API key.');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.apiKeyButtonText}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
 
         {/* Debug Section - Remove after testing */}
         <View style={styles.section}>
@@ -978,5 +1077,61 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  linkButton: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  linkButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  apiKeyContainer: {
+    marginTop: 8,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  inputHint: {
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    padding: 12,
+    textAlign: 'center',
+  },
+  apiKeyInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  apiKeyActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  apiKeyButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  apiKeyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -32,6 +32,7 @@ import {
   SettingsFeedbackSection,
   SaveCancelButtons,
 } from "../components/SettingsComponents";
+import { AISettingsNote } from '../components/AISettingsNote';
 
 interface CommandHistoryItem {
   id: string;
@@ -302,6 +303,10 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
             icon="🎙️"
             sparkId="speak-spark"
           />
+
+          <View style={{ padding: 20 }}>
+            <AISettingsNote sparkName="Speak Spark" />
+          </View>
 
           <View style={{ padding: 20 }}>
             <Text

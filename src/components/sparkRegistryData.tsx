@@ -40,6 +40,7 @@ import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
 import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import ScorecardSpark from "../sparks/ScorecardSpark";
+import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -258,6 +259,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "media",
       createdAt: "2024-01-15T00:00:00.000Z",
       rating: 4.5,
+      properties: ["Shareable"],
     },
     component: ShortSaverSpark,
   },
@@ -307,6 +309,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "game",
       createdAt: "2025-11-01T00:00:00.000Z",
       rating: 4.5,
+      properties: ["AI"],
     },
     component: BuzzyBingoSpark as React.ComponentType<any>,
   },
@@ -454,6 +457,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "productivity",
       createdAt: "2025-12-06T00:00:00.000Z",
       rating: 4.6,
+      properties: ["AI"],
     },
     component: RecAIpeSpark,
   },
@@ -479,6 +483,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "productivity",
       createdAt: "2025-12-09T00:00:00.000Z",
       rating: 4.5,
+      properties: ["AI"],
     },
     component: SpeakSpark,
   },
@@ -516,8 +521,21 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "health",
       createdAt: "2025-12-27T00:00:00.000Z",
       rating: 4.5,
+      properties: ["AI"],
     },
     component: DreamCatcherSpark,
+  },
+  "goal-tracker": {
+    metadata: {
+      id: "goal-tracker",
+      title: "Goal Tracker",
+      description: "Track your progress toward annual goals with visual charts",
+      icon: "🎯",
+      category: "productivity",
+      createdAt: new Date().toISOString(),
+      rating: 4.5,
+    },
+    component: GoalTrackerSpark,
   },
 };
 

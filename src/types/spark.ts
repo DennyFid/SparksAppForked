@@ -8,6 +8,7 @@ export interface SparkMetadata {
   createdAt: string; // ISO date string
   rating: number; // 1-5 stars
   archived?: boolean; // Optional flag for archived sparks
+  properties?: string[]; // Optional properties like 'AI', 'Shareable', etc.
 }
 
 export interface SparkConfig {

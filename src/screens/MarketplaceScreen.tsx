@@ -17,6 +17,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   const allSparks = getAllSparks();
   const { colors } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
 
   const handleSparkPress = (sparkId: string) => {
     navigation.navigate('Spark', { sparkId });
@@ -27,8 +28,22 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     setSelectedCategory(prev => prev === category ? null : category);
   };
 
+  const handlePropertyPress = (property: string) => {
+    // Toggle: if same property is clicked, clear filter; otherwise set new filter
+    setSelectedProperty(prev => prev === property ? null : property);
+  };
+
   // Get unique categories from all sparks
   const categories = Array.from(new Set(allSparks.map(spark => spark.metadata.category)));
+
+  // Get unique properties from all sparks
+  const allProperties = new Set<string>();
+  allSparks.forEach(spark => {
+    if (spark.metadata.properties) {
+      spark.metadata.properties.forEach(prop => allProperties.add(prop));
+    }
+  });
+  const properties = Array.from(allProperties).sort();
 
   // Get new sparks (3 most recently created)
   const newSparks = allSparks
@@ -40,9 +55,13 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     .sort((a, b) => b.metadata.rating - a.metadata.rating)
     .slice(0, 3);
 
-  // Get all sparks alphabetically, filtered by category if selected
+  // Get all sparks alphabetically, filtered by category and property if selected
   const allSparksAlphabetical = allSparks
-    .filter(spark => !selectedCategory || spark.metadata.category === selectedCategory)
+    .filter(spark => {
+      const categoryMatch = !selectedCategory || spark.metadata.category === selectedCategory;
+      const propertyMatch = !selectedProperty || (spark.metadata.properties && spark.metadata.properties.includes(selectedProperty));
+      return categoryMatch && propertyMatch;
+    })
     .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
 
   const renderStars = (rating: number) => {
@@ -276,8 +295,8 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       <ScrollView>
-        {/* Only show New Sparks and Top Rated when no category filter is active */}
-        {!selectedCategory && (
+        {/* Only show New Sparks and Top Rated when no filters are active */}
+        {!selectedCategory && !selectedProperty && (
           <>
             {/* New Sparks Section */}
             <View style={styles.sectionHeader}>
@@ -341,6 +360,29 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
               })}
             </View>
           </>
+        )}
+
+        {/* Property Filter Pills */}
+        {properties.length > 0 && (
+          <View style={styles.categoryPillsContainer}>
+            {properties.map((property) => (
+              <TouchableOpacity
+                key={property}
+                style={[
+                  styles.categoryPill,
+                  selectedProperty === property && styles.categoryPillActive
+                ]}
+                onPress={() => handlePropertyPress(property)}
+              >
+                <Text style={[
+                  styles.categoryPillText,
+                  selectedProperty === property && styles.categoryPillTextActive
+                ]}>
+                  {property}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {/* Category Filter Pills */}

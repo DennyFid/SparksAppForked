@@ -27,6 +27,7 @@ import {
   SettingsText,
   SettingsButton,
 } from '../components/SettingsComponents';
+import { AISettingsNote } from '../components/AISettingsNote';
 
 type RecordingState = 'idle' | 'recording' | 'recorded' | 'transcribing' | 'transcribed' | 'interpreting' | 'interpreted';
 
@@ -318,6 +319,10 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
           />
 
           <SettingsFeedbackSection sparkName="Dream Catcher" sparkId="dream-catcher" />
+
+          <View style={{ padding: 20 }}>
+            <AISettingsNote sparkName="Dream Catcher" />
+          </View>
 
           <SettingsSection title="About">
             <View style={{ padding: 16 }}>
