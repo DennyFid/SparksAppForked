@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { PinchGestureHandler, PanGestureHandler, GestureHandlerRootView, State } from 'react-native-gesture-handler';
 
 const { width: screenWidth } = Dimensions.get('window');
 import * as ImagePicker from 'expo-image-picker';
@@ -150,6 +151,15 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   const [selectedTripForDetail, setSelectedTripForDetail] = useState<Trip | null>(null);
   const [showPhotoDetail, setShowPhotoDetail] = useState(false); // Renamed from photoDetail to match usage
   const [selectedPhoto, setSelectedPhoto] = useState<TripPhoto | null>(null);
+  const [showZoomablePhoto, setShowZoomablePhoto] = useState(false);
+  const [zoomablePhotoUri, setZoomablePhotoUri] = useState<string | null>(null);
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const lastScale = useRef(1);
+  const lastTranslate = useRef({ x: 0, y: 0 });
+  const baseScale = useRef(new Animated.Value(1)).current;
+  const pinchScale = useRef(new Animated.Value(1)).current;
 
 
   // Photo Detail State
@@ -324,7 +334,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
     if (hasChanges) {
       // Save the migrated data immediately
-      await setSparkData('trip-story', {
+      setSparkData('trip-story', {
         trips: updatedTrips,
         activeDayDate,
         activeActivityId,
@@ -335,9 +345,9 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     return updatedTrips;
   };
 
-  const saveTrips = async (newTrips: Trip[]) => {
+  const saveTrips = (newTrips: Trip[]) => {
     try {
-      await setSparkData('trip-story', {
+      setSparkData('trip-story', {
         trips: newTrips,
         activeDayDate,
         activeActivityId,
@@ -377,11 +387,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
       const tripsFound = tripStoryData.trips.length;
       console.log(`🔍 Found ${tripsFound} trips in storage, attempting recovery...`);
 
-      // Restore the data using setSparkData
-      await setSparkData('trip-story', tripStoryData);
+      // Restore the data using setSparkData (synchronous)
+      setSparkData('trip-story', tripStoryData);
       
       // Reload trips to apply the recovered data
-      await loadTrips();
+      loadTrips();
 
       return { 
         recovered: true, 
@@ -400,7 +410,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
   const loadTrips = async () => {
     try {
-      const data = await getSparkData('trip-story');
+      const data = getSparkData('trip-story');
       if (data?.trips) {
         // Check if migration is needed:
         // 1. Photos with no URI but an ID
@@ -453,26 +463,28 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     }
   };
 
+  // Load trips on mount
+  useEffect(() => {
+    loadTrips();
+  }, []);
+
   // Save active state whenever it changes
   useEffect(() => {
     if (!isLoaded) return; // Prevent saving before load completes
 
-    const saveActiveState = async () => {
-      try {
-        const currentData = await getSparkData('trip-story');
-        await setSparkData('trip-story', {
-          ...currentData,
-          trips: trips, // Use current trips state
-          activeDayDate: activeDayDate,
-          activeActivityId: activeActivityId,
-          activeTripId: currentTrip?.id || activeTripId || null,
-        });
-      } catch (error) {
-        console.error('Error saving active state:', error);
-      }
-    };
-    saveActiveState();
-  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips, isLoaded]);
+    try {
+      const currentData = getSparkData('trip-story');
+      setSparkData('trip-story', {
+        ...currentData,
+        trips: trips, // Use current trips state
+        activeDayDate: activeDayDate,
+        activeActivityId: activeActivityId,
+        activeTripId: currentTrip?.id || activeTripId || null,
+      });
+    } catch (error) {
+      console.error('Error saving active state:', error);
+    }
+  }, [activeDayDate, activeActivityId, activeTripId, currentTrip, trips, isLoaded, getSparkData, setSparkData]);
 
   const activateDay = (date: string) => {
     if (!currentTrip) return;
@@ -535,7 +547,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     };
 
     const updatedTrips = [...trips, newTrip];
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
 
     // Schedule notifications if it's a planned trip (day before and day of at 8 AM)
     if (newTrip.status === 'planned') {
@@ -599,7 +611,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         : trip
     );
 
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
 
@@ -809,7 +821,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           : trip
       );
 
-      await saveTrips(updatedTrips);
+      saveTrips(updatedTrips);
       const updatedTrip = updatedTrips.find(t => t.id === currentTrip!.id) || null;
       setCurrentTrip(updatedTrip);
 
@@ -939,7 +951,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         : trip
     );
 
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
 
@@ -958,6 +970,11 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   };
 
   const handlePhotoPress = (photo: TripPhoto) => {
+    console.log('📷 handlePhotoPress - photo:', {
+      id: photo.id,
+      uri: photo.uri,
+      absoluteUri: toAbsoluteUri(photo.uri),
+    });
     setSelectedPhoto(photo);
     setPhotoName(photo.caption || '');
     setPhotoDate(new Date(photo.timestamp).toISOString().split('T')[0]);
@@ -1007,7 +1024,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         : trip
     );
 
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
     setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
     setShowPhotoDetail(false);
     setSelectedPhoto(null);
@@ -1038,7 +1055,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                 : trip
             );
 
-            await saveTrips(updatedTrips);
+            saveTrips(updatedTrips);
             setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
             setShowPhotoDetail(false);
             setSelectedPhoto(null);
@@ -1098,7 +1115,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         : trip
     );
 
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
     setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
     setShowEditActivity(false);
     setEditingActivity(null);
@@ -1128,7 +1145,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                 : trip
             );
 
-            await saveTrips(updatedTrips);
+            saveTrips(updatedTrips);
             setCurrentTrip(updatedTrips.find(t => t.id === currentTrip.id) || null);
             setShowEditActivity(false);
             setEditingActivity(null);
@@ -1235,7 +1252,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
     };
 
     const updatedTrips = trips.map(trip => trip.id === currentTrip.id ? updatedTrip : trip);
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
 
     // Update notifications if status changes
     if (currentTrip.status === 'planned' && newStatus !== 'planned') {
@@ -1286,7 +1303,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           style: 'destructive',
           onPress: async () => {
             const updatedTrips = trips.filter(trip => trip.id !== currentTrip.id);
-            await saveTrips(updatedTrips);
+            saveTrips(updatedTrips);
 
             // Notifications will auto-expire if time has passed
             // No explicit cancel needed
@@ -2199,7 +2216,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
         : trip
     );
 
-    await saveTrips(updatedTrips);
+    saveTrips(updatedTrips);
     const updatedTrip = updatedTrips.find(t => t.id === currentTrip.id) || null;
     setCurrentTrip(updatedTrip);
     setShowManageActivities(false);
@@ -2290,7 +2307,44 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
           <ScrollView style={styles.modalContent}>
             {/* Photo Preview */}
             <View style={styles.photoPreviewContainer}>
-              <Image source={{ uri: toAbsoluteUri(selectedPhoto.uri) }} style={styles.photoPreviewFullWidth} />
+              {selectedPhoto?.uri ? (() => {
+                const absoluteUri = toAbsoluteUri(selectedPhoto.uri);
+                console.log('🖼️ Rendering photo in detail modal:', {
+                  originalUri: selectedPhoto.uri,
+                  absoluteUri: absoluteUri,
+                  photoId: selectedPhoto.id,
+                });
+                return (
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => {
+                      setZoomablePhotoUri(absoluteUri);
+                      setShowZoomablePhoto(true);
+                    }}
+                    style={{ width: '100%' }}
+                  >
+                    <Image 
+                      source={{ uri: absoluteUri }} 
+                      style={styles.photoPreviewFullWidth}
+                      resizeMode="contain"
+                      onLoad={() => {
+                        console.log('✅ Photo loaded successfully in detail modal');
+                      }}
+                      onError={(error) => {
+                        console.error('❌ Error loading photo in detail modal:', {
+                          uri: selectedPhoto.uri,
+                          absoluteUri: absoluteUri,
+                          error: error.nativeEvent?.error || error,
+                        });
+                      }}
+                    />
+                  </TouchableOpacity>
+                );
+              })() : (
+                <View style={[styles.photoPreviewFullWidth, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ color: colors.textSecondary }}>Photo not available (no URI)</Text>
+                </View>
+              )}
             </View>
 
             {/* Photo Name */}
@@ -2507,6 +2561,108 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
             </View>
           </View>
         </View>
+      </Modal>
+    );
+  };
+
+  const renderZoomablePhotoModal = () => {
+    if (!zoomablePhotoUri) return null;
+
+    const onPinchGestureEvent = Animated.event(
+      [{ nativeEvent: { scale: pinchScale } }],
+      { useNativeDriver: true }
+    );
+
+    const onPinchHandlerStateChange = (event: any) => {
+      if (event.nativeEvent.oldState === State.ACTIVE) {
+        lastScale.current *= event.nativeEvent.scale;
+        if (lastScale.current < 1) {
+          lastScale.current = 1;
+        } else if (lastScale.current > 4) {
+          lastScale.current = 4;
+        }
+        baseScale.setValue(lastScale.current);
+        pinchScale.setValue(1);
+      }
+    };
+
+    const onPanGestureEvent = Animated.event(
+      [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
+      { useNativeDriver: true }
+    );
+
+    const onPanHandlerStateChange = (event: any) => {
+      if (event.nativeEvent.oldState === State.ACTIVE) {
+        lastTranslate.current.x += event.nativeEvent.translationX;
+        lastTranslate.current.y += event.nativeEvent.translationY;
+        translateX.setValue(lastTranslate.current.x);
+        translateY.setValue(lastTranslate.current.y);
+        translateX.setOffset(lastTranslate.current.x);
+        translateY.setOffset(lastTranslate.current.y);
+        translateX.setValue(0);
+        translateY.setValue(0);
+      }
+    };
+
+    const animatedStyle = {
+      transform: [
+        { scale: Animated.multiply(baseScale, pinchScale) },
+        { translateX: translateX },
+        { translateY: translateY },
+      ],
+    };
+
+    const handleClose = () => {
+      setShowZoomablePhoto(false);
+      setZoomablePhotoUri(null);
+      // Reset zoom state
+      lastScale.current = 1;
+      lastTranslate.current = { x: 0, y: 0 };
+      baseScale.setValue(1);
+      pinchScale.setValue(1);
+      translateX.setValue(0);
+      translateY.setValue(0);
+      translateX.setOffset(0);
+      translateY.setOffset(0);
+    };
+
+    return (
+      <Modal
+        visible={showZoomablePhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleClose}
+      >
+        <GestureHandlerRootView style={styles.zoomablePhotoContainer}>
+          <View style={styles.zoomablePhotoBackdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={handleClose}
+            />
+            <PanGestureHandler
+              onGestureEvent={onPanGestureEvent}
+              onHandlerStateChange={onPanHandlerStateChange}
+              minPointers={1}
+              maxPointers={1}
+            >
+              <Animated.View style={styles.zoomablePhotoWrapper} collapsable={false}>
+                <PinchGestureHandler
+                  onGestureEvent={onPinchGestureEvent}
+                  onHandlerStateChange={onPinchHandlerStateChange}
+                >
+                  <Animated.View collapsable={false}>
+                    <Animated.Image
+                      source={{ uri: zoomablePhotoUri }}
+                      style={[styles.zoomablePhoto, animatedStyle]}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                </PinchGestureHandler>
+              </Animated.View>
+            </PanGestureHandler>
+          </View>
+        </GestureHandlerRootView>
       </Modal>
     );
   };
@@ -2834,7 +2990,8 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
   );
 
   const renderCustomPhotoPickerModal = () => {
-    const photoSize = (screenWidth - 48) / 3; // 3 columns with padding
+    const photoWidth = screenWidth - 40; // Full width minus padding
+    const photoHeight = photoWidth * 1.2; // Slightly taller than square for better visibility
 
     const togglePhotoSelection = (photoId: string) => {
       setSelectedPickerPhotos(prev => {
@@ -2873,7 +3030,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                 </Text>
               </View>
             ) : (
-              <View style={styles.photoGrid}>
+              <View style={styles.photoListContainer}>
                 {customPickerPhotos.map((asset) => {
                   const isSelected = selectedPickerPhotos.has(asset.id);
                   // Get the display URI from our map, fallback to asset.uri
@@ -2882,13 +3039,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                     <TouchableOpacity
                       key={asset.id}
                       style={[
-                        styles.photoGridItem,
+                        styles.photoListItem,
                         {
-                          width: photoSize,
-                          height: photoSize,
+                          width: photoWidth,
+                          height: photoHeight,
                           borderWidth: isSelected ? 3 : 1,
                           borderColor: isSelected ? colors.primary : colors.border,
                           backgroundColor: colors.border + '40', // Light background for empty boxes
+                          marginBottom: 12,
                         }
                       ]}
                       onPress={() => togglePhotoSelection(asset.id)}
@@ -2896,14 +3054,14 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
                       {imageUri ? (
                         <Image
                           source={{ uri: toAbsoluteUri(imageUri) }}
-                          style={[styles.photoGridImage, { width: photoSize, height: photoSize }]}
+                          style={[styles.photoListItemImage, { width: photoWidth, height: photoHeight }]}
                           resizeMode="cover"
                           onError={(error) => {
                             console.error('❌ Error loading thumbnail for asset:', asset.id, imageUri, error);
                           }}
                         />
                       ) : (
-                        <View style={[styles.photoGridPlaceholder, { width: photoSize, height: photoSize }]}>
+                        <View style={[styles.photoGridPlaceholder, { width: photoWidth, height: photoHeight }]}>
                           <Text style={{ color: colors.textSecondary, fontSize: 24 }}>📷</Text>
                         </View>
                       )}
@@ -3850,6 +4008,7 @@ const TripStorySpark: React.FC<TripStorySparkProps> = ({
 
       {renderCreateTripModal()}
       {renderAddActivityModal()}
+      {renderZoomablePhotoModal()}
     </View>
   );
 };
@@ -4004,6 +4163,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     padding: 16,
+  },
+  photoListContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  photoListItem: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoListItemImage: {
+    borderRadius: 8,
   },
   photoGridItem: {
     borderRadius: 8,
@@ -4422,6 +4593,8 @@ const styles = StyleSheet.create({
   photoPreviewContainer: {
     alignItems: 'center',
     marginBottom: 20,
+    width: '100%',
+    minHeight: 250,
   },
   photoPreview: {
     width: 200,
@@ -4430,8 +4603,10 @@ const styles = StyleSheet.create({
   },
   photoPreviewFullWidth: {
     width: '100%',
-    height: 250,
+    minHeight: 250,
+    height: 300,
     borderRadius: 12,
+    backgroundColor: '#f0f0f0',
   },
   locationContainer: {
     padding: 16,
@@ -4784,6 +4959,25 @@ const styles = StyleSheet.create({
   radioDescription: {
     fontSize: 12,
     marginTop: 2,
+  },
+  zoomablePhotoContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  zoomablePhotoBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomablePhotoWrapper: {
+    width: screenWidth,
+    height: screenWidth,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomablePhoto: {
+    width: screenWidth,
+    height: screenWidth,
   },
 });
 
