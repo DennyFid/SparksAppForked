@@ -23,7 +23,6 @@ import SongSaverSpark from "../sparks/SongSaverSpark";
 import SparkSpark from "../sparks/SparkSpark";
 import { MinuteMinderSpark } from "../sparks/MinuteMinderSpark";
 import { BuzzyBingoSpark } from "../sparks/BuzzyBingoSpark";
-import HangmanSpark from "../sparks/HangmanSpark";
 import { CardScoreSpark } from "../sparks/CardScoreSpark";
 import { GolfWisdomSpark } from "../sparks/GolfWisdomSpark";
 import WeightTrackerSpark from "../sparks/WeightTrackerSpark";
@@ -85,7 +84,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       description: "Enhanced idea capture with formatting and search",
       icon: "💡",
       category: "productivity",
-      createdAt: new Date().toISOString(),
+      createdAt: "2025-12-10T00:00:00.000Z",
       rating: 4.3,
     },
     component: Ideas2Spark,
@@ -314,18 +313,6 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: BuzzyBingoSpark as React.ComponentType<any>,
   },
-  hangman: {
-    metadata: {
-      id: "hangman",
-      title: "Hangman",
-      description: "Classic hangman party game for 2-4 players",
-      icon: "🔤",
-      category: "game",
-      createdAt: new Date().toISOString(),
-      rating: 4.2,
-    },
-    component: HangmanSpark as React.ComponentType<any>,
-  },
   memory: {
     metadata: {
       id: "memory",
@@ -545,7 +532,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       description: "Track your progress toward annual goals with visual charts",
       icon: "🎯",
       category: "productivity",
-      createdAt: new Date().toISOString(),
+      createdAt: "2026-01-02T00:00:00.000Z",
       rating: 4.5,
     },
     component: GoalTrackerSpark,

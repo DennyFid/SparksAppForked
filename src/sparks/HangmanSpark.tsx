@@ -61,7 +61,7 @@ const HANGMAN_STATES = [
       ===`,
 ];
 
-export const HangmanSpark: React.FC<HangmanSparkProps> = ({}) => {
+export const HangmanSpark: React.FC<HangmanSparkProps> = ({ }) => {
   const { colors } = useTheme();
 
   const [numPlayers, setNumPlayers] = useState<number | null>(null);
