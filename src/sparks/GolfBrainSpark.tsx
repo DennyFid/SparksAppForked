@@ -3717,359 +3717,317 @@ const CourseSelectionScreen: React.FC<{
 };
 
 // Hole Detail Screen Component
-const HoleDetailScreen = React.forwardRef<
-  { saveCurrentData: () => void },
-  {
-    course: Course;
-    currentHole: number;
-    currentRound?: Round;
-    data: GolfBrainData;
-    onNextHole: () => void;
-    onPreviousHole: () => void;
-    onCompleteHole: (holeScore: HoleScore) => void;
-    onShowHistory: () => void;
-    onSaveHoleData: (holeNumber: number, shots: Shot[], putts: Shot[]) => void;
-    onLoadHoleData: (
-      holeNumber: number
-    ) => { shots: Shot[]; putts: Shot[] } | null;
-    onUpdateTodaysDistance: (
-      holeNumber: number,
-      distance: number | undefined
-    ) => void;
-    onEndRound: () => void;
-    onViewSummary: () => void;
-    onClose: () => void;
-    clubs: string[];
-    handicap?: number;
-    getBumpsForHole: (hole: Hole) => number;
-    getCumulativeOverPar: (
-      holeNumber: number,
-      currentShots?: Shot[],
-      currentPutts?: Shot[]
-    ) => number;
-    colors: any;
-    onFlameAnimation: () => void;
-    onPoopAnimation: () => void;
-  }
->(
-  (
-    {
-      course,
-      currentHole,
-      currentRound,
-      data,
-      onNextHole,
-      onPreviousHole,
-      onCompleteHole,
-      onShowHistory,
-      onSaveHoleData,
-      onLoadHoleData,
-      onUpdateTodaysDistance,
-      onEndRound,
-      onViewSummary,
-      onClose,
-      clubs,
-      handicap,
-      getBumpsForHole,
-      getCumulativeOverPar,
-      colors,
-      onFlameAnimation,
-      onPoopAnimation,
-    },
-    ref
-  ) => {
-    const hole = (course.holes || []).find((h) => h.number === currentHole);
-    const [shots, setShots] = useState<Shot[]>([]);
-    const [putts, setPutts] = useState<Shot[]>([]);
-    const [showHistory, setShowHistory] = useState(false);
-    const [showValidationError, setShowValidationError] = useState(false);
-    const [todaysDistance, setTodaysDistance] = useState<string>(
-      hole?.todaysDistance?.toString() || ""
-    );
-    const [showDistanceModal, setShowDistanceModal] = useState(false);
-    const [currentShotIndex, setCurrentShotIndex] = useState(0);
-    const scrollViewRef = useRef<ScrollView>(null);
-    const clubDropdownRef = useRef<{ open: () => void }>(null);
-    const [showClubDropdown, setShowClubDropdown] = useState(false);
-    const [playbackRate, setPlaybackRate] = useState(1.0);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const shotVideoRef = useRef<Video>(null);
+interface HoleDetailScreenProps {
+  course: Course;
+  currentHole: number;
+  currentRound?: Round;
+  data: GolfBrainData;
+  onNextHole: () => void;
+  onPreviousHole: () => void;
+  onCompleteHole: (holeScore: HoleScore) => void;
+  onShowHistory: () => void;
+  onSaveHoleData: (holeNumber: number, shots: Shot[], putts: Shot[]) => void;
+  onLoadHoleData: (
+    holeNumber: number
+  ) => { shots: Shot[]; putts: Shot[] } | null;
+  onUpdateTodaysDistance: (
+    holeNumber: number,
+    distance: number | undefined
+  ) => void;
+  onEndRound: () => void;
+  onViewSummary: () => void;
+  onClose: () => void;
+  clubs: string[];
+  handicap?: number;
+  getBumpsForHole: (hole: Hole) => number;
+  getCumulativeOverPar: (
+    holeNumber: number,
+    currentShots?: Shot[],
+    currentPutts?: Shot[]
+  ) => number;
+  colors: any;
+  onFlameAnimation: () => void;
+  onPoopAnimation: () => void;
+}
 
-    const expectedShots = hole ? Math.max(0, hole.par - 2) : 0; // par 3 = 1, par 4 = 2, par 5 = 3
-    console.log("Expected shots calculation:", {
-      holePar: hole?.par,
-      expectedShots,
-      holeNumber: hole?.number,
+
+const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleDetailScreenProps>((props: HoleDetailScreenProps, ref) => {
+  const {
+    course,
+    currentHole,
+    currentRound,
+    data,
+    onNextHole,
+    onPreviousHole,
+    onCompleteHole,
+    onShowHistory,
+    onSaveHoleData,
+    onLoadHoleData,
+    onUpdateTodaysDistance,
+    onEndRound,
+    onViewSummary,
+    onClose,
+    clubs,
+    handicap,
+    getBumpsForHole,
+    getCumulativeOverPar,
+    colors,
+    onFlameAnimation,
+    onPoopAnimation,
+  } = props;
+  const hole = (course.holes || []).find((h) => h.number === currentHole);
+  const [shots, setShots] = useState<Shot[]>([]);
+  const [putts, setPutts] = useState<Shot[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showValidationError, setShowValidationError] = useState(false);
+  const [todaysDistance, setTodaysDistance] = useState<string>(
+    hole?.todaysDistance?.toString() || ""
+  );
+  const [showDistanceModal, setShowDistanceModal] = useState(false);
+  const [currentShotIndex, setCurrentShotIndex] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const clubDropdownRef = useRef<{ open: () => void }>(null);
+  const [showClubDropdown, setShowClubDropdown] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const shotVideoRef = useRef<Video>(null);
+
+  const expectedShots = hole ? Math.max(0, hole.par - 2) : 0; // par 3 = 1, par 4 = 2, par 5 = 3
+  console.log("Expected shots calculation:", {
+    holePar: hole?.par,
+    expectedShots,
+    holeNumber: hole?.number,
+  });
+  const expectedPutts = 2;
+
+  // Check if all default iron shots have outcomes
+  const allShotsHaveOutcomes =
+    (shots?.length || 0) >= expectedShots &&
+    shots?.slice(0, expectedShots).every((shot) => shot.direction);
+
+  // Get all shots in order (iron shots first, then putts)
+  const getAllShots = () => {
+    const allShots = [
+      ...(shots || []).map((shot, index) => ({
+        shot,
+        type: "shot" as const,
+        index,
+        id: shot.id,
+      })),
+      ...(putts || []).map((shot, index) => ({
+        shot,
+        type: "putt" as const,
+        index,
+        id: shot.id,
+      })),
+    ];
+    console.log("getAllShots debug:", {
+      shotsCount: (shots || []).length,
+      puttsCount: (putts || []).length,
+      totalShots: allShots.length,
+      allShots: allShots.map((s) => ({ type: s.type, index: s.index })),
     });
-    const expectedPutts = 2;
+    return allShots;
+  };
 
-    // Check if all default iron shots have outcomes
-    const allShotsHaveOutcomes =
-      (shots?.length || 0) >= expectedShots &&
-      shots?.slice(0, expectedShots).every((shot) => shot.direction);
+  // Get current shot being displayed using sequential indexing
+  const getCurrentShot = () => {
+    const allShots = getAllShots();
+    return allShots[currentShotIndex] || null;
+  };
 
-    // Get all shots in order (iron shots first, then putts)
-    const getAllShots = () => {
-      const allShots = [
-        ...(shots || []).map((shot, index) => ({
-          shot,
-          type: "shot" as const,
-          index,
-          id: shot.id,
-        })),
-        ...(putts || []).map((shot, index) => ({
-          shot,
-          type: "putt" as const,
-          index,
-          id: shot.id,
-        })),
-      ];
-      console.log("getAllShots debug:", {
-        shotsCount: (shots || []).length,
-        puttsCount: (putts || []).length,
-        totalShots: allShots.length,
-        allShots: allShots.map((s) => ({ type: s.type, index: s.index })),
-      });
-      return allShots;
+  // Get current shot type and display info
+  const getCurrentShotInfo = () => {
+    const allShots = getAllShots();
+    const currentShot = allShots[currentShotIndex];
+    if (!currentShot) return null;
+
+    const isShot = currentShot.type === "shot";
+    const shotNumber = isShot ? currentShot.index + 1 : currentShot.index + 1;
+    const shotLabel = isShot ? `Shot ${shotNumber}` : `Putt ${shotNumber}`;
+
+    return {
+      shot: currentShot.shot,
+      type: currentShot.type,
+      shotNumber,
+      shotLabel,
+      isShot,
     };
+  };
 
-    // Get current shot being displayed using sequential indexing
-    const getCurrentShot = () => {
-      const allShots = getAllShots();
-      return allShots[currentShotIndex] || null;
-    };
+  // Expose saveCurrentData method to parent
+  useImperativeHandle(ref, () => ({
+    saveCurrentData: () => {
+      onSaveHoleData(currentHole, shots, putts);
+      // Save today's distance
+      const distanceValue = todaysDistance
+        ? parseInt(todaysDistance)
+        : undefined;
+      onUpdateTodaysDistance(currentHole, distanceValue);
+    },
+  }));
 
-    // Get current shot type and display info
-    const getCurrentShotInfo = () => {
-      const allShots = getAllShots();
-      const currentShot = allShots[currentShotIndex];
-      if (!currentShot) return null;
+  useEffect(() => {
+    setShowClubDropdown(false);
+    setPlaybackRate(1.0);
+    setIsPlaying(false);
+  }, [currentShotIndex]);
 
-      const isShot = currentShot.type === "shot";
-      const shotNumber = isShot ? currentShot.index + 1 : currentShot.index + 1;
-      const shotLabel = isShot ? `Shot ${shotNumber}` : `Putt ${shotNumber}`;
+  // Open dropdown modal when dropdown becomes visible (after "Other" is clicked)
+  useEffect(() => {
+    if (showClubDropdown && clubDropdownRef.current) {
+      // Small delay to ensure the dropdown component is fully rendered
+      const timer = setTimeout(() => {
+        if (clubDropdownRef.current) {
+          clubDropdownRef.current.open();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [showClubDropdown]);
 
-      return {
-        shot: currentShot.shot,
-        type: currentShot.type,
-        shotNumber,
-        shotLabel,
-        isShot,
-      };
-    };
+  // Initialize shots when hole changes - load existing data or create defaults
+  useEffect(() => {
+    console.log("Shot initialization debug:", {
+      currentHole,
+      hole: hole?.number,
+      par: hole?.par,
+      expectedShots,
+      expectedPutts,
+    });
 
-    // Expose saveCurrentData method to parent
-    useImperativeHandle(ref, () => ({
-      saveCurrentData: () => {
-        onSaveHoleData(currentHole, shots, putts);
-        // Save today's distance
-        const distanceValue = todaysDistance
-          ? parseInt(todaysDistance)
-          : undefined;
-        onUpdateTodaysDistance(currentHole, distanceValue);
-      },
-    }));
+    // Try to load existing data for this hole
+    const existingData = onLoadHoleData(currentHole);
 
-    useEffect(() => {
-      setShowClubDropdown(false);
-      setPlaybackRate(1.0);
-      setIsPlaying(false);
-    }, [currentShotIndex]);
+    if (existingData) {
+      console.log("Loading existing data:", existingData);
+      // Load existing data
+      const loadedShots = existingData.shots || [];
+      const loadedPutts = existingData.putts || [];
 
-    // Open dropdown modal when dropdown becomes visible (after "Other" is clicked)
-    useEffect(() => {
-      if (showClubDropdown && clubDropdownRef.current) {
-        // Small delay to ensure the dropdown component is fully rendered
-        const timer = setTimeout(() => {
-          if (clubDropdownRef.current) {
-            clubDropdownRef.current.open();
-          }
-        }, 50);
-        return () => clearTimeout(timer);
-      }
-    }, [showClubDropdown]);
-
-    // Initialize shots when hole changes - load existing data or create defaults
-    useEffect(() => {
-      console.log("Shot initialization debug:", {
-        currentHole,
-        hole: hole?.number,
-        par: hole?.par,
+      // If no shots exist but we expect shots, create default shots
+      console.log("Shot creation check:", {
+        loadedShotsLength: loadedShots.length,
         expectedShots,
-        expectedPutts,
+        shouldCreateShots: loadedShots.length === 0 && expectedShots > 0,
       });
 
-      // Try to load existing data for this hole
-      const existingData = onLoadHoleData(currentHole);
+      if (loadedShots.length === 0 && expectedShots > 0) {
+        console.log("No shots in loaded data, creating default shots");
 
-      if (existingData) {
-        console.log("Loading existing data:", existingData);
-        // Load existing data
-        const loadedShots = existingData.shots || [];
-        const loadedPutts = existingData.putts || [];
+        // Smart club selection based on user's default clubs
+        const getDefaultClub = (shotIndex: number) => {
+          if (!hole) return "Driver";
 
-        // If no shots exist but we expect shots, create default shots
-        console.log("Shot creation check:", {
-          loadedShotsLength: loadedShots.length,
-          expectedShots,
-          shouldCreateShots: loadedShots.length === 0 && expectedShots > 0,
-        });
+          const currentShotNumber = shotIndex + 1;
+          const par = hole.par;
+          const defaultClubs = data.settings.defaultClubs;
 
-        if (loadedShots.length === 0 && expectedShots > 0) {
-          console.log("No shots in loaded data, creating default shots");
+          // Par 5: Use user's default clubs
+          if (par === 5) {
+            if (currentShotNumber === 1)
+              return defaultClubs?.par5?.shot1 || "[Driver]";
+            if (currentShotNumber === 2)
+              return defaultClubs?.par5?.shot2 || "[Irons]";
+            return defaultClubs?.par5?.shot3 || "[Irons]";
+          }
 
-          // Smart club selection based on user's default clubs
-          const getDefaultClub = (shotIndex: number) => {
-            if (!hole) return "Driver";
+          // Par 4: Use user's default clubs
+          if (par === 4) {
+            if (currentShotNumber === 1)
+              return defaultClubs?.par4?.shot1 || "[Driver]";
+            return defaultClubs?.par4?.shot2 || "[Irons]";
+          }
 
-            const currentShotNumber = shotIndex + 1;
-            const par = hole.par;
-            const defaultClubs = data.settings.defaultClubs;
+          // Par 3: Use user's default clubs
+          if (par === 3) {
+            return defaultClubs?.par3?.shot1 || "[Irons]";
+          }
 
-            // Par 5: Use user's default clubs
-            if (par === 5) {
-              if (currentShotNumber === 1)
-                return defaultClubs?.par5?.shot1 || "[Driver]";
-              if (currentShotNumber === 2)
-                return defaultClubs?.par5?.shot2 || "[Irons]";
-              return defaultClubs?.par5?.shot3 || "[Irons]";
-            }
+          return "[Driver]"; // Default fallback
+        };
 
-            // Par 4: Use user's default clubs
-            if (par === 4) {
-              if (currentShotNumber === 1)
-                return defaultClubs?.par4?.shot1 || "[Driver]";
-              return defaultClubs?.par4?.shot2 || "[Irons]";
-            }
-
-            // Par 3: Use user's default clubs
-            if (par === 3) {
-              return defaultClubs?.par3?.shot1 || "[Irons]";
-            }
-
-            return "[Driver]"; // Default fallback
-          };
-
-          const defaultShots: Shot[] = Array.from(
-            { length: expectedShots },
-            (_, index) => {
-              const club = getDefaultClub(index);
-              console.log(
-                `Creating shot ${index + 1} for par ${hole?.par
-                } hole with club: ${club}`
-              );
-              return {
-                id: `shot-${Date.now()}-${index}`,
-                type: "shot",
-                lie: index === expectedShots - 1 ? "green" : "fairway", // Last shot defaults to green
-                direction: "good", // Default to good outcome
-                club: club, // Apply smart club selection
-                timestamp: Date.now(),
-                poorShot: false, // Always start as good shot
-              };
-            }
-          );
-          setShots(defaultShots);
-          console.log("Created default shots:", defaultShots);
-        } else {
-          console.log("Loaded shots before club assignment:", loadedShots);
-          // Check if any existing shots are missing clubs and apply smart club selection
-          const shotsWithClubs = loadedShots.map((shot, index) => {
-            let updatedShot = { ...shot };
-
-            // Reset poor shot status to ensure fresh start
-            updatedShot.poorShot = false;
-
-            if (!shot.club) {
-              // Apply smart club selection to shots without clubs
-              const getDefaultClub = (shotIndex: number) => {
-                if (!hole) return "Driver";
-
-                const currentShotNumber = shotIndex + 1;
-                const par = hole.par;
-                const defaultClubs = data.settings.defaultClubs;
-
-                // Par 5: Use user's default clubs
-                if (par === 5) {
-                  if (currentShotNumber === 1)
-                    return defaultClubs?.par5?.shot1 || "[Driver]";
-                  if (currentShotNumber === 2)
-                    return defaultClubs?.par5?.shot2 || "[Irons]";
-                  return defaultClubs?.par5?.shot3 || "[Irons]";
-                }
-
-                // Par 4: Use user's default clubs
-                if (par === 4) {
-                  if (currentShotNumber === 1)
-                    return defaultClubs?.par4?.shot1 || "[Driver]";
-                  return defaultClubs?.par4?.shot2 || "[Irons]";
-                }
-
-                // Par 3: Use user's default clubs
-                if (par === 3) {
-                  return defaultClubs?.par3?.shot1 || "[Irons]";
-                }
-
-                return "[Driver]"; // Default fallback
-              };
-
-              const club = getDefaultClub(index);
-              console.log(
-                `Adding club ${club} to existing shot ${index + 1} for par ${hole?.par
-                } hole`
-              );
-              updatedShot.club = club;
-            }
-
-            return updatedShot;
-          });
-
-          console.log("Updated shots with clubs:", shotsWithClubs);
-          setShots(shotsWithClubs);
-        }
-
-        // If no putts exist but we expect putts, create default putts
-        if (loadedPutts.length === 0 && expectedPutts > 0) {
-          console.log("No putts in loaded data, creating default putts");
-          const defaultPutts: Shot[] = Array.from(
-            { length: expectedPutts },
-            (_, index) => ({
-              id: `putt-${Date.now()}-${index}`,
-              type: "putt",
-              puttDistance: index === 1 ? "<4ft" : "5-10ft", // Second putt is typically a tap-in
-              direction: "good", // Default to good outcome
-              timestamp: Date.now(),
-              poorShot: false, // Always start as good putt
-            })
-          );
-          setPutts(defaultPutts);
-          console.log("Created default putts:", defaultPutts);
-        } else {
-          // Reset poor shot status for existing putts to ensure fresh start
-          const resetPutts = loadedPutts.map((putt) => ({
-            ...putt,
-            poorShot: false,
-          }));
-          setPutts(resetPutts);
-        }
-      } else {
-        console.log("Creating default shots:", {
-          expectedShots,
-          expectedPutts,
-        });
-        // Create default shots
         const defaultShots: Shot[] = Array.from(
           { length: expectedShots },
-          (_, index) => ({
-            id: `shot-${Date.now()}-${index}`,
-            type: "shot",
-            lie: index === expectedShots - 1 ? "green" : "fairway", // Last shot defaults to green
-            direction: "good", // Default to good outcome
-            timestamp: Date.now(),
-            poorShot: false, // Always start as good shot
-          })
+          (_, index) => {
+            const club = getDefaultClub(index);
+            console.log(
+              `Creating shot ${index + 1} for par ${hole?.par
+              } hole with club: ${club}`
+            );
+            return {
+              id: `shot-${Date.now()}-${index}`,
+              type: "shot",
+              lie: index === expectedShots - 1 ? "green" : "fairway", // Last shot defaults to green
+              direction: "good", // Default to good outcome
+              club: club, // Apply smart club selection
+              timestamp: Date.now(),
+              poorShot: false, // Always start as good shot
+            };
+          }
         );
+        setShots(defaultShots);
+        console.log("Created default shots:", defaultShots);
+      } else {
+        console.log("Loaded shots before club assignment:", loadedShots);
+        // Check if any existing shots are missing clubs and apply smart club selection
+        const shotsWithClubs = loadedShots.map((shot, index) => {
+          let updatedShot = { ...shot };
 
+          // Reset poor shot status to ensure fresh start
+          updatedShot.poorShot = false;
+
+          if (!shot.club) {
+            // Apply smart club selection to shots without clubs
+            const getDefaultClub = (shotIndex: number) => {
+              if (!hole) return "Driver";
+
+              const currentShotNumber = shotIndex + 1;
+              const par = hole.par;
+              const defaultClubs = data.settings.defaultClubs;
+
+              // Par 5: Use user's default clubs
+              if (par === 5) {
+                if (currentShotNumber === 1)
+                  return defaultClubs?.par5?.shot1 || "[Driver]";
+                if (currentShotNumber === 2)
+                  return defaultClubs?.par5?.shot2 || "[Irons]";
+                return defaultClubs?.par5?.shot3 || "[Irons]";
+              }
+
+              // Par 4: Use user's default clubs
+              if (par === 4) {
+                if (currentShotNumber === 1)
+                  return defaultClubs?.par4?.shot1 || "[Driver]";
+                return defaultClubs?.par4?.shot2 || "[Irons]";
+              }
+
+              // Par 3: Use user's default clubs
+              if (par === 3) {
+                return defaultClubs?.par3?.shot1 || "[Irons]";
+              }
+
+              return "[Driver]"; // Default fallback
+            };
+
+            const club = getDefaultClub(index);
+            console.log(
+              `Adding club ${club} to existing shot ${index + 1} for par ${hole?.par
+              } hole`
+            );
+            updatedShot.club = club;
+          }
+
+          return updatedShot;
+        });
+
+        console.log("Updated shots with clubs:", shotsWithClubs);
+        setShots(shotsWithClubs);
+      }
+
+      // If no putts exist but we expect putts, create default putts
+      if (loadedPutts.length === 0 && expectedPutts > 0) {
+        console.log("No putts in loaded data, creating default putts");
         const defaultPutts: Shot[] = Array.from(
           { length: expectedPutts },
           (_, index) => ({
@@ -4081,1647 +4039,1688 @@ const HoleDetailScreen = React.forwardRef<
             poorShot: false, // Always start as good putt
           })
         );
-
-        console.log("Created default shots:", defaultShots);
-        console.log("Created default putts:", defaultPutts);
-        setShots(defaultShots);
         setPutts(defaultPutts);
+        console.log("Created default putts:", defaultPutts);
+      } else {
+        // Reset poor shot status for existing putts to ensure fresh start
+        const resetPutts = loadedPutts.map((putt) => ({
+          ...putt,
+          poorShot: false,
+        }));
+        setPutts(resetPutts);
       }
-
-      // Update today's distance when hole changes
-      setTodaysDistance(hole?.todaysDistance?.toString() || "");
-
-      // Reset current shot to first shot when hole changes
-      setCurrentShotIndex(0);
-
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      }, 100);
-    }, [currentHole, expectedShots, expectedPutts, hole]);
-
-    // Scroll to top when switching shots
-    useEffect(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-    }, [currentShotIndex]);
-
-    const addShot = () => {
-      // Smart club selection based on user's default clubs
-      const getDefaultClub = () => {
-        if (!hole) return "Driver";
-
-        const currentShotNumber = shots.length + 1;
-        const par = hole.par;
-        const defaultClubs = data.settings.defaultClubs;
-
-        // Par 5: Use user's default clubs
-        if (par === 5) {
-          if (currentShotNumber === 1)
-            return defaultClubs?.par5?.shot1 || "Driver";
-          if (currentShotNumber === 2)
-            return defaultClubs?.par5?.shot2 || "7-Iron";
-          return defaultClubs?.par5?.shot3 || "9-Iron";
-        }
-
-        // Par 4: Use user's default clubs
-        if (par === 4) {
-          if (currentShotNumber === 1)
-            return defaultClubs?.par4?.shot1 || "Driver";
-          return defaultClubs?.par4?.shot2 || "9-Iron";
-        }
-
-        // Par 3: Use user's default clubs
-        if (par === 3) {
-          return defaultClubs?.par3?.shot1 || "7-Iron";
-        }
-
-        return "Driver"; // Default fallback
-      };
-
-      const newShot: Shot = {
-        id: `shot-${Date.now()}-${Math.random()}`,
-        type: "shot",
-        lie: "green",
-        direction: "good", // Default to good outcome
-        club: getDefaultClub(),
-        timestamp: Date.now(),
-        poorShot: false,
-      };
-      setShots((prev) => {
-        const newShots = [...prev, newShot];
-
-        // If the previous shot has lie 'green', change it to 'fairway'
-        if (prev.length > 0 && prev[prev.length - 1].lie === "green") {
-          const updatedPrevShots = [...prev];
-          updatedPrevShots[updatedPrevShots.length - 1] = {
-            ...updatedPrevShots[updatedPrevShots.length - 1],
-            lie: "fairway",
-          };
-          return [...updatedPrevShots, newShot];
-        }
-
-        return newShots;
+    } else {
+      console.log("Creating default shots:", {
+        expectedShots,
+        expectedPutts,
       });
-
-      // Go to the new shot (it will be the last iron shot)
-      setCurrentShotIndex((shots || []).length); // Index of the new shot
-
-      HapticFeedback.light();
-    };
-
-    const addPutt = () => {
-      const newPutt: Shot = {
-        id: `putt-${Date.now()}-${Math.random()}`,
-        type: "putt",
-        puttDistance: "5-10ft",
-        direction: "good", // Default to good outcome
-        timestamp: Date.now(),
-        poorShot: false,
-      };
-      setPutts((prev) => [...prev, newPutt]);
-
-      // Go to the new putt (it will be the last putt)
-      setCurrentShotIndex((shots || []).length + (putts || []).length); // Index of the new putt
-
-      HapticFeedback.light();
-    };
-
-    // Shot navigation functions
-    const goToPreviousShot = () => {
-      if (currentShotIndex > 0) {
-        setCurrentShotIndex(currentShotIndex - 1);
-        HapticFeedback.light();
-      }
-    };
-
-    const goToNextShot = () => {
-      const allShots = getAllShots();
-      if (currentShotIndex < allShots.length - 1) {
-        setCurrentShotIndex(currentShotIndex + 1);
-        HapticFeedback.light();
-      }
-    };
-
-    const canGoPrevious = currentShotIndex > 0;
-    const canGoNext = currentShotIndex < getAllShots().length - 1;
-
-    const removeShot = (shotId: string, type: "shot" | "putt") => {
-      if (type === "shot") {
-        const shotIndex = shots.findIndex((shot) => shot.id === shotId);
-        setShots((prev) => prev.filter((shot) => shot.id !== shotId));
-
-        // Adjust current shot index if needed
-        if (currentShotIndex === shotIndex) {
-          // If we removed the current shot, go to the previous one or first available
-          setCurrentShotIndex(Math.max(0, shotIndex - 1));
-        } else if (currentShotIndex > shotIndex) {
-          // If we removed a shot before the current one, adjust the index
-          setCurrentShotIndex(currentShotIndex - 1);
-        }
-      } else {
-        const puttIndex = (putts || []).findIndex((putt) => putt.id === shotId);
-        const globalIndex = (shots || []).length + puttIndex;
-        setPutts((prev) => prev.filter((putt) => putt.id !== shotId));
-
-        // Adjust current shot index if needed
-        if (currentShotIndex === globalIndex) {
-          // If we removed the current putt, go to the previous one or first available
-          setCurrentShotIndex(Math.max(0, globalIndex - 1));
-        } else if (currentShotIndex > globalIndex) {
-          // If we removed a putt before the current one, adjust the index
-          setCurrentShotIndex(currentShotIndex - 1);
-        }
-      }
-      HapticFeedback.light();
-
-      // Check if all shots and putts are deleted, and remove hole from scorecard
-      setTimeout(() => {
-        const updatedShots =
-          type === "shot" ? shots.filter((shot) => shot.id !== shotId) : shots;
-        const updatedPutts =
-          type === "putt"
-            ? (putts || []).filter((putt) => putt.id !== shotId)
-            : putts || [];
-
-        if (updatedShots.length === 0 && updatedPutts.length === 0) {
-          // Remove this hole from the scorecard
-          onSaveHoleData(currentHole, [], []);
-          // Navigate to previous hole or close if this is the first hole
-          if (currentHole > 1) {
-            onPreviousHole();
-          } else {
-            onClose();
-          }
-        }
-      }, 100);
-    };
-
-    const updateShot = (
-      shotId: string,
-      type: "shot" | "putt",
-      field: keyof Shot,
-      value: any
-    ) => {
-      if (type === "shot") {
-        setShots((prev) =>
-          prev.map((shot) =>
-            shot.id === shotId ? { ...shot, [field]: value } : shot
-          )
-        );
-      } else {
-        setPutts((prev) =>
-          prev.map((shot) =>
-            shot.id === shotId ? { ...shot, [field]: value } : shot
-          )
-        );
-      }
-      // Clear validation error when shots are updated
-      setShowValidationError(false);
-
-      // No auto-advance - let user manually navigate
-    };
-
-    const totalScore = (shots || []).length + (putts || []).length;
-    const netScore = totalScore - (hole?.par || 0);
-
-    const handleCompleteHole = () => {
-      if ((shots || []).length === 0 && (putts || []).length === 0) {
-        Alert.alert(
-          "Error",
-          "Please add at least one shot to complete the hole"
-        );
-        return;
-      }
-
-      // Check if all shots have been described
-      const allShotsDescribed = (shots || []).every((shot) => shot.direction);
-      const allPuttsDescribed = (putts || []).every((putt) => putt.direction); // puttDistance is optional
-
-      if (!allShotsDescribed || !allPuttsDescribed) {
-        setShowValidationError(true);
-        Alert.alert(
-          "Error",
-          "Cannot go to next hole until all shots have a selected outcome or deleted"
-        );
-        return;
-      }
-
-      const holeScore: HoleScore = {
-        holeNumber: currentHole,
-        courseId: course.id,
-        shots: [...shots, ...putts],
-        totalScore,
-        par: hole?.par || 0,
-        netScore,
-        completedAt: Date.now(),
-      };
-
-      onCompleteHole(holeScore);
-      HapticFeedback.success();
-    };
-
-    const handleViewSummary = () => {
-      // Show current round summary
-      onViewSummary();
-    };
-
-    const handleRecordingComplete = (swing: RecordedSwing) => {
-      console.log("Recording completed:", swing);
-      // Find the shot to update
-      // We need to match based on hole and shot number
-      // swing.shotNumber is 1-based index
-
-      // Determine if it's a shot or putt based on index
-      // Note: RecordSwing is currently only passed for shots (shotInfo.isShot check in JSX)
-      // swing.shotNumber from RecordSwing corresponds to the visible shot number
-
-      // Iterate through shots to find the one matching the current index
-      const shotToUpdate = (shots || []).find(
-        (s, i) => i + 1 === swing.shotNumber
+      // Create default shots
+      const defaultShots: Shot[] = Array.from(
+        { length: expectedShots },
+        (_, index) => ({
+          id: `shot-${Date.now()}-${index}`,
+          type: "shot",
+          lie: index === expectedShots - 1 ? "green" : "fairway", // Last shot defaults to green
+          direction: "good", // Default to good outcome
+          timestamp: Date.now(),
+          poorShot: false, // Always start as good shot
+        })
       );
 
-      if (shotToUpdate) {
-        updateShot(shotToUpdate.id, "shot", "videoUri", swing.uri);
-        HapticFeedback.success();
-      } else {
-        console.warn(
-          "Could not find shot to update with recording for shot number:",
-          swing.shotNumber
-        );
-      }
-    };
-
-    // Analyze historical shot data for this hole
-    const getHistoricalShotData = () => {
-      if (!currentRound) return { iron: {}, putts: {} };
-
-      // Get all rounds for this course and hole
-      const allRounds = (data.rounds || []).filter(
-        (round) => round.courseId === course.id
-      );
-      const holeScores = allRounds.flatMap((round) =>
-        (round.holeScores || []).filter((hs) => hs.holeNumber === currentHole)
+      const defaultPutts: Shot[] = Array.from(
+        { length: expectedPutts },
+        (_, index) => ({
+          id: `putt-${Date.now()}-${index}`,
+          type: "putt",
+          puttDistance: index === 1 ? "<4ft" : "5-10ft", // Second putt is typically a tap-in
+          direction: "good", // Default to good outcome
+          timestamp: Date.now(),
+          poorShot: false, // Always start as good putt
+        })
       );
 
-      const shotData: { [key: string]: number } = {};
-      const puttData: { [key: string]: number } = {};
-
-      holeScores.forEach((holeScore) => {
-        (holeScore.shots || []).forEach((shot) => {
-          if (shot.direction) {
-            if (shot.type === "shot") {
-              shotData[shot.direction] = (shotData[shot.direction] || 0) + 1;
-            } else if (shot.type === "putt") {
-              puttData[shot.direction] = (puttData[shot.direction] || 0) + 1;
-            }
-          }
-        });
-      });
-
-      return { shot: shotData, putts: puttData };
-    };
-
-    const historicalData = getHistoricalShotData();
-
-    const styles = StyleSheet.create({
-      container: {
-        flex: 1,
-        backgroundColor: colors.background,
-      },
-      header: {
-        padding: 20,
-        paddingBottom: 10,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      },
-      holeInfo: {
-        flex: 1,
-      },
-      holeNumber: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: colors.text,
-      },
-      holeDetails: {
-        fontSize: 16,
-        color: colors.textSecondary,
-        marginTop: 4,
-      },
-      todaysDistanceLabel: {
-        fontSize: 14,
-        color: colors.text,
-        fontWeight: "600",
-      },
-      todaysDistanceContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        width: "100%",
-      },
-      editIcon: {
-        fontSize: 16,
-        marginLeft: 8,
-      },
-      modalOverlay: {
-        flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-      },
-      distanceModalContainer: {
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: 20,
-        width: "80%",
-        maxWidth: 400,
-      },
-      distanceModalHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 20,
-      },
-      distanceModalTitle: {
-        fontSize: 18,
-        fontWeight: "600",
-        color: colors.text,
-      },
-      modalCloseButton: {
-        fontSize: 24,
-        color: colors.textSecondary,
-      },
-      distanceModalContent: {
-        marginBottom: 20,
-      },
-      distanceModalLabel: {
-        fontSize: 14,
-        color: colors.text,
-        marginBottom: 8,
-      },
-      distanceModalInput: {
-        backgroundColor: colors.background,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 16,
-        color: colors.text,
-      },
-      distanceModalActions: {
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        gap: 12,
-      },
-      distanceModalButton: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 8,
-        backgroundColor: colors.border,
-      },
-      distanceModalButtonPrimary: {
-        backgroundColor: colors.primary,
-      },
-      distanceModalButtonText: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: colors.text,
-      },
-      distanceModalButtonTextPrimary: {
-        color: "#FFFFFF",
-      },
-      bumpInfo: {
-        fontSize: 12,
-        color: colors.primary,
-        fontWeight: "500",
-        marginTop: 4,
-      },
-      scoreDisplay: {
-        backgroundColor: "grey",
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        alignItems: "center",
-      },
-      scoreRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-      },
-      scoreText: {
-        color: colors.background,
-        fontSize: 18,
-        fontWeight: "bold",
-      },
-      netScoreText: {
-        color: colors.background,
-        fontSize: 12,
-        opacity: 0.8,
-      },
-      headerRight: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-      },
-      bumpEmoji: {
-        fontSize: 14,
-      },
-      progressBar: {
-        height: 4,
-        backgroundColor: colors.border,
-        marginHorizontal: 20,
-        marginBottom: 20,
-      },
-      progressFill: {
-        height: "100%",
-        backgroundColor: colors.primary,
-        width: `${(currentHole / 18) * 100}%`,
-      },
-      commonShotsSection: {
-        backgroundColor: colors.surface,
-        margin: 20,
-        marginBottom: 0,
-        borderRadius: 12,
-        padding: 16,
-      },
-      sectionTitle: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: colors.text,
-        marginBottom: 8,
-        marginTop: 8,
-      },
-      shotList: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
-        marginBottom: 16,
-      },
-      shotTag: {
-        backgroundColor: colors.primary,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-      },
-      shotTagText: {
-        color: colors.background,
-        fontSize: 12,
-        fontWeight: "500",
-      },
-      content: {
-        flex: 1,
-        paddingHorizontal: 20,
-      },
-      card: {
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      cardHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 12,
-      },
-      cardTitle: {
-        fontSize: 18,
-        fontWeight: "600",
-        color: colors.text,
-      },
-      expectedText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-      },
-      shotCard: {
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: 12, // Reduced padding to remove excess white space
-        paddingBottom: 12, // Reduced bottom padding
-        marginBottom: 5, // Add 5px spacing between cards
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      shotHeader: {
-        flexDirection: "row",
-        justifyContent: "flex-start",
-        alignItems: "center",
-        marginBottom: 8,
-      },
-      shotNavButton: {
-        height: 32,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        backgroundColor: colors.primary,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      disabledShotNavButton: {
-        backgroundColor: colors.border,
-      },
-      shotNavButtonText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: colors.background,
-      },
-      disabledShotNavButtonText: {
-        color: colors.textSecondary,
-      },
-      shotNumber: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: colors.text,
-      },
-      shotFields: {
-        gap: 8,
-      },
-      shotFieldRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-      },
-      fieldLabel: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: colors.text,
-        width: 60,
-      },
-      dropdown: {
-        flex: 1,
-        backgroundColor: colors.background,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 8,
-        minHeight: 40,
-      },
-      puttDistanceLabel: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: colors.text,
-        marginRight: 8,
-        width: 40,
-      },
-      puttDistanceDropdown: {
-        flex: 1,
-        backgroundColor: colors.background,
-        borderRadius: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        minHeight: 40,
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      placeholderText: {
-        color: colors.textSecondary,
-      },
-      dropdownText: {
-        fontSize: 14,
-        color: colors.text,
-      },
-      lieDropdown: {
-        flex: 1,
-        backgroundColor: colors.background,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 8,
-        minHeight: 40,
-      },
-      quickClubButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 9999,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-      quickClubButtonText: {
-        fontSize: 14,
-        fontWeight: "600",
-      },
-      obWaterButton: {
-        height: 32,
-        paddingHorizontal: 16,
-        borderRadius: 16, // Pill shape
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: "#8B4513", // Brown outline
-        alignItems: "center",
-        justifyContent: "center",
-      },
-      obWaterButtonText: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#8B4513", // Brown text
-      },
-      recordSwingButton: {
-        height: 40,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-        backgroundColor: "#4CAF50", // Green
-        borderWidth: 2,
-        borderColor: "#4CAF50",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 8,
-      },
-      recordingButton: {
-        backgroundColor: "#F44336", // Red when recording
-        borderColor: "#F44336",
-      },
-      recordSwingButtonText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#FFFFFF",
-      },
-      countdownText: {
-        fontSize: 48,
-        fontWeight: "bold",
-        color: "#FFFFFF",
-      },
-      cameraModal: {
-        flex: 1,
-        backgroundColor: "#000000",
-      },
-      cameraView: {
-        flex: 1,
-      },
-      cameraOverlay: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: "center",
-        alignItems: "center",
-      },
-      cameraControls: {
-        position: "absolute",
-        bottom: 40,
-        left: 0,
-        right: 0,
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 20,
-      },
-      recordingInfo: {
-        position: "absolute",
-        top: 60,
-        alignSelf: "center",
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-      },
-      recordingDurationText: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: "#FFFFFF",
-      },
-      videoThumbnailContainer: {
-        marginTop: 8,
-        marginBottom: 8,
-        borderRadius: 12,
-        overflow: "hidden",
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: colors.primary,
-      },
-      videoThumbnail: {
-        width: "100%",
-        height: 120,
-      },
-      videoThumbnailTextContainer: {
-        padding: 12,
-        backgroundColor: colors.surface,
-      },
-      videoThumbnailTitle: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: colors.text,
-        marginBottom: 4,
-      },
-      videoThumbnailSubtext: {
-        fontSize: 11,
-        fontWeight: "500",
-        color: colors.textSecondary,
-      },
-
-      clubDropdown: {
-        flex: 1,
-        backgroundColor: colors.background,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 8,
-        minHeight: 40,
-      },
-      requiredField: {
-        borderColor: "#ff4444",
-        borderWidth: 2,
-      },
-      feetInput: {
-        flex: 1,
-        backgroundColor: colors.background,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 8,
-        fontSize: 14,
-        color: colors.text,
-        minHeight: 40,
-      },
-      deleteShotButton: {
-        backgroundColor: colors.error || "#ff4444",
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        height: 28,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 80,
-      },
-      deleteShotButtonText: {
-        color: colors.background,
-        fontSize: 12,
-        fontWeight: "600",
-      },
-      addButton: {
-        backgroundColor: colors.border,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        alignItems: "center",
-        marginTop: 8,
-      },
-      addButtonText: {
-        color: colors.text,
-        fontSize: 16,
-        fontWeight: "600",
-      },
-      bottomButtons: {
-        padding: 20,
-        paddingTop: 0,
-        gap: 12,
-      },
-      actionButtonsContainer: {
-        backgroundColor: colors.background,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-      },
-      actionButtonsRow: {
-        flexDirection: "row",
-        gap: 12,
-      },
-      navigationButtonsRow: {
-        flexDirection: "row",
-        gap: 12,
-      },
-      button: {
-        height: 32,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      primaryButton: {
-        backgroundColor: colors.primary,
-        borderWidth: 1,
-        borderColor: colors.primary,
-      },
-      secondaryButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: colors.primary,
-      },
-      buttonText: {
-        fontSize: 16,
-        fontWeight: "600",
-      },
-      primaryButtonText: {
-        color: colors.background,
-      },
-      secondaryButtonText: {
-        color: colors.primary,
-      },
-      historyButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-      },
-      historyButtonText: {
-        color: colors.text,
-        fontWeight: "600",
-        fontSize: 16,
-      },
-      actionButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      actionButtonText: {
-        color: colors.text,
-        fontWeight: "500",
-      },
-      actionButtonsCard: {
-        backgroundColor: colors.surface,
-        margin: 20,
-        marginTop: 4,
-        marginBottom: 0,
-        borderRadius: 12,
-        padding: 16,
-      },
-      nextHoleContainer: {
-        margin: 20,
-        marginTop: 8,
-        marginBottom: 20,
-      },
-      permanentNavigation: {
-        padding: 2,
-        paddingBottom: 4,
-        paddingTop: 4,
-        backgroundColor: colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        minHeight: 28,
-      },
-      navRow: {
-        flexDirection: "row",
-        justifyContent: "center",
-        gap: 8,
-        marginBottom: 3,
-        marginTop: 3,
-      },
-      navButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: colors.border,
-        borderRadius: 16,
-        height: 32,
-        paddingHorizontal: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      navButtonText: {
-        color: colors.text,
-        fontWeight: "600",
-        fontSize: 12,
-      },
-      arrowButton: {
-        backgroundColor: colors.primary, // Blue for navigation
-        borderWidth: 2,
-        borderColor: colors.primary,
-        borderRadius: 16,
-        height: 32,
-        paddingHorizontal: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      arrowButtonText: {
-        color: colors.background,
-        fontWeight: "600",
-        fontSize: 12,
-      },
-      // xxx
-      endRoundButton: {
-        backgroundColor: colors.error || "#f44336",
-        borderWidth: 2,
-        borderColor: colors.error || "#d32f2f",
-        borderRadius: 16,
-        height: 32,
-        paddingHorizontal: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      endRoundButtonText: {
-        color: colors.background,
-        fontWeight: "600",
-        fontSize: 12,
-      },
-      disabledButton: {
-        backgroundColor: colors.border,
-        borderColor: colors.border,
-      },
-      disabledButtonText: {
-        color: colors.textSecondary,
-      },
-      viewButtonsContainer: {
-        flexDirection: "row",
-        justifyContent: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        gap: 12,
-      },
-      viewButton: {
-        backgroundColor: colors.surface,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: colors.border,
-        flex: 1,
-        maxWidth: 150,
-      },
-      viewButtonActive: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
-      },
-      viewButtonText: {
-        color: colors.text,
-        fontSize: 16,
-        fontWeight: "600",
-        textAlign: "center",
-      },
-      viewButtonTextActive: {
-        color: colors.background,
-      },
-      addShotCard: {
-        backgroundColor: colors.primary,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 0,
-        borderWidth: 2,
-        borderColor: colors.primary,
-        shadowColor: colors.primary,
-        shadowOffset: {
-          width: 0,
-          height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-      },
-      addShotCardContent: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingVertical: 8, // Reduced padding for smaller card
-      },
-      addShotCardText: {
-        fontSize: 18, // Reduced font size for smaller card
-        fontWeight: "600",
-        color: colors.background,
-        marginBottom: 4, // Reduced margin for smaller card
-      },
-      addShotCardSubtext: {
-        fontSize: 12, // Reduced font size for smaller card
-        color: colors.background,
-        textAlign: "center",
-        opacity: 0.8,
-      },
-      todaysDistanceCard: {
-        backgroundColor: colors.surface,
-        margin: 20,
-        marginTop: 4,
-        marginBottom: 8,
-        borderRadius: 12,
-        padding: 8,
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      noShotsContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-      },
-      noShotsText: {
-        fontSize: 18,
-        color: colors.textSecondary,
-        marginBottom: 30,
-        textAlign: "center",
-      },
-      addShotButtonsContainer: {
-        flexDirection: "row",
-        gap: 16,
-      },
-      addShotButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-        alignItems: "center",
-        minWidth: 120,
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: "#8B4513", // Brown outline
-      },
-      addPuttButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: "#8B4513", // Brown outline
-      },
-      addShotButtonText: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#8B4513", // Brown text
-      },
-      addPuttButtonText: {
-        color: "#8B4513", // Brown text
-      },
-      shotNavigationContainer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-      },
-      shotCounter: {
-        alignItems: "center",
-      },
-      shotCounterText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        fontWeight: "500",
-      },
-      shotGridContainer: {
-        paddingVertical: 8,
-        backgroundColor: colors.background,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        position: "relative",
-        marginTop: 4,
-      },
-      shotNavigationButtons: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 4,
-        marginBottom: 4,
-      },
-      outcomeGridNavigation: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        marginTop: 8,
-        position: "relative",
-      },
-      navigationSide: {
-        flex: 1,
-        alignItems: "center",
-      },
-      navigationCenter: {
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: [{ translateX: -40 }, { translateY: -14 }], // Half button width and height
-        alignItems: "center",
-      },
-      navigationPill: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 16,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        minWidth: 40,
-        alignItems: "center",
-      },
-      navigationPillText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: colors.text,
-      },
-      smallNavigationPill: {
-        backgroundColor: colors.primary,
-        borderWidth: 1,
-        borderColor: colors.primary,
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        alignItems: "center",
-        minWidth: 70,
-        maxWidth: 80,
-      },
-      smallNavigationPillPrev: {
-        backgroundColor: "lightgrey",
-        borderWidth: 1,
-        borderColor: "lightgrey",
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        alignItems: "center",
-        minWidth: 70,
-        maxWidth: 80,
-      },
-      smallNavigationPillText: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: colors.text,
-        textAlign: "center",
-      },
-      shotNavigationArrows: {
-        position: "absolute",
-        bottom: 8,
-        left: 16,
-        right: 16,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      },
-      shotArrowButton: {
-        height: 32,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        backgroundColor: colors.primary,
-        alignItems: "center",
-        justifyContent: "center",
-        marginHorizontal: 4,
-        minWidth: 80,
-      },
-      disabledShotArrow: {
-        backgroundColor: colors.border,
-      },
-      shotArrowText: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#fff",
-      },
-      disabledShotArrowText: {
-        color: colors.textSecondary,
-      },
-      shotRow: {
-        marginBottom: 4,
-      },
-      shotRowContent: {
-        paddingHorizontal: 20,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        flexGrow: 1,
-      },
-      shotButton: {
-        height: 32,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 40,
-      },
-      activeShotButton: {
-        backgroundColor: "grey",
-        borderColor: "black",
-      },
-      shotButtonText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: colors.text,
-      },
-      activeShotButtonText: {
-        color: "white",
-      },
-      penaltyButton: {
-        backgroundColor: "#000000",
-        borderColor: "#000000",
-      },
-      penaltyButtonText: {
-        color: "#FFFFFF",
-      },
-      addShotGridButton: {
-        height: 32,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: "#8B4513", // Brown outline
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 60,
-      },
-      // xxx
-      addShotGridButtonText: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#8B4513", // Brown text
-      },
-      videoContainer: {
-        width: "100%",
-        alignItems: "center",
-        marginTop: 8,
-        backgroundColor: colors.surface,
-        borderRadius: 12,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-      },
-      videoPlayer: {
-        width: "100%",
-        height: 200,
-        backgroundColor: "#000",
-        borderRadius: 8,
-      },
-      reRecordButton: {
-        marginTop: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        backgroundColor: colors.error,
-        borderRadius: 20,
-      },
-      reRecordButtonText: {
-        color: "#FFFFFF",
-        fontWeight: "600",
-        fontSize: 14,
-      },
-    });
-
-    if (!hole) {
-      return (
-        <View style={styles.container}>
-          <Text
-            style={{ color: colors.text, textAlign: "center", marginTop: 50 }}
-          >
-            Hole not found
-          </Text>
-        </View>
-      );
+      console.log("Created default shots:", defaultShots);
+      console.log("Created default putts:", defaultPutts);
+      setShots(defaultShots);
+      setPutts(defaultPutts);
     }
 
+    // Update today's distance when hole changes
+    setTodaysDistance(hole?.todaysDistance?.toString() || "");
+
+    // Reset current shot to first shot when hole changes
+    setCurrentShotIndex(0);
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
+  }, [currentHole, expectedShots, expectedPutts, hole, currentShotIndex]);
+
+  // Scroll to top when switching shots
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, [currentShotIndex]);
+
+  const addShot = () => {
+    // Smart club selection based on user's default clubs
+    const getDefaultClub = () => {
+      if (!hole) return "Driver";
+
+      const currentShotNumber = shots.length + 1;
+      const par = hole.par;
+      const defaultClubs = data.settings.defaultClubs;
+
+      // Par 5: Use user's default clubs
+      if (par === 5) {
+        if (currentShotNumber === 1)
+          return defaultClubs?.par5?.shot1 || "Driver";
+        if (currentShotNumber === 2)
+          return defaultClubs?.par5?.shot2 || "7-Iron";
+        return defaultClubs?.par5?.shot3 || "9-Iron";
+      }
+
+      // Par 4: Use user's default clubs
+      if (par === 4) {
+        if (currentShotNumber === 1)
+          return defaultClubs?.par4?.shot1 || "Driver";
+        return defaultClubs?.par4?.shot2 || "9-Iron";
+      }
+
+      // Par 3: Use user's default clubs
+      if (par === 3) {
+        return defaultClubs?.par3?.shot1 || "7-Iron";
+      }
+
+      return "Driver"; // Default fallback
+    };
+
+    const newShot: Shot = {
+      id: `shot-${Date.now()}-${Math.random()}`,
+      type: "shot",
+      lie: "green",
+      direction: "good", // Default to good outcome
+      club: getDefaultClub(),
+      timestamp: Date.now(),
+      poorShot: false,
+    };
+    setShots((prev) => {
+      const newShots = [...prev, newShot];
+
+      // If the previous shot has lie 'green', change it to 'fairway'
+      if (prev.length > 0 && prev[prev.length - 1].lie === "green") {
+        const updatedPrevShots = [...prev];
+        updatedPrevShots[updatedPrevShots.length - 1] = {
+          ...updatedPrevShots[updatedPrevShots.length - 1],
+          lie: "fairway",
+        };
+        return [...updatedPrevShots, newShot];
+      }
+
+      return newShots;
+    });
+
+    // Go to the new shot (it will be the last iron shot)
+    setCurrentShotIndex((shots || []).length); // Index of the new shot
+
+    HapticFeedback.light();
+  };
+
+  const addPutt = () => {
+    const newPutt: Shot = {
+      id: `putt-${Date.now()}-${Math.random()}`,
+      type: "putt",
+      puttDistance: "5-10ft",
+      direction: "good", // Default to good outcome
+      timestamp: Date.now(),
+      poorShot: false,
+    };
+    setPutts((prev) => [...prev, newPutt]);
+
+    // Go to the new putt (it will be the last putt)
+    setCurrentShotIndex((shots || []).length + (putts || []).length); // Index of the new putt
+
+    HapticFeedback.light();
+  };
+
+  // Shot navigation functions
+  const goToPreviousShot = () => {
+    if (currentShotIndex > 0) {
+      setCurrentShotIndex(currentShotIndex - 1);
+      HapticFeedback.light();
+    }
+  };
+
+  const goToNextShot = () => {
+    const allShots = getAllShots();
+    if (currentShotIndex < allShots.length - 1) {
+      setCurrentShotIndex(currentShotIndex + 1);
+      HapticFeedback.light();
+    }
+  };
+
+  const canGoPrevious = currentShotIndex > 0;
+  const canGoNext = currentShotIndex < getAllShots().length - 1;
+
+  const removeShot = (shotId: string, type: "shot" | "putt") => {
+    if (type === "shot") {
+      const shotIndex = shots.findIndex((shot) => shot.id === shotId);
+      setShots((prev) => prev.filter((shot) => shot.id !== shotId));
+
+      // Adjust current shot index if needed
+      if (currentShotIndex === shotIndex) {
+        // If we removed the current shot, go to the previous one or first available
+        setCurrentShotIndex(Math.max(0, shotIndex - 1));
+      } else if (currentShotIndex > shotIndex) {
+        // If we removed a shot before the current one, adjust the index
+        setCurrentShotIndex(currentShotIndex - 1);
+      }
+    } else {
+      const puttIndex = (putts || []).findIndex((putt) => putt.id === shotId);
+      const globalIndex = (shots || []).length + puttIndex;
+      setPutts((prev) => prev.filter((putt) => putt.id !== shotId));
+
+      // Adjust current shot index if needed
+      if (currentShotIndex === globalIndex) {
+        // If we removed the current putt, go to the previous one or first available
+        setCurrentShotIndex(Math.max(0, globalIndex - 1));
+      } else if (currentShotIndex > globalIndex) {
+        // If we removed a putt before the current one, adjust the index
+        setCurrentShotIndex(currentShotIndex - 1);
+      }
+    }
+    HapticFeedback.light();
+
+    // Check if all shots and putts are deleted, and remove hole from scorecard
+    setTimeout(() => {
+      const updatedShots =
+        type === "shot" ? shots.filter((shot) => shot.id !== shotId) : shots;
+      const updatedPutts =
+        type === "putt"
+          ? (putts || []).filter((putt) => putt.id !== shotId)
+          : putts || [];
+
+      if (updatedShots.length === 0 && updatedPutts.length === 0) {
+        // Remove this hole from the scorecard
+        onSaveHoleData(currentHole, [], []);
+        // Navigate to previous hole or close if this is the first hole
+        if (currentHole > 1) {
+          onPreviousHole();
+        } else {
+          onClose();
+        }
+      }
+    }, 100);
+  };
+
+  const updateShot = (
+    shotId: string,
+    type: "shot" | "putt",
+    field: keyof Shot,
+    value: any
+  ) => {
+    if (type === "shot") {
+      setShots((prev) =>
+        prev.map((shot) =>
+          shot.id === shotId ? { ...shot, [field]: value } : shot
+        )
+      );
+    } else {
+      setPutts((prev) =>
+        prev.map((shot) =>
+          shot.id === shotId ? { ...shot, [field]: value } : shot
+        )
+      );
+    }
+    // Clear validation error when shots are updated
+    setShowValidationError(false);
+
+    // No auto-advance - let user manually navigate
+  };
+
+  const totalScore = (shots || []).length + (putts || []).length;
+  const netScore = totalScore - (hole?.par || 0);
+
+  const handleCompleteHole = () => {
+    if ((shots || []).length === 0 && (putts || []).length === 0) {
+      Alert.alert(
+        "Error",
+        "Please add at least one shot to complete the hole"
+      );
+      return;
+    }
+
+    // Check if all shots have been described
+    const allShotsDescribed = (shots || []).every((shot) => shot.direction);
+    const allPuttsDescribed = (putts || []).every((putt) => putt.direction); // puttDistance is optional
+
+    if (!allShotsDescribed || !allPuttsDescribed) {
+      setShowValidationError(true);
+      Alert.alert(
+        "Error",
+        "Cannot go to next hole until all shots have a selected outcome or deleted"
+      );
+      return;
+    }
+
+    const holeScore: HoleScore = {
+      holeNumber: currentHole,
+      courseId: course.id,
+      shots: [...shots, ...putts],
+      totalScore,
+      par: hole?.par || 0,
+      netScore,
+      completedAt: Date.now(),
+    };
+
+    onCompleteHole(holeScore);
+    HapticFeedback.success();
+  };
+
+  const handleViewSummary = () => {
+    // Show current round summary
+    onViewSummary();
+  };
+
+  const handleRecordingComplete = (swing: RecordedSwing) => {
+    console.log("Recording completed:", swing);
+    // Find the shot to update
+    // We need to match based on hole and shot number
+    // swing.shotNumber is 1-based index
+
+    // Determine if it's a shot or putt based on index
+    // Note: RecordSwing is currently only passed for shots (shotInfo.isShot check in JSX)
+    // swing.shotNumber from RecordSwing corresponds to the visible shot number
+
+    // Iterate through shots to find the one matching the current index
+    const shotToUpdate = (shots || []).find(
+      (s, i) => i + 1 === swing.shotNumber
+    );
+
+    if (shotToUpdate) {
+      updateShot(shotToUpdate.id, "shot", "videoUri", swing.uri);
+      HapticFeedback.success();
+    } else {
+      console.warn(
+        "Could not find shot to update with recording for shot number:",
+        swing.shotNumber
+      );
+    }
+  };
+
+  // Analyze historical shot data for this hole
+  const getHistoricalShotData = () => {
+    if (!currentRound) return { iron: {}, putts: {} };
+
+    // Get all rounds for this course and hole
+    const allRounds = (data.rounds || []).filter(
+      (round) => round.courseId === course.id
+    );
+    const holeScores = allRounds.flatMap((round) =>
+      (round.holeScores || []).filter((hs) => hs.holeNumber === currentHole)
+    );
+
+    const shotData: { [key: string]: number } = {};
+    const puttData: { [key: string]: number } = {};
+
+    holeScores.forEach((holeScore) => {
+      (holeScore.shots || []).forEach((shot) => {
+        if (shot.direction) {
+          if (shot.type === "shot") {
+            shotData[shot.direction] = (shotData[shot.direction] || 0) + 1;
+          } else if (shot.type === "putt") {
+            puttData[shot.direction] = (puttData[shot.direction] || 0) + 1;
+          }
+        }
+      });
+    });
+
+    return { shot: shotData, putts: puttData };
+  };
+
+  const historicalData = getHistoricalShotData();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      padding: 20,
+      paddingBottom: 10,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    holeInfo: {
+      flex: 1,
+    },
+    holeNumber: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.text,
+    },
+    holeDetails: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    todaysDistanceLabel: {
+      fontSize: 14,
+      color: colors.text,
+      fontWeight: "600",
+    },
+    todaysDistanceContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+    },
+    editIcon: {
+      fontSize: 16,
+      marginLeft: 8,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    distanceModalContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      width: "80%",
+      maxWidth: 400,
+    },
+    distanceModalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    distanceModalTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    modalCloseButton: {
+      fontSize: 24,
+      color: colors.textSecondary,
+    },
+    distanceModalContent: {
+      marginBottom: 20,
+    },
+    distanceModalLabel: {
+      fontSize: 14,
+      color: colors.text,
+      marginBottom: 8,
+    },
+    distanceModalInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      color: colors.text,
+    },
+    distanceModalActions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: 12,
+    },
+    distanceModalButton: {
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 8,
+      backgroundColor: colors.border,
+    },
+    distanceModalButtonPrimary: {
+      backgroundColor: colors.primary,
+    },
+    distanceModalButtonText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: colors.text,
+    },
+    distanceModalButtonTextPrimary: {
+      color: "#FFFFFF",
+    },
+    bumpInfo: {
+      fontSize: 12,
+      color: colors.primary,
+      fontWeight: "500",
+      marginTop: 4,
+    },
+    scoreDisplay: {
+      backgroundColor: "grey",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      alignItems: "center",
+    },
+    scoreRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    scoreText: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+    netScoreText: {
+      color: colors.background,
+      fontSize: 12,
+      opacity: 0.8,
+    },
+    headerRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    bumpEmoji: {
+      fontSize: 14,
+    },
+    progressBar: {
+      height: 4,
+      backgroundColor: colors.border,
+      marginHorizontal: 20,
+      marginBottom: 20,
+    },
+    progressFill: {
+      height: "100%",
+      backgroundColor: colors.primary,
+      width: `${(currentHole / 18) * 100}%`,
+    },
+    commonShotsSection: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 8,
+      marginTop: 8,
+    },
+    shotList: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 16,
+    },
+    shotTag: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    shotTagText: {
+      color: colors.background,
+      fontSize: 12,
+      fontWeight: "500",
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    expectedText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    shotCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12, // Reduced padding to remove excess white space
+      paddingBottom: 12, // Reduced bottom padding
+      marginBottom: 5, // Add 5px spacing between cards
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    shotHeader: {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    shotNavButton: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    disabledShotNavButton: {
+      backgroundColor: colors.border,
+    },
+    shotNavButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.background,
+    },
+    disabledShotNavButtonText: {
+      color: colors.textSecondary,
+    },
+    shotNumber: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    shotFields: {
+      gap: 8,
+    },
+    shotFieldRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    fieldLabel: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: colors.text,
+      width: 60,
+    },
+    dropdown: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      minHeight: 40,
+    },
+    puttDistanceLabel: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+      marginRight: 8,
+      width: 40,
+    },
+    puttDistanceDropdown: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      minHeight: 40,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    placeholderText: {
+      color: colors.textSecondary,
+    },
+    dropdownText: {
+      fontSize: 14,
+      color: colors.text,
+    },
+    lieDropdown: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      minHeight: 40,
+    },
+    quickClubButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 9999,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    quickClubButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    obWaterButton: {
+      height: 32,
+      paddingHorizontal: 16,
+      borderRadius: 16, // Pill shape
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: "#8B4513", // Brown outline
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    obWaterButtonText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#8B4513", // Brown text
+    },
+    recordSwingButton: {
+      height: 40,
+      paddingHorizontal: 20,
+      borderRadius: 20,
+      backgroundColor: "#4CAF50", // Green
+      borderWidth: 2,
+      borderColor: "#4CAF50",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 8,
+    },
+    recordingButton: {
+      backgroundColor: "#F44336", // Red when recording
+      borderColor: "#F44336",
+    },
+    recordSwingButtonText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: "#FFFFFF",
+    },
+    countdownText: {
+      fontSize: 48,
+      fontWeight: "bold",
+      color: "#FFFFFF",
+    },
+    cameraModal: {
+      flex: 1,
+      backgroundColor: "#000000",
+    },
+    cameraView: {
+      flex: 1,
+    },
+    cameraOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    cameraControls: {
+      position: "absolute",
+      bottom: 40,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 20,
+    },
+    recordingInfo: {
+      position: "absolute",
+      top: 60,
+      alignSelf: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 20,
+    },
+    recordingDurationText: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: "#FFFFFF",
+    },
+    videoThumbnailContainer: {
+      marginTop: 8,
+      marginBottom: 8,
+      borderRadius: 12,
+      overflow: "hidden",
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    videoThumbnail: {
+      width: "100%",
+      height: 120,
+    },
+    videoThumbnailTextContainer: {
+      padding: 12,
+      backgroundColor: colors.surface,
+    },
+    videoThumbnailTitle: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 4,
+    },
+    videoThumbnailSubtext: {
+      fontSize: 11,
+      fontWeight: "500",
+      color: colors.textSecondary,
+    },
+
+    clubDropdown: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      minHeight: 40,
+    },
+    requiredField: {
+      borderColor: "#ff4444",
+      borderWidth: 2,
+    },
+    feetInput: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      fontSize: 14,
+      color: colors.text,
+      minHeight: 40,
+    },
+    deleteShotButton: {
+      backgroundColor: colors.error || "#ff4444",
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 80,
+    },
+    deleteShotButtonText: {
+      color: colors.background,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    addButton: {
+      backgroundColor: colors.border,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    addButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    bottomButtons: {
+      padding: 20,
+      paddingTop: 0,
+      gap: 12,
+    },
+    actionButtonsContainer: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 8,
+    },
+    actionButtonsRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    navigationButtonsRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    button: {
+      height: 32,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    secondaryButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    buttonText: {
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    primaryButtonText: {
+      color: colors.background,
+    },
+    secondaryButtonText: {
+      color: colors.primary,
+    },
+    historyButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    historyButtonText: {
+      color: colors.text,
+      fontWeight: "600",
+      fontSize: 16,
+    },
+    actionButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    actionButtonText: {
+      color: colors.text,
+      fontWeight: "500",
+    },
+    actionButtonsCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginTop: 4,
+      marginBottom: 0,
+      borderRadius: 12,
+      padding: 16,
+    },
+    nextHoleContainer: {
+      margin: 20,
+      marginTop: 8,
+      marginBottom: 20,
+    },
+    permanentNavigation: {
+      padding: 2,
+      paddingBottom: 4,
+      paddingTop: 4,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      minHeight: 28,
+    },
+    navRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 3,
+      marginTop: 3,
+    },
+    navButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderRadius: 16,
+      height: 32,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    navButtonText: {
+      color: colors.text,
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    arrowButton: {
+      backgroundColor: colors.primary, // Blue for navigation
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderRadius: 16,
+      height: 32,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    arrowButtonText: {
+      color: colors.background,
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    // xxx
+    endRoundButton: {
+      backgroundColor: colors.error || "#f44336",
+      borderWidth: 2,
+      borderColor: colors.error || "#d32f2f",
+      borderRadius: 16,
+      height: 32,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    endRoundButtonText: {
+      color: colors.background,
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    disabledButton: {
+      backgroundColor: colors.border,
+      borderColor: colors.border,
+    },
+    disabledButtonText: {
+      color: colors.textSecondary,
+    },
+    viewButtonsContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      gap: 12,
+    },
+    viewButton: {
+      backgroundColor: colors.surface,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: colors.border,
+      flex: 1,
+      maxWidth: 150,
+    },
+    viewButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    viewButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    viewButtonTextActive: {
+      color: colors.background,
+    },
+    addShotCard: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 0,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    addShotCardContent: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: 8, // Reduced padding for smaller card
+    },
+    addShotCardText: {
+      fontSize: 18, // Reduced font size for smaller card
+      fontWeight: "600",
+      color: colors.background,
+      marginBottom: 4, // Reduced margin for smaller card
+    },
+    addShotCardSubtext: {
+      fontSize: 12, // Reduced font size for smaller card
+      color: colors.background,
+      textAlign: "center",
+      opacity: 0.8,
+    },
+    todaysDistanceCard: {
+      backgroundColor: colors.surface,
+      margin: 20,
+      marginTop: 4,
+      marginBottom: 8,
+      borderRadius: 12,
+      padding: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    noShotsContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    noShotsText: {
+      fontSize: 18,
+      color: colors.textSecondary,
+      marginBottom: 30,
+      textAlign: "center",
+    },
+    addShotButtonsContainer: {
+      flexDirection: "row",
+      gap: 16,
+    },
+    addShotButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      alignItems: "center",
+      minWidth: 120,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: "#8B4513", // Brown outline
+    },
+    addPuttButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: "#8B4513", // Brown outline
+    },
+    addShotButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#8B4513", // Brown text
+    },
+    addPuttButtonText: {
+      color: "#8B4513", // Brown text
+    },
+    shotNavigationContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    shotCounter: {
+      alignItems: "center",
+    },
+    shotCounterText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: "500",
+    },
+    shotGridContainer: {
+      paddingVertical: 8,
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      position: "relative",
+      marginTop: 4,
+    },
+    shotNavigationButtons: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 4,
+      marginBottom: 4,
+    },
+    outcomeGridNavigation: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      marginTop: 8,
+      position: "relative",
+    },
+    navigationSide: {
+      flex: 1,
+      alignItems: "center",
+    },
+    navigationCenter: {
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      transform: [{ translateX: -40 }, { translateY: -14 }], // Half button width and height
+      alignItems: "center",
+    },
+    navigationPill: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      minWidth: 40,
+      alignItems: "center",
+    },
+    navigationPillText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    smallNavigationPill: {
+      backgroundColor: colors.primary,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      alignItems: "center",
+      minWidth: 70,
+      maxWidth: 80,
+    },
+    smallNavigationPillPrev: {
+      backgroundColor: "lightgrey",
+      borderWidth: 1,
+      borderColor: "lightgrey",
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      alignItems: "center",
+      minWidth: 70,
+      maxWidth: 80,
+    },
+    smallNavigationPillText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: colors.text,
+      textAlign: "center",
+    },
+    shotNavigationArrows: {
+      position: "absolute",
+      bottom: 8,
+      left: 16,
+      right: 16,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    shotArrowButton: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginHorizontal: 4,
+      minWidth: 80,
+    },
+    disabledShotArrow: {
+      backgroundColor: colors.border,
+    },
+    shotArrowText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#fff",
+    },
+    disabledShotArrowText: {
+      color: colors.textSecondary,
+    },
+    shotRow: {
+      marginBottom: 4,
+    },
+    shotRowContent: {
+      paddingHorizontal: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      flexGrow: 1,
+    },
+    shotButton: {
+      height: 32,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 40,
+    },
+    activeShotButton: {
+      backgroundColor: "grey",
+      borderColor: "black",
+    },
+    shotButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    activeShotButtonText: {
+      color: "white",
+    },
+    penaltyButton: {
+      backgroundColor: "#000000",
+      borderColor: "#000000",
+    },
+    penaltyButtonText: {
+      color: "#FFFFFF",
+    },
+    addShotGridButton: {
+      height: 32,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: "#8B4513", // Brown outline
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 60,
+    },
+    // xxx
+    addShotGridButtonText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#8B4513", // Brown text
+    },
+    videoContainer: {
+      width: "100%",
+      alignItems: "center",
+      marginTop: 8,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    videoPlayer: {
+      width: "100%",
+      height: 200,
+      backgroundColor: "#000",
+      borderRadius: 8,
+    },
+    reRecordButton: {
+      marginTop: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      backgroundColor: colors.error,
+      borderRadius: 20,
+    },
+    reRecordButtonText: {
+      color: "#FFFFFF",
+      fontWeight: "600",
+      fontSize: 14,
+    },
+  });
+
+  if (!hole) {
     return (
       <View style={styles.container}>
-        {/* Top Navigation - Moved per request */}
-        <TouchableOpacity
-          style={[styles.button, styles.navButton, { margin: 20, marginBottom: 10, width: 'auto', alignSelf: 'stretch' }]}
-          onPress={handleViewSummary}
+        <Text
+          style={{ color: colors.text, textAlign: "center", marginTop: 50 }}
         >
-          <Text style={[styles.buttonText, styles.navButtonText, { textAlign: 'center' }]}>
-            Round Summary
+          Hole not found
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Top Navigation - Moved per request */}
+      <TouchableOpacity
+        style={[styles.button, styles.navButton, { margin: 20, marginBottom: 10, width: 'auto', alignSelf: 'stretch' }]}
+        onPress={handleViewSummary}
+      >
+        <Text style={[styles.buttonText, styles.navButtonText, { textAlign: 'center' }]}>
+          Round Summary
+        </Text>
+      </TouchableOpacity>
+
+      {/* Top Nav Buttons */}
+      <View style={[styles.navRow, { marginHorizontal: 20, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 10 }]}>
+        {/* Prev Hole */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.navButton,
+            currentHole <= 1 && styles.disabledButton,
+            { flex: 1, paddingVertical: 12 }
+          ]}
+          onPress={currentHole > 1 ? onPreviousHole : undefined}
+          disabled={currentHole <= 1}
+        >
+          <Text
+            style={[
+              styles.buttonText,
+              styles.navButtonText,
+              currentHole <= 1 && styles.disabledButtonText,
+            ]}
+          >
+            ← Prev Hole
           </Text>
         </TouchableOpacity>
 
-        {/* Top Nav Buttons */}
-        <View style={[styles.navRow, { marginHorizontal: 20, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 10 }]}>
-          {/* Prev Hole */}
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.navButton,
-              currentHole <= 1 && styles.disabledButton,
-              { flex: 1, paddingVertical: 12 }
-            ]}
-            onPress={currentHole > 1 ? onPreviousHole : undefined}
-            disabled={currentHole <= 1}
-          >
-            <Text
-              style={[
-                styles.buttonText,
-                styles.navButtonText,
-                currentHole <= 1 && styles.disabledButtonText,
-              ]}
-            >
-              ← Prev Hole
-            </Text>
-          </TouchableOpacity>
+        {/* Hole History */}
+        <TouchableOpacity
+          style={[styles.button, styles.navButton, { flex: 1, paddingVertical: 12 }]}
+          onPress={onShowHistory}
+        >
+          <Text style={[styles.buttonText, styles.navButtonText]}>
+            Hole History
+          </Text>
+        </TouchableOpacity>
 
-          {/* Hole History */}
-          <TouchableOpacity
-            style={[styles.button, styles.navButton, { flex: 1, paddingVertical: 12 }]}
-            onPress={onShowHistory}
-          >
-            <Text style={[styles.buttonText, styles.navButtonText]}>
-              Hole History
-            </Text>
-          </TouchableOpacity>
-
-          {/* Next Hole */}
-          <TouchableOpacity
+        {/* Next Hole */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.arrowButton,
+            currentHole >= 18 && styles.disabledButton,
+            { flex: 1, paddingVertical: 12 },
+            // Make blue only if there's no "Next Shot" button (on last shot/putt)
+            (() => {
+              const allShots = getAllShots();
+              const canGoNext = currentShotIndex < allShots.length - 1;
+              return !canGoNext && currentHole < 18
+                ? {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                }
+                : {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                };
+            })(),
+          ]}
+          onPress={currentHole < 18 ? handleCompleteHole : undefined}
+          disabled={currentHole >= 18}
+        >
+          <Text
             style={[
-              styles.button,
-              styles.arrowButton,
-              currentHole >= 18 && styles.disabledButton,
-              { flex: 1, paddingVertical: 12 },
-              // Make blue only if there's no "Next Shot" button (on last shot/putt)
+              styles.buttonText,
+              currentHole >= 18 && styles.disabledButtonText,
               (() => {
                 const allShots = getAllShots();
                 const canGoNext = currentShotIndex < allShots.length - 1;
-                return !canGoNext && currentHole < 18
-                  ? {
-                    backgroundColor: colors.primary,
-                    borderColor: colors.primary,
-                  }
-                  : {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  };
+                if (canGoNext) {
+                  return { color: colors.text, fontSize: 12 };
+                } else {
+                  return currentHole < 18
+                    ? { color: colors.background }
+                    : { color: colors.text };
+                }
               })(),
             ]}
-            onPress={currentHole < 18 ? handleCompleteHole : undefined}
-            disabled={currentHole >= 18}
           >
-            <Text
-              style={[
-                styles.buttonText,
-                currentHole >= 18 && styles.disabledButtonText,
-                (() => {
-                  const allShots = getAllShots();
-                  const canGoNext = currentShotIndex < allShots.length - 1;
-                  if (canGoNext) {
-                    return { color: colors.text, fontSize: 12 };
-                  } else {
-                    return currentHole < 18
-                      ? { color: colors.background }
-                      : { color: colors.text };
-                  }
-                })(),
-              ]}
-            >
-              Next Hole →
+            Next Hole →
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.holeInfo}>
+          <Text style={styles.holeNumber}>
+            Hole {currentHole}
+            {(() => {
+              const cumulativeOverPar = getCumulativeOverPar(
+                currentHole,
+                shots,
+                putts
+              );
+              if (cumulativeOverPar === 0) return " (even par)";
+              if (cumulativeOverPar > 0)
+                return ` (${cumulativeOverPar} over)`;
+              return ` (${Math.abs(cumulativeOverPar)} under)`;
+            })()}
+          </Text>
+          <Text style={styles.holeDetails}>
+            Par {hole.par} • Stroke Index {hole.strokeIndex}
+            {hole.distanceYards && ` • ${hole.distanceYards} yards`}
+          </Text>
+          {handicap !== undefined && (
+            <Text style={styles.bumpInfo}>
+              {getBumpsForHole(hole) > 0
+                ? `You get ${getBumpsForHole(hole)} stroke${getBumpsForHole(hole) === 1 ? "" : "s"
+                } on this hole`
+                : "No strokes on this hole"}
             </Text>
-          </TouchableOpacity>
+          )}
         </View>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.holeInfo}>
-            <Text style={styles.holeNumber}>
-              Hole {currentHole}
-              {(() => {
-                const cumulativeOverPar = getCumulativeOverPar(
-                  currentHole,
-                  shots,
-                  putts
-                );
-                if (cumulativeOverPar === 0) return " (even par)";
-                if (cumulativeOverPar > 0)
-                  return ` (${cumulativeOverPar} over)`;
-                return ` (${Math.abs(cumulativeOverPar)} under)`;
-              })()}
-            </Text>
-            <Text style={styles.holeDetails}>
-              Par {hole.par} • Stroke Index {hole.strokeIndex}
-              {hole.distanceYards && ` • ${hole.distanceYards} yards`}
-            </Text>
-            {handicap !== undefined && (
-              <Text style={styles.bumpInfo}>
-                {getBumpsForHole(hole) > 0
-                  ? `You get ${getBumpsForHole(hole)} stroke${getBumpsForHole(hole) === 1 ? "" : "s"
-                  } on this hole`
-                  : "No strokes on this hole"}
-              </Text>
-            )}
-          </View>
-          <View style={styles.headerRight}>
-            <View style={styles.scoreDisplay}>
-              <View style={styles.scoreRow}>
-                <Text style={styles.scoreText}>{totalScore}</Text>
-                {handicap !== undefined && getBumpsForHole(hole) > 0 && (
-                  <Text style={styles.bumpEmoji}>
-                    {getBumpsForHole(hole) === 1 ? "☝️" : "✌️"}
-                  </Text>
-                )}
-              </View>
-              <Text style={styles.netScoreText}>
-                {netScore > 0
-                  ? `+${netScore}`
-                  : netScore === 0
-                    ? "E"
-                    : netScore}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Progress Bar */}
-        <View style={styles.progressBar}>
-          <View style={styles.progressFill} />
-        </View>
-
-        {/* Today's Distance Card - Moved to bottom of ScrollView */}
-
-        {/* Distance Modal */}
-        <Modal
-          visible={showDistanceModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowDistanceModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.distanceModalContainer}>
-              <View style={styles.distanceModalHeader}>
-                <Text style={styles.distanceModalTitle}>Update Distance</Text>
-                <TouchableOpacity onPress={() => setShowDistanceModal(false)}>
-                  <Text style={styles.modalCloseButton}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.distanceModalContent}>
-                <Text style={styles.distanceModalLabel}>
-                  Today's Distance (yards):
+        <View style={styles.headerRight}>
+          <View style={styles.scoreDisplay}>
+            <View style={styles.scoreRow}>
+              <Text style={styles.scoreText}>{totalScore}</Text>
+              {handicap !== undefined && getBumpsForHole(hole) > 0 && (
+                <Text style={styles.bumpEmoji}>
+                  {getBumpsForHole(hole) === 1 ? "☝️" : "✌️"}
                 </Text>
-                <TextInput
-                  style={styles.distanceModalInput}
-                  placeholder="Enter distance"
-                  placeholderTextColor={colors.textSecondary}
-                  value={todaysDistance}
-                  onChangeText={setTodaysDistance}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  returnKeyType="done"
-                  onSubmitEditing={() => {
-                    const distanceValue = todaysDistance.trim()
-                      ? parseInt(todaysDistance.trim())
-                      : undefined;
-                    onUpdateTodaysDistance(currentHole, distanceValue);
-                    setShowDistanceModal(false);
-                  }}
-                  autoFocus={true}
-                />
-              </View>
-              <View style={styles.distanceModalActions}>
-                <TouchableOpacity
-                  style={styles.distanceModalButton}
-                  onPress={() => setShowDistanceModal(false)}
-                >
-                  <Text style={styles.distanceModalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+              )}
+            </View>
+            <Text style={styles.netScoreText}>
+              {netScore > 0
+                ? `+${netScore}`
+                : netScore === 0
+                  ? "E"
+                  : netScore}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Progress Bar */}
+      <View style={styles.progressBar}>
+        <View style={styles.progressFill} />
+      </View>
+
+      {/* Today's Distance Card - Moved to bottom of ScrollView */}
+
+      {/* Distance Modal */}
+      <Modal
+        visible={showDistanceModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDistanceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.distanceModalContainer}>
+            <View style={styles.distanceModalHeader}>
+              <Text style={styles.distanceModalTitle}>Update Distance</Text>
+              <TouchableOpacity onPress={() => setShowDistanceModal(false)}>
+                <Text style={styles.modalCloseButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.distanceModalContent}>
+              <Text style={styles.distanceModalLabel}>
+                Today's Distance (yards):
+              </Text>
+              <TextInput
+                style={styles.distanceModalInput}
+                placeholder="Enter distance"
+                placeholderTextColor={colors.textSecondary}
+                value={todaysDistance}
+                onChangeText={setTodaysDistance}
+                keyboardType="numeric"
+                maxLength={4}
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  const distanceValue = todaysDistance.trim()
+                    ? parseInt(todaysDistance.trim())
+                    : undefined;
+                  onUpdateTodaysDistance(currentHole, distanceValue);
+                  setShowDistanceModal(false);
+                }}
+                autoFocus={true}
+              />
+            </View>
+            <View style={styles.distanceModalActions}>
+              <TouchableOpacity
+                style={styles.distanceModalButton}
+                onPress={() => setShowDistanceModal(false)}
+              >
+                <Text style={styles.distanceModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.distanceModalButton,
+                  styles.distanceModalButtonPrimary,
+                ]}
+                onPress={() => {
+                  const distanceValue = todaysDistance.trim()
+                    ? parseInt(todaysDistance.trim())
+                    : undefined;
+                  onUpdateTodaysDistance(currentHole, distanceValue);
+                  setShowDistanceModal(false);
+                }}
+              >
+                <Text
                   style={[
-                    styles.distanceModalButton,
-                    styles.distanceModalButtonPrimary,
+                    styles.distanceModalButtonText,
+                    styles.distanceModalButtonTextPrimary,
                   ]}
-                  onPress={() => {
-                    const distanceValue = todaysDistance.trim()
-                      ? parseInt(todaysDistance.trim())
-                      : undefined;
-                    onUpdateTodaysDistance(currentHole, distanceValue);
-                    setShowDistanceModal(false);
-                  }}
                 >
-                  <Text
-                    style={[
-                      styles.distanceModalButtonText,
-                      styles.distanceModalButtonTextPrimary,
-                    ]}
-                  >
-                    Save
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  Save
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Single Shot Display */}
-        <PanGestureHandler
-          onHandlerStateChange={({ nativeEvent }) => {
-            if (nativeEvent.state === State.END) {
-              const { translationX, velocityX } = nativeEvent;
-              const swipeThreshold = 50;
-              const velocityThreshold = 500;
+      {/* Single Shot Display */}
+      <PanGestureHandler
+        onHandlerStateChange={({ nativeEvent }) => {
+          if (nativeEvent.state === State.END) {
+            const { translationX, velocityX } = nativeEvent;
+            const swipeThreshold = 50;
+            const velocityThreshold = 500;
 
-              // Swipe right to left (Next) - negative translationX or high velocity to the left
-              if (
-                translationX < -swipeThreshold ||
-                velocityX < -velocityThreshold
-              ) {
-                if (canGoNext) {
-                  HapticFeedback.light();
-                  goToNextShot();
-                }
-              }
-              // Swipe left to right (Previous) - positive translationX or high velocity to the right
-              else if (
-                translationX > swipeThreshold ||
-                velocityX > velocityThreshold
-              ) {
-                if (canGoPrevious) {
-                  HapticFeedback.light();
-                  goToPreviousShot();
-                }
+            // Swipe right to left (Next) - negative translationX or high velocity to the left
+            if (
+              translationX < -swipeThreshold ||
+              velocityX < -velocityThreshold
+            ) {
+              if (canGoNext) {
+                HapticFeedback.light();
+                goToNextShot();
               }
             }
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <ScrollView
-              style={[styles.content, { flex: 1 }]}
-              contentContainerStyle={{ paddingBottom: 100 }}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled={true}
-            >
-              {(() => {
-                const shotInfo = getCurrentShotInfo();
-                if (!shotInfo) {
-                  // No shots yet - show add shot options
-                  return (
-                    <View style={styles.noShotsContainer}>
-                      <Text style={styles.noShotsText}>
-                        No shots recorded yet
-                      </Text>
-                      <View style={styles.addShotButtonsContainer}>
-                        <TouchableOpacity
-                          style={[styles.addShotButton, styles.addShotButton]}
-                          onPress={addShot}
+            // Swipe left to right (Previous) - positive translationX or high velocity to the right
+            else if (
+              translationX > swipeThreshold ||
+              velocityX > velocityThreshold
+            ) {
+              if (canGoPrevious) {
+                HapticFeedback.light();
+                goToPreviousShot();
+              }
+            }
+          }
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            style={[styles.content, { flex: 1 }]}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+          >
+            {(() => {
+              const shotInfo = getCurrentShotInfo();
+              if (!shotInfo) {
+                // No shots yet - show add shot options
+                return (
+                  <View style={styles.noShotsContainer}>
+                    <Text style={styles.noShotsText}>
+                      No shots recorded yet
+                    </Text>
+                    <View style={styles.addShotButtonsContainer}>
+                      <TouchableOpacity
+                        style={[styles.addShotButton, styles.addShotButton]}
+                        onPress={addShot}
+                      >
+                        <Text
+                          style={[
+                            styles.addShotButtonText,
+                            styles.addShotButtonText,
+                          ]}
                         >
-                          <Text
-                            style={[
-                              styles.addShotButtonText,
-                              styles.addShotButtonText,
-                            ]}
-                          >
-                            + Add Shot
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.addShotButton, styles.addPuttButton]}
-                          onPress={addPutt}
+                          + Add Shot
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.addShotButton, styles.addPuttButton]}
+                        onPress={addPutt}
+                      >
+                        <Text
+                          style={[
+                            styles.addShotButtonText,
+                            styles.addPuttButtonText,
+                          ]}
                         >
-                          <Text
-                            style={[
-                              styles.addShotButtonText,
-                              styles.addPuttButtonText,
-                            ]}
-                          >
-                            + Add Putt
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                          + Add Putt
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                  );
+                  </View>
+                );
+              }
+
+              // Helper function to check if a club name is a group (has brackets)
+              const isClubGroup = (clubName: string): boolean => {
+                return clubName.startsWith("[") && clubName.endsWith("]");
+              };
+
+              // Get club groups from the clubs list (anything with [])
+              const clubGroups = (clubs || []).filter((club) =>
+                isClubGroup(club)
+              );
+
+              // Get regular clubs (not groups)
+              const regularClubs = (clubs || []).filter(
+                (club) => !isClubGroup(club)
+              );
+
+              // Helper function to check if a club matches a group
+              const clubMatchesGroup = (
+                clubName: string,
+                group: string
+              ): boolean => {
+                // If the club name is exactly the group name, it matches
+                if (clubName === group) return true;
+                return false;
+              };
+
+              // Get clubs with groups for dropdown - maintain the order from settings
+              const clubsWithGroups = clubs || [];
+
+              // Get default club for current shot
+              const getDefaultClubForShot = (): string | null => {
+                if (!hole || !shotInfo.isShot) return null;
+                const currentShotNumber = shotInfo.shotNumber;
+                const par = hole.par;
+                const defaultClubs = data.settings.defaultClubs;
+
+                if (par === 5) {
+                  if (currentShotNumber === 1)
+                    return defaultClubs?.par5?.shot1 || "[Driver]";
+                  if (currentShotNumber === 2)
+                    return defaultClubs?.par5?.shot2 || "[Irons]";
+                  if (currentShotNumber === 3)
+                    return defaultClubs?.par5?.shot3 || "[Irons]";
+                } else if (par === 4) {
+                  if (currentShotNumber === 1)
+                    return defaultClubs?.par4?.shot1 || "[Driver]";
+                  if (currentShotNumber === 2)
+                    return defaultClubs?.par4?.shot2 || "[Irons]";
+                } else if (par === 3) {
+                  if (currentShotNumber === 1)
+                    return defaultClubs?.par3?.shot1 || "[Irons]";
                 }
 
-                // Helper function to check if a club name is a group (has brackets)
-                const isClubGroup = (clubName: string): boolean => {
-                  return clubName.startsWith("[") && clubName.endsWith("]");
-                };
+                return null;
+              };
 
-                // Get club groups from the clubs list (anything with [])
-                const clubGroups = (clubs || []).filter((club) =>
-                  isClubGroup(club)
-                );
+              const defaultClubForShot = getDefaultClubForShot();
 
-                // Get regular clubs (not groups)
-                const regularClubs = (clubs || []).filter(
-                  (club) => !isClubGroup(club)
-                );
-
-                // Helper function to check if a club matches a group
-                const clubMatchesGroup = (
-                  clubName: string,
-                  group: string
-                ): boolean => {
-                  // If the club name is exactly the group name, it matches
-                  if (clubName === group) return true;
-                  return false;
-                };
-
-                // Get clubs with groups for dropdown - maintain the order from settings
-                const clubsWithGroups = clubs || [];
-
-                // Get default club for current shot
-                const getDefaultClubForShot = (): string | null => {
-                  if (!hole || !shotInfo.isShot) return null;
-                  const currentShotNumber = shotInfo.shotNumber;
-                  const par = hole.par;
-                  const defaultClubs = data.settings.defaultClubs;
-
-                  if (par === 5) {
-                    if (currentShotNumber === 1)
-                      return defaultClubs?.par5?.shot1 || "[Driver]";
-                    if (currentShotNumber === 2)
-                      return defaultClubs?.par5?.shot2 || "[Irons]";
-                    if (currentShotNumber === 3)
-                      return defaultClubs?.par5?.shot3 || "[Irons]";
-                  } else if (par === 4) {
-                    if (currentShotNumber === 1)
-                      return defaultClubs?.par4?.shot1 || "[Driver]";
-                    if (currentShotNumber === 2)
-                      return defaultClubs?.par4?.shot2 || "[Irons]";
-                  } else if (par === 3) {
-                    if (currentShotNumber === 1)
-                      return defaultClubs?.par3?.shot1 || "[Irons]";
-                  }
-
-                  return null;
-                };
-
-                const defaultClubForShot = getDefaultClubForShot();
-
-                return (
+              return (
+                <View style={{ marginBottom: 16 }}>
+                  {/* Shot Card Section - Moved to top per user request */}
                   <View
                     style={[
                       styles.shotCard,
                       { marginBottom: 0, paddingBottom: 18 },
                     ]}
                   >
-                    {/* Shot Header - Moved to top */}
+                    {/* Shot Header */}
                     <View style={styles.shotHeader}>
                       <Text style={styles.shotNumber}>
                         {shotInfo.type === "shot"
@@ -5730,126 +5729,124 @@ const HoleDetailScreen = React.forwardRef<
                       </Text>
                     </View>
 
-                    {/* Record Swing Component - Moved to top per user request */}
-                    {shotInfo.isShot && (
-                      <View style={{ marginBottom: 12, marginTop: 4 }}>
-                        {shotInfo.shot.videoUri ? (
-                          <View style={styles.videoContainer}>
-                            <Video
-                              ref={shotVideoRef}
-                              source={{ uri: shotInfo.shot.videoUri }}
-                              style={styles.videoPlayer}
-                              useNativeControls
-                              resizeMode={ResizeMode.CONTAIN}
-                              isLooping
-                              rate={playbackRate}
-                              shouldCorrectPitch={false}
-                              onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
-                                if (status.isLoaded) {
-                                  setIsPlaying(status.isPlaying);
+                    {/* Record Swing Component */}
+                    <View style={{ marginBottom: 12, marginTop: 4 }}>
+                      {shotInfo.isShot && shotInfo.shot.videoUri ? (
+                        <View style={styles.videoContainer}>
+                          <Video
+                            ref={shotVideoRef}
+                            source={{ uri: shotInfo.shot.videoUri }}
+                            style={styles.videoPlayer}
+                            useNativeControls
+                            resizeMode={ResizeMode.CONTAIN}
+                            isLooping
+                            rate={playbackRate}
+                            shouldCorrectPitch={false}
+                            onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+                              if (status.isLoaded) {
+                                setIsPlaying(status.isPlaying);
+                              }
+                            }}
+                            onFullscreenUpdate={(event) => {
+                              if (
+                                event.fullscreenUpdate ===
+                                VideoFullscreenUpdate.PLAYER_DID_DISMISS
+                              ) {
+                                if (shotVideoRef.current) {
+                                  shotVideoRef.current.pauseAsync();
                                 }
-                              }}
-                              onFullscreenUpdate={(event) => {
-                                if (
-                                  event.fullscreenUpdate ===
-                                  VideoFullscreenUpdate.PLAYER_DID_DISMISS
-                                ) {
+                              }
+                            }}
+                          />
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              gap: 12,
+                              marginTop: 12,
+                              marginBottom: 4,
+                            }}
+                          >
+                            {[1.0, 0.5, 0.25].map((rate) => (
+                              <TouchableOpacity
+                                key={rate}
+                                style={{
+                                  paddingHorizontal: 16,
+                                  paddingVertical: 8,
+                                  borderRadius: 20,
+                                  backgroundColor: "rgba(0, 0, 0, 0.8)",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  borderWidth: 1,
+                                  borderColor: "rgba(255, 255, 255, 0.3)",
+                                  minWidth: 70,
+                                }}
+                                onPress={async () => {
+                                  setPlaybackRate(rate);
                                   if (shotVideoRef.current) {
-                                    shotVideoRef.current.pauseAsync();
+                                    await shotVideoRef.current.playAsync();
+                                    await shotVideoRef.current.presentFullscreenPlayer();
                                   }
-                                }
-                              }}
-                            />
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                gap: 12,
-                                marginTop: 12,
-                                marginBottom: 4,
-                              }}
-                            >
-                              {[1.0, 0.5, 0.25].map((rate) => (
-                                <TouchableOpacity
-                                  key={rate}
+                                  HapticFeedback.light();
+                                }}
+                              >
+                                <Text
                                   style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 20,
-                                    backgroundColor: "rgba(0, 0, 0, 0.8)",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    borderWidth: 1,
-                                    borderColor: "rgba(255, 255, 255, 0.3)",
-                                    minWidth: 70,
-                                  }}
-                                  onPress={async () => {
-                                    setPlaybackRate(rate);
-                                    if (shotVideoRef.current) {
-                                      await shotVideoRef.current.playAsync();
-                                      await shotVideoRef.current.presentFullscreenPlayer();
-                                    }
-                                    HapticFeedback.light();
+                                    color: "#FFFFFF",
+                                    fontSize: 14,
+                                    fontWeight: "bold",
                                   }}
                                 >
-                                  <Text
-                                    style={{
-                                      color: "#FFFFFF",
-                                      fontSize: 14,
-                                      fontWeight: "bold",
-                                    }}
-                                  >
-                                    {rate === 1.0 ? "1x" : `${rate}x`}
-                                  </Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.reRecordButton}
-                              onPress={() => {
-                                Alert.alert(
-                                  "Re-record Swing",
-                                  "This will delete the current recording. Are you sure?",
-                                  [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                      text: "Delete",
-                                      style: "destructive",
-                                      onPress: () =>
-                                        updateShot(
-                                          shotInfo.shot.id,
-                                          "shot",
-                                          "videoUri",
-                                          undefined
-                                        ),
-                                    },
-                                  ]
-                                );
-                              }}
-                            >
-                              <Text style={styles.reRecordButtonText}>
-                                Re-record Swing
-                              </Text>
-                            </TouchableOpacity>
+                                  {rate === 1.0 ? "1x" : `${rate}x`}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
                           </View>
-                        ) : (
-                          <RecordSwing
-                            holeNumber={currentHole}
-                            shotNumber={shotInfo.shotNumber}
-                            club={shotInfo.shot.club || "Unknown"}
-                            countdownSeconds={
-                              data.settings.swingRecording.countdownSeconds
-                            }
-                            durationSeconds={
-                              data.settings.swingRecording.durationSeconds
-                            }
-                            colors={colors}
-                            onRecordingComplete={handleRecordingComplete}
-                          />
-                        )}
-                      </View>
-                    )}
+                          <TouchableOpacity
+                            style={styles.reRecordButton}
+                            onPress={() => {
+                              Alert.alert(
+                                "Re-record Swing",
+                                "This will delete the current recording. Are you sure?",
+                                [
+                                  { text: "Cancel", style: "cancel" },
+                                  {
+                                    text: "Delete",
+                                    style: "destructive",
+                                    onPress: () =>
+                                      updateShot(
+                                        shotInfo.shot.id,
+                                        shotInfo.type === "shot" ? "shot" : "putt",
+                                        "videoUri",
+                                        undefined
+                                      ),
+                                  },
+                                ]
+                              );
+                            }}
+                          >
+                            <Text style={styles.reRecordButtonText}>
+                              Re-record Swing
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <RecordSwing
+                          holeNumber={currentHole}
+                          shotNumber={shotInfo.shotNumber}
+                          club={shotInfo.shot.club || "Unknown"}
+                          countdownSeconds={
+                            data.settings.swingRecording.countdownSeconds
+                          }
+                          durationSeconds={
+                            data.settings.swingRecording.durationSeconds
+                          }
+                          colors={colors}
+                          onRecordingComplete={handleRecordingComplete}
+                        />
+                      )}
+                    </View>
 
                     <View style={styles.shotFields}>
                       <View
@@ -6014,436 +6011,442 @@ const HoleDetailScreen = React.forwardRef<
                         )}
                       </View>
                     </View>
-
-                    {/* Outcome Grid for this shot */}
-                    <View style={{ height: 12, marginTop: 6 }} />
-                    <View
-                      style={[
-                        shotInfo.shot.direction === "penalty" && {
-                          backgroundColor: "#000000",
-                          borderRadius: 8,
-                          padding: 8,
-                        },
-                      ]}
-                    >
-                      <OutcomeGrid
-                        shotType={
-                          shotInfo.type === "shot" ? "iron" : shotInfo.type
-                        }
-                        shotNumber={shotInfo.shotNumber}
-                        historicalData={
-                          shotInfo.isShot
-                            ? historicalData.shot || {}
-                            : historicalData.putts || {}
-                        }
-                        selectedOutcome={shotInfo.shot.direction}
-                        isPoorShot={shotInfo.shot.poorShot === true}
-                        onSelect={(outcome) => {
-                          updateShot(
-                            shotInfo.shot.id,
-                            shotInfo.type === "shot" ? "shot" : "putt",
-                            "direction",
-                            outcome
-                          );
-                          updateShot(
-                            shotInfo.shot.id,
-                            shotInfo.type === "shot" ? "shot" : "putt",
-                            "poorShot",
-                            false
-                          );
-                        }}
-                        onPoopSelect={(outcome) => {
-                          updateShot(
-                            shotInfo.shot.id,
-                            shotInfo.type === "shot" ? "shot" : "putt",
-                            "direction",
-                            outcome
-                          );
-                          updateShot(
-                            shotInfo.shot.id,
-                            shotInfo.type === "shot" ? "shot" : "putt",
-                            "poorShot",
-                            true
-                          );
-                        }}
-                        onFlameAnimation={onFlameAnimation}
-                        onPoopAnimation={onPoopAnimation}
-                        showError={
-                          showValidationError && !shotInfo.shot.direction
-                        }
-                        colors={colors}
-                      />
-                    </View>
-
-
-
-                    {/* OB/Water buttons - Moved to bottom */}
-                    {shotInfo.isShot && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          gap: 8,
-                          marginTop: 0,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <TouchableOpacity
-                          style={[styles.obWaterButton, { flex: 1 }]}
-                          onPress={() => {
-                            if (shotInfo.shot.direction !== "penalty") {
-                              updateShot(
-                                shotInfo.shot.id,
-                                "shot",
-                                "lie",
-                                shotInfo.shot.lie === "ob" ? "fairway" : "ob"
-                              );
-                              // Handle OB - set next shot to penalty
-                              const nextShotIndex = 1; // s2 is index 1
-                              if (nextShotIndex < shots.length) {
-                                updateShot(
-                                  shots[nextShotIndex].id,
-                                  "shot",
-                                  "direction",
-                                  "penalty"
-                                );
-                              }
-
-                              // If setting OB (not unsetting), prompt to add another shot
-                              if (shotInfo.shot.lie !== "ob") {
-                                Alert.alert(
-                                  "Add Another Shot?",
-                                  "Do you want to add another shot?",
-                                  [
-                                    {
-                                      text: "No",
-                                      style: "cancel",
-                                    },
-                                    {
-                                      text: "Yes",
-                                      onPress: () => {
-                                        // Add another shot with gap wedge default
-                                        const newShot: Shot = {
-                                          id: `shot-${Date.now()}-${Math.random()}`,
-                                          type: "shot",
-                                          lie: "green",
-                                          direction: "good", // Default to good
-                                          club: "Gap Wedge", // Default to gap wedge
-                                          timestamp: Date.now(),
-                                        };
-
-                                        setShots((prev) => [...prev, newShot]);
-                                        // Stay on current shot, don't navigate to the new shot
-                                      },
-                                    },
-                                  ]
-                                );
-                              }
-                            }
-                          }}
-                          disabled={shotInfo.shot.direction === "penalty"}
-                        >
-                          <Text style={styles.obWaterButtonText}>OB</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.obWaterButton, { flex: 1 }]}
-                          onPress={() => {
-                            if (shotInfo.shot.direction !== "penalty") {
-                              updateShot(
-                                shotInfo.shot.id,
-                                "shot",
-                                "lie",
-                                shotInfo.shot.lie === "water"
-                                  ? "fairway"
-                                  : "water"
-                              );
-                              // Handle Water - set next shot to penalty
-                              const nextShotIndex = 1; // s2 is index 1
-                              if (nextShotIndex < shots.length) {
-                                updateShot(
-                                  shots[nextShotIndex].id,
-                                  "shot",
-                                  "direction",
-                                  "penalty"
-                                );
-                              }
-
-                              // If setting Water (not unsetting), prompt to add another shot
-                              if (shotInfo.shot.lie !== "water") {
-                                Alert.alert(
-                                  "Add Another Shot?",
-                                  "Do you want to add another shot?",
-                                  [
-                                    {
-                                      text: "No",
-                                      style: "cancel",
-                                    },
-                                    {
-                                      text: "Yes",
-                                      onPress: () => {
-                                        // Add another shot with gap wedge default
-                                        const newShot: Shot = {
-                                          id: `shot-${Date.now()}-${Math.random()}`,
-                                          type: "shot",
-                                          lie: "green",
-                                          direction: "good", // Default to good
-                                          club: "Gap Wedge", // Default to gap wedge
-                                          timestamp: Date.now(),
-                                        };
-
-                                        setShots((prev) => [...prev, newShot]);
-                                        // Stay on current shot, don't navigate to the new shot
-                                      },
-                                    },
-                                  ]
-                                );
-                              }
-                            }
-                          }}
-                          disabled={shotInfo.shot.direction === "penalty"}
-                        >
-                          <Text style={styles.obWaterButtonText}>Water</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-
-                    {/* Today's Distance - Moved to bottom */}
-                    <View
-                      style={[
-                        styles.todaysDistanceCard,
-                        { marginTop: 8, marginBottom: 0 },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        style={styles.todaysDistanceContainer}
-                        onPress={() => setShowDistanceModal(true)}
-                      >
-                        <Text style={styles.todaysDistanceLabel}>
-                          Today's Distance:{" "}
-                          {todaysDistance || hole?.todaysDistance || "Not set"}
-                        </Text>
-                        <Text style={styles.editIcon}>✎</Text>
-                      </TouchableOpacity>
-                    </View>
                   </View>
-                );
-              })()}
-            </ScrollView>
 
-            {/* Dynamic Navigation Pills - Moved outside ScrollView to always be visible */}
-            {(() => {
-              const shotInfo = getCurrentShotInfo();
-              if (!shotInfo) return null;
+                  {/* Shot Grid Navigation - Moved to top */}
+                  <View style={styles.shotGridContainer}>
+                    {/* Shots Row */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.shotRow}
+                      contentContainerStyle={styles.shotRowContent}
+                    >
+                      {(shots || []).map((shot, index) => {
+                        const isPenalty = shot.direction === "penalty";
+                        return (
+                          <TouchableOpacity
+                            key={shot.id}
+                            style={[
+                              styles.shotButton,
+                              currentShotIndex === index && styles.activeShotButton,
+                              isPenalty && styles.penaltyButton,
+                            ]}
+                            onPress={() => setCurrentShotIndex(index)}
+                          >
+                            <Text
+                              style={[
+                                styles.shotButtonText,
+                                currentShotIndex === index &&
+                                styles.activeShotButtonText,
+                                isPenalty && styles.penaltyButtonText,
+                              ]}
+                            >
+                              {`s${index + 1}`}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
 
-              const canGoPrevious = currentShotIndex > 0;
-              const canGoNext = currentShotIndex < getAllShots().length - 1;
-
-              return (
-                <View
-                  style={[
-                    styles.outcomeGridNavigation,
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 20,
-                      paddingVertical: 8,
-                    },
-                  ]}
-                >
-                  {/* Previous shot */}
-                  <View
-                    style={{
-                      flex: 1,
-                      alignItems: "flex-start",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {canGoPrevious && (
+                      {/* Add Shot Button */}
                       <TouchableOpacity
-                        style={styles.smallNavigationPillPrev}
-                        onPress={goToPreviousShot}
+                        style={styles.addShotGridButton}
+                        onPress={addShot}
                       >
-                        <Text
+                        <Text style={styles.addShotGridButtonText}>+shot</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+
+                    {/* Putts Row */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.shotRow}
+                      contentContainerStyle={styles.shotRowContent}
+                    >
+                      {(putts || []).map((putt, index) => (
+                        <TouchableOpacity
+                          key={putt.id}
                           style={[
-                            styles.smallNavigationPillText,
-                            { color: colors.text },
+                            styles.shotButton,
+                            currentShotIndex === (shots || []).length + index &&
+                            styles.activeShotButton,
                           ]}
+                          onPress={() =>
+                            setCurrentShotIndex((shots || []).length + index)
+                          }
                         >
-                          {(() => {
-                            const prevShotIndex = currentShotIndex - 1;
-                            if (prevShotIndex < (shots || []).length) {
-                              return `← Shot ${prevShotIndex + 1}`;
-                            } else {
-                              const puttIndex =
-                                prevShotIndex - (shots || []).length;
-                              return `← Putt ${puttIndex + 1}`;
-                            }
-                          })()}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.shotButtonText,
+                              currentShotIndex === (shots || []).length + index &&
+                              styles.activeShotButtonText,
+                            ]}
+                          >
+                            p{index + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+
+                      {/* Add Putt Button */}
+                      <TouchableOpacity
+                        style={styles.addShotGridButton}
+                        onPress={addPutt}
+                      >
+                        <Text style={styles.addShotGridButtonText}>+putt</Text>
                       </TouchableOpacity>
-                    )}
+                    </ScrollView>
                   </View>
 
-                  {/* Delete current shot */}
+                  {/* Dynamic Navigation Pills - Contextual Next/Prev buttons */}
+                  {(() => {
+                    const shotInfo = getCurrentShotInfo();
+                    if (!shotInfo) return null;
+
+                    const canGoPrevious = currentShotIndex > 0;
+                    const canGoNext =
+                      currentShotIndex < getAllShots().length - 1;
+
+                    return (
+                      <View
+                        style={[
+                          styles.outcomeGridNavigation,
+                          {
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingHorizontal: 20,
+                            paddingVertical: 8,
+                            justifyContent: "space-between",
+                          },
+                        ]}
+                      >
+                        {/* Previous shot */}
+                        <View
+                          style={{
+                            flex: 1,
+                            alignItems: "flex-start",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {canGoPrevious && (
+                            <TouchableOpacity
+                              style={styles.smallNavigationPillPrev}
+                              onPress={goToPreviousShot}
+                            >
+                              <Text
+                                style={[
+                                  styles.smallNavigationPillText,
+                                  { color: colors.text },
+                                ]}
+                              >
+                                {(() => {
+                                  const prevShotIndex = currentShotIndex - 1;
+                                  if (prevShotIndex < (shots || []).length) {
+                                    return `← Shot ${prevShotIndex + 1}`;
+                                  } else {
+                                    const puttIndex =
+                                      prevShotIndex - (shots || []).length;
+                                    return `← Putt ${puttIndex + 1}`;
+                                  }
+                                })()}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+
+                        {/* Delete current shot */}
+                        <View
+                          style={{
+                            flex: 1,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <TouchableOpacity
+                            style={styles.deleteShotButton}
+                            onPress={() => {
+                              const currentShotInfo = getCurrentShotInfo();
+                              if (currentShotInfo) {
+                                removeShot(
+                                  currentShotInfo.shot.id,
+                                  currentShotInfo.type === "shot"
+                                    ? "shot"
+                                    : "putt"
+                                );
+                              }
+                            }}
+                          >
+                            <Text style={styles.deleteShotButtonText}>
+                              {(() => {
+                                const currentShotInfo = getCurrentShotInfo();
+                                return currentShotInfo
+                                  ? currentShotInfo.type === "shot"
+                                    ? "Delete Shot"
+                                    : "Delete Putt"
+                                  : "Delete";
+                              })()}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Next shot */}
+                        <View
+                          style={{
+                            flex: 1,
+                            alignItems: "flex-end",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {canGoNext && (
+                            <TouchableOpacity
+                              style={styles.smallNavigationPill}
+                              onPress={goToNextShot}
+                            >
+                              <Text
+                                style={[
+                                  styles.smallNavigationPillText,
+                                  { color: colors.background },
+                                ]}
+                              >
+                                {(() => {
+                                  const nextShotIndex = currentShotIndex + 1;
+                                  if (nextShotIndex < (shots || []).length) {
+                                    return `Shot ${nextShotIndex + 1} →`;
+                                  } else {
+                                    const puttIndex =
+                                      nextShotIndex - (shots || []).length;
+                                    return `Putt ${puttIndex + 1} →`;
+                                  }
+                                })()}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })()}
+
+                  {/* Outcome Grid for this shot */}
+                  <View style={{ height: 12, marginTop: 6 }} />
                   <View
-                    style={{
-                      flex: 1,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    style={[
+                      shotInfo.shot.direction === "penalty" && {
+                        backgroundColor: "#000000",
+                        borderRadius: 8,
+                        padding: 8,
+                      },
+                    ]}
                   >
-                    <TouchableOpacity
-                      style={styles.deleteShotButton}
-                      onPress={() => {
-                        const currentShotInfo = getCurrentShotInfo();
-                        if (currentShotInfo) {
-                          removeShot(
-                            currentShotInfo.shot.id,
-                            currentShotInfo.type === "shot" ? "shot" : "putt"
-                          );
-                        }
+                    <OutcomeGrid
+                      shotType={
+                        shotInfo.type === "shot" ? "iron" : shotInfo.type
+                      }
+                      shotNumber={shotInfo.shotNumber}
+                      historicalData={
+                        shotInfo.isShot
+                          ? historicalData.shot || {}
+                          : historicalData.putts || {}
+                      }
+                      selectedOutcome={shotInfo.shot.direction}
+                      isPoorShot={shotInfo.shot.poorShot === true}
+                      onSelect={(outcome) => {
+                        updateShot(
+                          shotInfo.shot.id,
+                          shotInfo.type === "shot" ? "shot" : "putt",
+                          "direction",
+                          outcome
+                        );
+                        updateShot(
+                          shotInfo.shot.id,
+                          shotInfo.type === "shot" ? "shot" : "putt",
+                          "poorShot",
+                          false
+                        );
+                      }}
+                      onPoopSelect={(outcome) => {
+                        updateShot(
+                          shotInfo.shot.id,
+                          shotInfo.type === "shot" ? "shot" : "putt",
+                          "direction",
+                          outcome
+                        );
+                        updateShot(
+                          shotInfo.shot.id,
+                          shotInfo.type === "shot" ? "shot" : "putt",
+                          "poorShot",
+                          true
+                        );
+                      }}
+                      onFlameAnimation={onFlameAnimation}
+                      onPoopAnimation={onPoopAnimation}
+                      showError={
+                        showValidationError && !shotInfo.shot.direction
+                      }
+                      colors={colors}
+                    />
+                  </View>
+
+                  {/* OB/Water buttons - Moved to bottom */}
+                  {shotInfo.isShot && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 8,
+                        marginTop: 0,
+                        marginBottom: 8,
                       }}
                     >
-                      <Text style={styles.deleteShotButtonText}>
-                        {(() => {
-                          const currentShotInfo = getCurrentShotInfo();
-                          return currentShotInfo
-                            ? currentShotInfo.type === "shot"
-                              ? "Delete Shot"
-                              : "Delete Putt"
-                            : "Delete";
-                        })()}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Next shot */}
-                  <View
-                    style={{
-                      flex: 1,
-                      alignItems: "flex-end",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {canGoNext && (
                       <TouchableOpacity
-                        style={styles.smallNavigationPill}
-                        onPress={goToNextShot}
-                      >
-                        <Text
-                          style={[
-                            styles.smallNavigationPillText,
-                            { color: colors.background },
-                          ]}
-                        >
-                          {(() => {
-                            const nextShotIndex = currentShotIndex + 1;
-                            if (nextShotIndex < (shots || []).length) {
-                              return `Shot ${nextShotIndex + 1} →`;
-                            } else {
-                              const puttIndex =
-                                nextShotIndex - (shots || []).length;
-                              return `Putt ${puttIndex + 1} →`;
+                        style={[styles.obWaterButton, { flex: 1 }]}
+                        onPress={() => {
+                          if (shotInfo.shot.direction !== "penalty") {
+                            updateShot(
+                              shotInfo.shot.id,
+                              "shot",
+                              "lie",
+                              shotInfo.shot.lie === "ob" ? "fairway" : "ob"
+                            );
+                            // Handle OB - set next shot to penalty
+                            const nextShotIndex = 1; // s2 is index 1
+                            if (nextShotIndex < shots.length) {
+                              updateShot(
+                                shots[nextShotIndex].id,
+                                "shot",
+                                "direction",
+                                "penalty"
+                              );
                             }
-                          })()}
-                        </Text>
+
+                            // If setting OB (not unsetting), prompt to add another shot
+                            if (shotInfo.shot.lie !== "ob") {
+                              Alert.alert(
+                                "Add Another Shot?",
+                                "Do you want to add another shot?",
+                                [
+                                  {
+                                    text: "No",
+                                    style: "cancel",
+                                  },
+                                  {
+                                    text: "Yes",
+                                    onPress: () => {
+                                      // Add another shot with gap wedge default
+                                      const newShot: Shot = {
+                                        id: `shot-${Date.now()}-${Math.random()}`,
+                                        type: "shot",
+                                        lie: "green",
+                                        direction: "good", // Default to good
+                                        club: "Gap Wedge", // Default to gap wedge
+                                        timestamp: Date.now(),
+                                      };
+
+                                      setShots((prev) => [...prev, newShot]);
+                                      // Stay on current shot, don't navigate to the new shot
+                                    },
+                                  },
+                                ]
+                              );
+                            }
+                          }
+                        }}
+                        disabled={shotInfo.shot.direction === "penalty"}
+                      >
+                        <Text style={styles.obWaterButtonText}>OB</Text>
                       </TouchableOpacity>
-                    )}
+                      <TouchableOpacity
+                        style={[styles.obWaterButton, { flex: 1 }]}
+                        onPress={() => {
+                          if (shotInfo.shot.direction !== "penalty") {
+                            updateShot(
+                              shotInfo.shot.id,
+                              "shot",
+                              "lie",
+                              shotInfo.shot.lie === "water"
+                                ? "fairway"
+                                : "water"
+                            );
+                            // Handle Water - set next shot to penalty
+                            const nextShotIndex = 1; // s2 is index 1
+                            if (nextShotIndex < shots.length) {
+                              updateShot(
+                                shots[nextShotIndex].id,
+                                "shot",
+                                "direction",
+                                "penalty"
+                              );
+                            }
+
+                            // If setting Water (not unsetting), prompt to add another shot
+                            if (shotInfo.shot.lie !== "water") {
+                              Alert.alert(
+                                "Add Another Shot?",
+                                "Do you want to add another shot?",
+                                [
+                                  {
+                                    text: "No",
+                                    style: "cancel",
+                                  },
+                                  {
+                                    text: "Yes",
+                                    onPress: () => {
+                                      // Add another shot with gap wedge default
+                                      const newShot: Shot = {
+                                        id: `shot-${Date.now()}-${Math.random()}`,
+                                        type: "shot",
+                                        lie: "green",
+                                        direction: "good", // Default to good
+                                        club: "Gap Wedge", // Default to gap wedge
+                                        timestamp: Date.now(),
+                                      };
+
+                                      setShots((prev) => [...prev, newShot]);
+                                      // Stay on current shot, don't navigate to the new shot
+                                    },
+                                  },
+                                ]
+                              );
+                            }
+                          }
+                        }}
+                        disabled={shotInfo.shot.direction === "penalty"}
+                      >
+                        <Text style={styles.obWaterButtonText}>Water</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Today's Distance - Moved to bottom */}
+                  <View
+                    style={[
+                      styles.todaysDistanceCard,
+                      { marginTop: 8, marginBottom: 0 },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      style={styles.todaysDistanceContainer}
+                      onPress={() => setShowDistanceModal(true)}
+                    >
+                      <Text style={styles.todaysDistanceLabel}>
+                        Today's Distance:{" "}
+                        {todaysDistance || hole?.todaysDistance || "Not set"}
+                      </Text>
+                      <Text style={styles.editIcon}>✎</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
             })()}
-          </View>
-        </PanGestureHandler>
-
-        {/* Shot Grid Navigation */}
-        <View style={styles.shotGridContainer}>
-          {/* Shots Row */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.shotRow}
-            contentContainerStyle={styles.shotRowContent}
-          >
-            {(shots || []).map((shot, index) => {
-              const isPenalty = shot.direction === "penalty";
-              return (
-                <TouchableOpacity
-                  key={shot.id}
-                  style={[
-                    styles.shotButton,
-                    currentShotIndex === index && styles.activeShotButton,
-                    isPenalty && styles.penaltyButton,
-                  ]}
-                  onPress={() => setCurrentShotIndex(index)}
-                >
-                  <Text
-                    style={[
-                      styles.shotButtonText,
-                      currentShotIndex === index && styles.activeShotButtonText,
-                      isPenalty && styles.penaltyButtonText,
-                    ]}
-                  >
-                    {`s${index + 1}`}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* Add Shot Button */}
-            <TouchableOpacity
-              style={styles.addShotGridButton}
-              onPress={addShot}
-            >
-              <Text style={styles.addShotGridButtonText}>+shot</Text>
-            </TouchableOpacity>
-          </ScrollView>
-
-          {/* Putts Row */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.shotRow}
-            contentContainerStyle={styles.shotRowContent}
-          >
-            {(putts || []).map((putt, index) => (
-              <TouchableOpacity
-                key={putt.id}
-                style={[
-                  styles.shotButton,
-                  currentShotIndex === (shots || []).length + index &&
-                  styles.activeShotButton,
-                ]}
-                onPress={() =>
-                  setCurrentShotIndex((shots || []).length + index)
-                }
-              >
-                <Text
-                  style={[
-                    styles.shotButtonText,
-                    currentShotIndex === (shots || []).length + index &&
-                    styles.activeShotButtonText,
-                  ]}
-                >
-                  p{index + 1}
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            {/* Add Putt Button */}
-            <TouchableOpacity
-              style={styles.addShotGridButton}
-              onPress={addPutt}
-            >
-              <Text style={styles.addShotGridButtonText}>+putt</Text>
-            </TouchableOpacity>
           </ScrollView>
         </View>
+      </PanGestureHandler>
 
-
-      </View>
-    );
-  }
+      {/* Shot Navigation Arrows - Moved to bottom */}
+    </View>
+  );
+}
 );
+
+
 
 // Course Creation Modal
 
