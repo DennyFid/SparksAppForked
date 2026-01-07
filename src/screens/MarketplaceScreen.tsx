@@ -16,6 +16,7 @@ interface Props {
 export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
   const allSparks = getAllSparks();
   const { colors } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
 
@@ -102,190 +103,7 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     return stars;
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      padding: 24,
-      paddingTop: 60, // Additional spacing for iOS Dynamic Island
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    title: {
-      fontSize: 26,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-    },
-    grid: {
-      padding: 24,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-    },
-    sparkCard: {
-      width: '31%',
-      aspectRatio: 1.1,
-      marginBottom: 16,
-      marginHorizontal: '1%',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    sparkCardContent: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 12,
-      position: 'relative',
-    },
-    sparkCardContentWithRating: {
-      flex: 1,
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 12,
-      position: 'relative',
-    },
-    sparkIconContainer: {
-      position: 'relative',
-      marginBottom: 4,
-    },
-    sparkIcon: {
-      fontSize: 32,
-    },
-    sparkTitle: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text,
-      textAlign: 'center',
-    },
-    categoryTabs: {
-      flexDirection: 'row',
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    categoryTab: {
-      flex: 1,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      marginHorizontal: 4,
-      borderRadius: 8,
-      alignItems: 'center',
-      backgroundColor: colors.background,
-    },
-    activeCategoryTab: {
-      backgroundColor: colors.primary,
-    },
-    categoryTabText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-    activeCategoryTabText: {
-      color: colors.background,
-    },
-    sectionHeader: {
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-    },
-    sectionTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    ratingText: {
-      fontSize: 10,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginTop: 4,
-    },
-    ratingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 4,
-      marginBottom: 0,
-    },
-    starsContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginRight: 4,
-      marginTop: 0,
-    },
-    star: {
-      fontSize: 6,
-      marginHorizontal: .5,
-    },
-    starGray: {
-      fontSize: 10,
-      marginHorizontal: 0.5,
-      opacity: 0.3,
-    },
-    ratingNumber: {
-      fontSize: 10,
-      color: colors.textSecondary,
-      fontWeight: '600',
-    },
-    partialStarContainer: {
-      position: 'relative',
-      marginHorizontal: 0.5,
-    },
-    partialStarBackground: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'hidden',
-    },
-    partialStarForeground: {
-      position: 'relative',
-    },
-    categoryPillsContainer: {
-      paddingHorizontal: 24,
-      paddingVertical: 16,
-      backgroundColor: colors.background,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-    },
-    categoryPill: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      marginRight: 8,
-      marginBottom: 8,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    categoryPillActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    categoryPillText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
-      textTransform: 'capitalize',
-    },
-    categoryPillTextActive: {
-      color: colors.background,
-    },
-  });
+
 
   return (
     <View style={styles.container}>
@@ -434,3 +252,188 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
+
+const getStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    padding: 24,
+    paddingTop: 60, // Additional spacing for iOS Dynamic Island
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  grid: {
+    padding: 24,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  sparkCard: {
+    width: '31%',
+    aspectRatio: 1.1,
+    marginBottom: 16,
+    marginHorizontal: '1%',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sparkCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+    position: 'relative',
+  },
+  sparkCardContentWithRating: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    position: 'relative',
+  },
+  sparkIconContainer: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  sparkIcon: {
+    fontSize: 32,
+  },
+  sparkTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  categoryTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  categoryTab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  activeCategoryTab: {
+    backgroundColor: colors.primary,
+  },
+  categoryTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  activeCategoryTabText: {
+    color: colors.background,
+  },
+  sectionHeader: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  ratingText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 0,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+    marginTop: 0,
+  },
+  star: {
+    fontSize: 6,
+    marginHorizontal: .5,
+  },
+  starGray: {
+    fontSize: 10,
+    marginHorizontal: 0.5,
+    opacity: 0.3,
+  },
+  ratingNumber: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  partialStarContainer: {
+    position: 'relative',
+    marginHorizontal: 0.5,
+  },
+  partialStarBackground: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  partialStarForeground: {
+    position: 'relative',
+  },
+  categoryPillsContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: colors.background,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    textTransform: 'capitalize',
+  },
+  categoryPillTextActive: {
+    color: colors.background,
+  },
+});

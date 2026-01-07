@@ -16,110 +16,15 @@ interface Props {
 
 
 
+
 export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
   const { getUserSparks } = useSparkStore();
   const { colors } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
   const userSparkIds = getUserSparks();
 
   // Filter to only show user's sparks
   const userSparks = userSparkIds.map(sparkId => getSparkById(sparkId)).filter(Boolean);
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      padding: 24,
-      paddingTop: 60, // Additional spacing for iOS Dynamic Island
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    title: {
-      fontSize: 26,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-    },
-    grid: {
-      flex: 1,
-      padding: 24,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-    },
-    sparkCard: {
-      width: '31%',
-      aspectRatio: 1.1,
-      marginBottom: 16,
-      marginHorizontal: '1%',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    sparkCardContent: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 16,
-      position: 'relative',
-    },
-    sparkIconContainer: {
-      position: 'relative',
-      marginBottom: 6,
-    },
-    sparkIcon: {
-      fontSize: 36,
-    },
-    sparkTitle: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text,
-      textAlign: 'center',
-    },
-    emptyState: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 40,
-    },
-    emptyIcon: {
-      fontSize: 64,
-      marginBottom: 16,
-    },
-    emptyTitle: {
-      fontSize: 24,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    emptySubtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 24,
-      marginBottom: 32,
-    },
-    discoverButton: {
-      paddingHorizontal: 32,
-      paddingVertical: 16,
-      borderRadius: 12,
-    },
-    discoverButtonText: {
-      fontSize: 18,
-      fontWeight: '600',
-    },
-  });
 
   return (
     <View style={styles.container}>
@@ -196,3 +101,100 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
+
+const getStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    padding: 24,
+    paddingTop: 60, // Additional spacing for iOS Dynamic Island
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  grid: {
+    flex: 1,
+    padding: 24,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  sparkCard: {
+    width: '31%',
+    aspectRatio: 1.1,
+    marginBottom: 16,
+    marginHorizontal: '1%',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sparkCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    position: 'relative',
+  },
+  sparkIconContainer: {
+    position: 'relative',
+    marginBottom: 6,
+  },
+  sparkIcon: {
+    fontSize: 36,
+  },
+  sparkTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  discoverButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  discoverButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});

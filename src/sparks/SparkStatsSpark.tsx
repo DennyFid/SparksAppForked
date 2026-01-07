@@ -93,7 +93,7 @@ export const SparkStatsSpark: React.FC<SparkProps> = ({ showSettings = false, on
             processStats(events);
         } catch (error) {
             console.error('📊 SparkStats: Error loading stats:', error);
-            Alert.alert('Error', 'Failed to load community stats. Please try again later.');
+            Alert.alert('Error', `Failed to load community stats: ${(error as any).message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }

@@ -103,7 +103,7 @@
     },
     "android": {
       "package": "com.mattdyor.sparks",
-      "versionCode": 30,
+      "versionCode": 39,
       "compileSdkVersion": 35,
       "targetSdkVersion": 35,
       "googleServicesFile": "./google-services.json",

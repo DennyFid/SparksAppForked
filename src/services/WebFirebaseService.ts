@@ -433,7 +433,7 @@ export class WebFirebaseService {
         (error as any).message,
         (error as any).code
       );
-      return [];
+      throw error;
     }
   }
 

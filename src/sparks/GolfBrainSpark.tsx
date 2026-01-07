@@ -1808,6 +1808,46 @@ const RoundSummaryScreen: React.FC<{
             ))}
           </View>
         )}
+
+        {/* Shots with Videos Listing */}
+        <View style={styles.clubBreakdown}>
+          <Text style={styles.clubBreakdownTitle}>Shots with Videos</Text>
+          {(() => {
+            const shotsWithVideos: { hole: number, shot: Shot, shotNumber: number }[] = [];
+            (round.holeScores || []).forEach(hs => {
+              (hs.shots || []).forEach((s, idx) => {
+                if (s.videoUri) {
+                  shotsWithVideos.push({ hole: hs.holeNumber, shot: s, shotNumber: idx + 1 });
+                }
+              });
+            });
+
+            if (shotsWithVideos.length === 0) {
+              return <Text style={{ color: colors.textSecondary, fontStyle: 'italic', paddingVertical: 8 }}>No videos recorded yet.</Text>;
+            }
+
+            return shotsWithVideos.map((item) => (
+              <View key={item.shot.id} style={[styles.clubRow, { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 12 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.clubName}>Hole {item.hole} - Shot {item.shotNumber}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{item.shot.club}</Text>
+                </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => onHolePress && onHolePress(item.hole)}
+                  disabled={!onHolePress}
+                >
+                  <Text style={{ color: colors.background, fontWeight: "600" }}>View</Text>
+                </TouchableOpacity>
+              </View>
+            ));
+          })()}
+        </View>
       </ScrollView>
     );
   };
@@ -4054,11 +4094,15 @@ const HoleDetailScreen = React.forwardRef<
       // Reset current shot to first shot when hole changes
       setCurrentShotIndex(0);
 
-      // Scroll to first shot when hole changes
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       }, 100);
     }, [currentHole, expectedShots, expectedPutts, hole]);
+
+    // Scroll to top when switching shots
+    useEffect(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, [currentShotIndex]);
 
     const addShot = () => {
       // Smart club selection based on user's default clubs
@@ -5313,6 +5357,97 @@ const HoleDetailScreen = React.forwardRef<
 
     return (
       <View style={styles.container}>
+        {/* Top Navigation - Moved per request */}
+        <TouchableOpacity
+          style={[styles.button, styles.navButton, { margin: 20, marginBottom: 10, width: 'auto', alignSelf: 'stretch' }]}
+          onPress={handleViewSummary}
+        >
+          <Text style={[styles.buttonText, styles.navButtonText, { textAlign: 'center' }]}>
+            Round Summary
+          </Text>
+        </TouchableOpacity>
+
+        {/* Top Nav Buttons */}
+        <View style={[styles.navRow, { marginHorizontal: 20, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 10 }]}>
+          {/* Prev Hole */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.navButton,
+              currentHole <= 1 && styles.disabledButton,
+              { flex: 1, paddingVertical: 12 }
+            ]}
+            onPress={currentHole > 1 ? onPreviousHole : undefined}
+            disabled={currentHole <= 1}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                styles.navButtonText,
+                currentHole <= 1 && styles.disabledButtonText,
+              ]}
+            >
+              ← Prev Hole
+            </Text>
+          </TouchableOpacity>
+
+          {/* Hole History */}
+          <TouchableOpacity
+            style={[styles.button, styles.navButton, { flex: 1, paddingVertical: 12 }]}
+            onPress={onShowHistory}
+          >
+            <Text style={[styles.buttonText, styles.navButtonText]}>
+              Hole History
+            </Text>
+          </TouchableOpacity>
+
+          {/* Next Hole */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.arrowButton,
+              currentHole >= 18 && styles.disabledButton,
+              { flex: 1, paddingVertical: 12 },
+              // Make blue only if there's no "Next Shot" button (on last shot/putt)
+              (() => {
+                const allShots = getAllShots();
+                const canGoNext = currentShotIndex < allShots.length - 1;
+                return !canGoNext && currentHole < 18
+                  ? {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  }
+                  : {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  };
+              })(),
+            ]}
+            onPress={currentHole < 18 ? handleCompleteHole : undefined}
+            disabled={currentHole >= 18}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                currentHole >= 18 && styles.disabledButtonText,
+                (() => {
+                  const allShots = getAllShots();
+                  const canGoNext = currentShotIndex < allShots.length - 1;
+                  if (canGoNext) {
+                    return { color: colors.text, fontSize: 12 };
+                  } else {
+                    return currentHole < 18
+                      ? { color: colors.background }
+                      : { color: colors.text };
+                  }
+                })(),
+              ]}
+            >
+              Next Hole →
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.holeInfo}>
@@ -6304,101 +6439,7 @@ const HoleDetailScreen = React.forwardRef<
           </ScrollView>
         </View>
 
-        {/* Permanent Navigation - Fixed above spark bottom navigation */}
-        <View style={styles.permanentNavigation}>
-          {/* Top Row */}
-          <View style={styles.navRow}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.navButton,
-                currentHole <= 1 && styles.disabledButton,
-              ]}
-              onPress={currentHole > 1 ? onPreviousHole : undefined}
-              disabled={currentHole <= 1}
-            >
-              <Text
-                style={[
-                  styles.buttonText,
-                  styles.navButtonText,
-                  currentHole <= 1 && styles.disabledButtonText,
-                ]}
-              >
-                ← Prev Hole
-              </Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, styles.navButton]}
-              onPress={onShowHistory}
-            >
-              <Text style={[styles.buttonText, styles.navButtonText]}>
-                Hole History
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.arrowButton,
-                currentHole >= 18 && styles.disabledButton,
-                // Make blue only if there's no "Next Shot" button (on last shot/putt)
-                (() => {
-                  const allShots = getAllShots();
-                  const canGoNext = currentShotIndex < allShots.length - 1;
-                  return !canGoNext && currentHole < 18
-                    ? {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                    }
-                    : {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    };
-                })(),
-              ]}
-              onPress={currentHole < 18 ? handleCompleteHole : undefined}
-              disabled={currentHole >= 18}
-            >
-              <Text
-                style={[
-                  styles.buttonText,
-                  currentHole >= 18 && styles.disabledButtonText,
-                  // Make text white when button is blue, otherwise match Hole History color
-                  // When canGoNext is true (NOT last shot), use same font size as Hole History (12px)
-                  // When canGoNext is false (last shot), keep larger font size (16px) to make it obvious
-                  (() => {
-                    const allShots = getAllShots();
-                    const canGoNext = currentShotIndex < allShots.length - 1;
-                    if (canGoNext) {
-                      // NOT last shot - use same font size as Hole History
-                      return { color: colors.text, fontSize: 12 };
-                    } else {
-                      // Last shot - keep larger font size and make text white when button is blue
-                      return currentHole < 18
-                        ? { color: colors.background }
-                        : { color: colors.text };
-                    }
-                  })(),
-                ]}
-              >
-                Next Hole →
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Bottom Row */}
-          <View style={styles.navRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.navButton]}
-              onPress={handleViewSummary}
-            >
-              <Text style={[styles.buttonText, styles.navButtonText]}>
-                Round Summary
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     );
   }

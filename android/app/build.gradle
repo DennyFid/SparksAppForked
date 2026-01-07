@@ -92,7 +92,7 @@ android {
         applicationId 'com.mattdyor.sparks'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 30
+        versionCode 39
         versionName "1.0.24"
     }
     signingConfigs {

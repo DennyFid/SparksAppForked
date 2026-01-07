@@ -3,7 +3,8 @@ for Android...
 The `expo prebuild --clean` command regenerates build.gradle from app.json.
 
 cd /Users/mattdyor/SparksApp
-rm -rf android ios
+# Uninstall existing app to avoid signature mismatch
+~/Library/Android/sdk/platform-tools/adb uninstall com.mattdyor.sparks || true
 npm install
 npx expo prebuild --clean
 cd android && ./gradlew clean && cd ..

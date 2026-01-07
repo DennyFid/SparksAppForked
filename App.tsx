@@ -43,13 +43,17 @@ try {
   console.log("⚠️ Firebase initialization status:", (error as Error).message);
 }
 
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

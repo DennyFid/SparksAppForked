@@ -3,7 +3,7 @@
 <plist version="1.0">
   <dict>
     <key>AVAudioSessionCategoryPlayAndRecord</key>
-    <false/>
+    <true/>
     <key>AVAudioSessionCategoryPlayback</key>
     <true/>
     <key>CADisableMinimumFrameDurationOnPhone</key>

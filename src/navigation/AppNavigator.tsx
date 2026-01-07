@@ -10,10 +10,7 @@ import {
   createBottomTabNavigator,
   BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
-import {
-  createStackNavigator,
-  TransitionPresets,
-} from "@react-navigation/stack";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useTheme } from "../contexts/ThemeContext";
 import {
   RootTabParamList,
@@ -30,16 +27,11 @@ import { getSparkById } from "../components/SparkRegistry";
 import { HapticFeedback } from "../utils/haptics";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
-const MySparksStack = createStackNavigator<MySparkStackParamList>();
-const MarketplaceStack = createStackNavigator<MarketplaceStackParamList>();
+const MySparksStack = createNativeStackNavigator<MySparkStackParamList>();
+const MarketplaceStack = createNativeStackNavigator<MarketplaceStackParamList>();
 
 // Create navigation ref for programmatic navigation (e.g., from notifications)
 export const navigationRef = createNavigationContainerRef<RootTabParamList>();
-
-// Use standard React Navigation transitions
-const sparkTransition = {
-  ...TransitionPresets.SlideFromRightIOS,
-};
 
 // Helper function to get focused route name
 const getFocusedRouteNameFromRoute = (route: any) => {
@@ -75,7 +67,6 @@ const MySparksStackNavigator = () => {
         headerTitleStyle: {
           fontWeight: "bold",
         },
-        ...TransitionPresets.SlideFromRightIOS,
       }}
     >
       <MySparksStack.Screen
@@ -96,7 +87,6 @@ const MySparksStackNavigator = () => {
           title: `Spark: ${route.params.sparkId}`,
           headerBackTitle: "Back",
           headerShown: false,
-          ...sparkTransition,
         })}
         listeners={{
           focus: () => setTabBarVisible?.(false),
@@ -121,7 +111,6 @@ const MarketplaceStackNavigator = () => {
         headerTitleStyle: {
           fontWeight: "bold",
         },
-        ...TransitionPresets.SlideFromRightIOS,
       }}
     >
       <MarketplaceStack.Screen
@@ -142,7 +131,6 @@ const MarketplaceStackNavigator = () => {
           title: `Spark: ${route.params.sparkId}`,
           headerBackTitle: "Back",
           headerShown: false,
-          ...sparkTransition,
         })}
         listeners={{
           focus: () => setTabBarVisible?.(false),
@@ -749,6 +737,7 @@ export const AppNavigator: React.FC = () => {
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.textSecondary,
             tabBarStyle: { display: "none" }, // Hide default tab bar, we use custom
+            freezeOnBlur: true,
           }}
           tabBar={(props) => (
             <CustomTabBar {...props} tabBarVisible={tabBarVisible} />
@@ -802,6 +791,7 @@ export const AppNavigator: React.FC = () => {
               tabPress: () => setTabBarVisible(true),
             }}
           />
+
         </Tab.Navigator>
       </NavigationContainer>
     </TabBarVisibilityContext.Provider>
