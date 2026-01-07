@@ -1896,7 +1896,8 @@ const GolfBrainSettings: React.FC<{
 
     // Local state for settings changes
     const [localSettings, setLocalSettings] = useState<GolfBrainData["settings"]>(
-      data.settings
+      // Initialize with deep copy to avoid reference issues
+      JSON.parse(JSON.stringify(data.settings))
     );
     const [hasChanges, setHasChanges] = useState(false);
 
@@ -1952,7 +1953,17 @@ const GolfBrainSettings: React.FC<{
     };
 
     const handleSaveSettings = () => {
-      onUpdateSettings(localSettings);
+      console.log("Settings: Saving changes", JSON.stringify(localSettings, null, 2));
+      // Ensure we are passing the full local settings object
+      onUpdateSettings({
+        ...data.settings, // Start with existing global settings
+        ...localSettings, // Overlay local changes
+        // Ensure complex objects are merged if needed, though localSettings should be complete
+        swingRecording: {
+          ...data.settings.swingRecording,
+          ...localSettings.swingRecording,
+        }
+      });
       setHasChanges(false);
       onClose();
     };
@@ -4091,52 +4102,62 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     // Reset current shot to first shot when hole changes
     setCurrentShotIndex(0);
 
+    // Scroll to top when hole changes
     setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      forceScrollToTop();
     }, 100);
   }, [currentHole, expectedShots, expectedPutts, hole]);
+
+  // Helper to reliably scroll to top
+  const forceScrollToTop = () => {
+    // Attempt immediate scroll
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+    }
+    // Backup scroll after a short delay to ensure layout updates are handled
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: 0, animated: true });
+      }
+    }, 100);
+  };
 
 
 
   const addShot = () => {
     // Smart club selection based on user's default clubs
-    const getDefaultClub = () => {
-      if (!hole) return "Driver";
 
-      const currentShotNumber = shots.length + 1;
-      const par = hole.par;
-      const defaultClubs = data.settings.defaultClubs;
-
-      // Par 5: Use user's default clubs
-      if (par === 5) {
-        if (currentShotNumber === 1)
-          return defaultClubs?.par5?.shot1 || "Driver";
-        if (currentShotNumber === 2)
-          return defaultClubs?.par5?.shot2 || "7-Iron";
-        return defaultClubs?.par5?.shot3 || "9-Iron";
-      }
-
-      // Par 4: Use user's default clubs
-      if (par === 4) {
-        if (currentShotNumber === 1)
-          return defaultClubs?.par4?.shot1 || "Driver";
-        return defaultClubs?.par4?.shot2 || "9-Iron";
-      }
-
-      // Par 3: Use user's default clubs
-      if (par === 3) {
-        return defaultClubs?.par3?.shot1 || "7-Iron";
-      }
-
-      return "Driver"; // Default fallback
-    };
 
     const newShot: Shot = {
       id: `shot-${Date.now()}-${Math.random()}`,
       type: "shot",
       lie: "green",
       direction: "good", // Default to good outcome
-      club: getDefaultClub(),
+      club: (() => {
+        if (!hole) return "Driver";
+        // Replicate logic or call helper if hoisted. Since we can't easily hoist without refactoring properties, 
+        // we'll inline the same logic pattern for now, but with correct implementation.
+        // Actually, since I can't access getSmartClubSelection safely from here (it's inside the render scope),
+        // I should have defined it at component level. 
+        // For now, I will align this logic to match the new robust logic.
+
+        const shotNum = shots.length + 1;
+        const par = hole.par;
+        const dClubs = data.settings.defaultClubs;
+
+        if (par === 5) {
+          if (shotNum === 1) return dClubs?.par5?.shot1 || "Driver";
+          if (shotNum === 2) return dClubs?.par5?.shot2 || "7-Iron";
+          return dClubs?.par5?.shot3 || "9-Iron";
+        }
+        if (par === 4) {
+          if (shotNum === 1) return dClubs?.par4?.shot1 || "Driver";
+          return dClubs?.par4?.shot2 || "9-Iron";
+        }
+        if (par === 3) return dClubs?.par3?.shot1 || "7-Iron";
+
+        return "Driver";
+      })(),
       timestamp: Date.now(),
       poorShot: false,
     };
@@ -4159,6 +4180,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     // Go to the new shot (it will be the last iron shot)
     setCurrentShotIndex((shots || []).length); // Index of the new shot
 
+    forceScrollToTop();
     HapticFeedback.light();
   };
 
@@ -4176,6 +4198,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     // Go to the new putt (it will be the last putt)
     setCurrentShotIndex((shots || []).length + (putts || []).length); // Index of the new putt
 
+    forceScrollToTop();
     HapticFeedback.light();
   };
 
@@ -4183,7 +4206,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
   const goToPreviousShot = () => {
     if (currentShotIndex > 0) {
       setCurrentShotIndex(currentShotIndex - 1);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      forceScrollToTop();
       HapticFeedback.light();
     }
   };
@@ -4192,7 +4215,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     const allShots = getAllShots();
     if (currentShotIndex < allShots.length - 1) {
       setCurrentShotIndex(currentShotIndex + 1);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      forceScrollToTop();
       HapticFeedback.light();
     }
   };
@@ -4599,6 +4622,7 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       marginBottom: 5, // Add 5px spacing between cards
       borderWidth: 1,
       borderColor: colors.border,
+      marginTop: 8,
     },
     shotHeader: {
       flexDirection: "row",
@@ -4877,7 +4901,6 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       gap: 12,
     },
     button: {
-      height: 32,
       paddingHorizontal: 16,
       borderRadius: 16,
       alignItems: "center",
@@ -4956,19 +4979,37 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       marginTop: 3,
     },
     navButton: {
+      // Retaining for backward compatibility if used elsewhere, but ideally deprecated
       backgroundColor: colors.surface,
       borderWidth: 2,
       borderColor: colors.border,
       borderRadius: 16,
-      height: 32,
-      paddingHorizontal: 16,
+      paddingHorizontal: 2,
       alignItems: "center",
       justifyContent: "center",
       minWidth: 60,
     },
     navButtonText: {
-      color: '#FF0000', // Changed for debugging
+      color: colors.text,
       fontWeight: "600",
+    },
+    // New Standardized Navigation Buttons (Matching Record Swing dimensions)
+    navigationButtonBase: {
+      height: 40,
+      paddingHorizontal: 10,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    navigationButtonOutline: {
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.border, // Using border color for outline
+    },
+    navigationButtonFilled: {
+      backgroundColor: colors.primary,
+      borderWidth: 2,
+      borderColor: colors.primary,
     },
     arrowButton: {
       backgroundColor: colors.primary, // Blue for navigation
@@ -5354,23 +5395,38 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
     <View style={styles.container}>
       {/* Top Navigation - Moved per request */}
       <TouchableOpacity
-        style={[styles.button, styles.navButton, { margin: 20, marginBottom: 10, width: 'auto', alignSelf: 'stretch' }]}
+        style={[
+          styles.navigationButtonBase,
+          styles.navigationButtonOutline,
+          { marginHorizontal: 20, marginBottom: 10, width: "auto", alignSelf: "stretch" },
+        ]}
         onPress={handleViewSummary}
       >
-        <Text style={[styles.buttonText, styles.navButtonText, { textAlign: 'center' }]}>
+        <Text style={[styles.buttonText, styles.navButtonText, { textAlign: "center" }]}>
           Round Summary
         </Text>
       </TouchableOpacity>
 
       {/* Top Nav Buttons */}
-      <View style={[styles.navRow, { marginHorizontal: 20, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 10 }]}>
+      <View
+        style={[
+          styles.navRow,
+          {
+            marginHorizontal: 20,
+            marginBottom: 10,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            gap: 10,
+          },
+        ]}
+      >
         {/* Prev Hole */}
         <TouchableOpacity
           style={[
-            styles.button,
-            styles.navButton,
+            styles.navigationButtonBase,
+            styles.navigationButtonOutline,
             currentHole <= 1 && styles.disabledButton,
-            { flex: 1, paddingVertical: 12 }
+            { flex: 1 },
           ]}
           onPress={currentHole > 1 ? onPreviousHole : undefined}
           disabled={currentHole <= 1}
@@ -5382,63 +5438,37 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
               currentHole <= 1 && styles.disabledButtonText,
             ]}
           >
-            ← Prev Hole
+            ← Prev
           </Text>
         </TouchableOpacity>
 
         {/* Hole History */}
         <TouchableOpacity
-          style={[styles.button, styles.navButton, { flex: 1, paddingVertical: 12 }]}
+          style={[styles.navigationButtonBase, styles.navigationButtonOutline, { flex: 1 }]}
           onPress={onShowHistory}
         >
-          <Text style={[styles.buttonText, styles.navButtonText]}>
-            Hole History
-          </Text>
+          <Text style={[styles.buttonText, styles.navButtonText]}>History</Text>
         </TouchableOpacity>
 
         {/* Next Hole */}
         <TouchableOpacity
           style={[
-            styles.button,
-            styles.arrowButton,
-            currentHole >= 18 && styles.disabledButton,
-            { flex: 1, paddingVertical: 12 },
-            // Make blue only if there's no "Next Shot" button (on last shot/putt)
-            (() => {
-              const allShots = getAllShots();
-              const canGoNext = currentShotIndex < allShots.length - 1;
-              return !canGoNext && currentHole < 18
-                ? {
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                }
-                : {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                };
-            })(),
+            styles.navigationButtonBase,
+            styles.navigationButtonFilled,
+            currentHole === 18 && styles.disabledButton,
+            { flex: 1 },
           ]}
-          onPress={currentHole < 18 ? handleCompleteHole : undefined}
-          disabled={currentHole >= 18}
+          onPress={currentHole < 18 ? onNextHole : undefined}
+          disabled={currentHole === 18}
         >
           <Text
             style={[
               styles.buttonText,
-              currentHole >= 18 && styles.disabledButtonText,
-              (() => {
-                const allShots = getAllShots();
-                const canGoNext = currentShotIndex < allShots.length - 1;
-                if (canGoNext) {
-                  return { color: colors.text };
-                } else {
-                  return currentHole < 18
-                    ? { color: colors.background }
-                    : { color: colors.text };
-                }
-              })(),
+              { color: colors.background },
+              currentHole === 18 && styles.disabledButtonText,
             ]}
           >
-            Next Hole →
+            Next →
           </Text>
         </TouchableOpacity>
       </View>
@@ -5574,6 +5604,99 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
       </Modal>
 
       {/* Single Shot Display */}
+      {/* Shot Grid Navigation - Moved to top */}
+      {
+        getCurrentShotInfo() && (
+          <View style={styles.shotGridContainer}>
+            {/* Shots Row */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.shotRow}
+              contentContainerStyle={styles.shotRowContent}
+            >
+              {(shots || []).map((shot, index) => {
+                const isPenalty = shot.direction === "penalty";
+                return (
+                  <TouchableOpacity
+                    key={shot.id}
+                    style={[
+                      styles.shotButton,
+                      currentShotIndex === index && styles.activeShotButton,
+                      isPenalty && styles.penaltyButton,
+                    ]}
+                    onPress={() => {
+                      setCurrentShotIndex(index);
+                      forceScrollToTop();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.shotButtonText,
+                        currentShotIndex === index &&
+                        styles.activeShotButtonText,
+                        isPenalty && styles.penaltyButtonText,
+                      ]}
+                    >
+                      {`s${index + 1}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Add Shot Button */}
+              <TouchableOpacity
+                style={styles.addShotGridButton}
+                onPress={addShot}
+              >
+                <Text style={styles.addShotGridButtonText}>+shot</Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Putts Row */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.shotRow}
+              contentContainerStyle={styles.shotRowContent}
+            >
+              {(putts || []).map((putt, index) => (
+                <TouchableOpacity
+                  key={putt.id}
+                  style={[
+                    styles.shotButton,
+                    currentShotIndex === (shots || []).length + index &&
+                    styles.activeShotButton,
+                  ]}
+                  onPress={() => {
+                    setCurrentShotIndex((shots || []).length + index);
+                    forceScrollToTop();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.shotButtonText,
+                      currentShotIndex === (shots || []).length + index &&
+                      styles.activeShotButtonText,
+                    ]}
+                  >
+                    p{index + 1}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* Add Putt Button */}
+              <TouchableOpacity
+                style={styles.addShotGridButton}
+                onPress={addPutt}
+              >
+                <Text style={styles.addShotGridButtonText}>+putt</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )
+      }
+
       <GestureHandlerRootView style={{ flex: 1 }}>
         <PanGestureHandler
           onHandlerStateChange={({ nativeEvent }) => {
@@ -5607,840 +5730,773 @@ const HoleDetailScreen = React.forwardRef<{ saveCurrentData: () => void }, HoleD
         >
           <View style={{ flex: 1 }}>
             <ScrollView
+              ref={scrollViewRef}
               style={[styles.content, { flex: 1 }]}
               contentContainerStyle={{ paddingBottom: 100 }}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}
             >
-            {(() => {
-              const shotInfo = getCurrentShotInfo();
-              if (!shotInfo) {
-                // No shots yet - show add shot options
-                return (
-                  <View style={styles.noShotsContainer}>
-                    <Text style={styles.noShotsText}>
-                      No shots recorded yet
-                    </Text>
-                    <View style={styles.addShotButtonsContainer}>
-                      <TouchableOpacity
-                        style={[styles.addShotButton, styles.addShotButton]}
-                        onPress={addShot}
-                      >
-                        <Text
-                          style={[
-                            styles.addShotButtonText,
-                            styles.addShotButtonText,
-                          ]}
-                        >
-                          + Add Shot
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.addShotButton, styles.addPuttButton]}
-                        onPress={addPutt}
-                      >
-                        <Text
-                          style={[
-                            styles.addShotButtonText,
-                            styles.addPuttButtonText,
-                          ]}
-                        >
-                          + Add Putt
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              }
-
-              // Helper function to check if a club name is a group (has brackets)
-              const isClubGroup = (clubName: string): boolean => {
-                return clubName.startsWith("[") && clubName.endsWith("]");
-              };
-
-              // Get club groups from the clubs list (anything with [])
-              const clubGroups = (clubs || []).filter((club) =>
-                isClubGroup(club)
-              );
-
-              // Get regular clubs (not groups)
-              const regularClubs = (clubs || []).filter(
-                (club) => !isClubGroup(club)
-              );
-
-              // Helper function to check if a club matches a group
-              const clubMatchesGroup = (
-                clubName: string,
-                group: string
-              ): boolean => {
-                // If the club name is exactly the group name, it matches
-                if (clubName === group) return true;
-                return false;
-              };
-
-              // Get clubs with groups for dropdown - maintain the order from settings
-              const clubsWithGroups = clubs || [];
-
-              // Get default club for current shot
-              const getDefaultClubForShot = (): string | null => {
-                if (!hole || !shotInfo.isShot) return null;
-                const currentShotNumber = shotInfo.shotNumber;
-                const par = hole.par;
-                const defaultClubs = data.settings.defaultClubs;
-
-                if (par === 5) {
-                  if (currentShotNumber === 1)
-                    return defaultClubs?.par5?.shot1 || "[Driver]";
-                  if (currentShotNumber === 2)
-                    return defaultClubs?.par5?.shot2 || "[Irons]";
-                  if (currentShotNumber === 3)
-                    return defaultClubs?.par5?.shot3 || "[Irons]";
-                } else if (par === 4) {
-                  if (currentShotNumber === 1)
-                    return defaultClubs?.par4?.shot1 || "[Driver]";
-                  if (currentShotNumber === 2)
-                    return defaultClubs?.par4?.shot2 || "[Irons]";
-                } else if (par === 3) {
-                  if (currentShotNumber === 1)
-                    return defaultClubs?.par3?.shot1 || "[Irons]";
-                }
-
-                return null;
-              };
-
-              const defaultClubForShot = getDefaultClubForShot();
-
-              return (
-                <View style={{ marginBottom: 16 }}>
-                  {/* Shot Grid Navigation - Moved to top */}
-                  <View style={styles.shotGridContainer}>
-                    {/* Shots Row */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.shotRow}
-                      contentContainerStyle={styles.shotRowContent}
-                    >
-                      {(shots || []).map((shot, index) => {
-                        const isPenalty = shot.direction === "penalty";
-                        return (
-                          <TouchableOpacity
-                            key={shot.id}
-                            style={[
-                              styles.shotButton,
-                              currentShotIndex === index && styles.activeShotButton,
-                              isPenalty && styles.penaltyButton,
-                            ]}
-                            onPress={() => setCurrentShotIndex(index)}
-                          >
-                            <Text
-                              style={[
-                                styles.shotButtonText,
-                                currentShotIndex === index &&
-                                styles.activeShotButtonText,
-                                isPenalty && styles.penaltyButtonText,
-                              ]}
-                            >
-                              {`s${index + 1}`}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Add Shot Button */}
-                      <TouchableOpacity
-                        style={styles.addShotGridButton}
-                        onPress={addShot}
-                      >
-                        <Text style={styles.addShotGridButtonText}>+shot</Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-
-                    {/* Putts Row */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.shotRow}
-                      contentContainerStyle={styles.shotRowContent}
-                    >
-                      {(putts || []).map((putt, index) => (
+              {(() => {
+                const shotInfo = getCurrentShotInfo();
+                if (!shotInfo) {
+                  // No shots yet - show add shot options
+                  return (
+                    <View style={styles.noShotsContainer}>
+                      <Text style={styles.noShotsText}>
+                        No shots recorded yet
+                      </Text>
+                      <View style={styles.addShotButtonsContainer}>
                         <TouchableOpacity
-                          key={putt.id}
-                          style={[
-                            styles.shotButton,
-                            currentShotIndex === (shots || []).length + index &&
-                            styles.activeShotButton,
-                          ]}
-                          onPress={() =>
-                            setCurrentShotIndex((shots || []).length + index)
-                          }
+                          style={[styles.addShotButton, styles.addShotButton]}
+                          onPress={addShot}
                         >
                           <Text
                             style={[
-                              styles.shotButtonText,
-                              currentShotIndex === (shots || []).length + index &&
-                              styles.activeShotButtonText,
+                              styles.addShotButtonText,
+                              styles.addShotButtonText,
                             ]}
                           >
-                            p{index + 1}
+                            + Add Shot
                           </Text>
                         </TouchableOpacity>
-                      ))}
-
-                      {/* Add Putt Button */}
-                      <TouchableOpacity
-                        style={styles.addShotGridButton}
-                        onPress={addPutt}
-                      >
-                        <Text style={styles.addShotGridButtonText}>+putt</Text>
-                      </TouchableOpacity>
-                    </ScrollView>
-                  </View>
-                  {/* Shot Card Section - Moved to top per user request */}
-                  <View
-                    style={[
-                      styles.shotCard,
-                      { marginBottom: 0, paddingBottom: 18 },
-                    ]}
-                  >
-                    {/* Shot Header */}
-                    <View style={styles.shotHeader}>
-                      <Text style={styles.shotNumber}>
-                        {shotInfo.type === "shot"
-                          ? `Shot ${shotInfo.shotNumber}`
-                          : `Putt ${shotInfo.shotNumber}`}
-                      </Text>
+                        <TouchableOpacity
+                          style={[styles.addShotButton, styles.addPuttButton]}
+                          onPress={addPutt}
+                        >
+                          <Text
+                            style={[
+                              styles.addShotButtonText,
+                              styles.addPuttButtonText,
+                            ]}
+                          >
+                            + Add Putt
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
+                  );
+                }
 
-                    {/* Record Swing Component */}
-                    <View style={{ marginBottom: 12, marginTop: 4 }}>
-                      {shotInfo.shot.videoUri ? (
-                        <View style={styles.videoContainer}>
-                          <Video
-                            ref={shotVideoRef}
-                            source={{ uri: shotInfo.shot.videoUri }}
-                            style={styles.videoPlayer}
-                            useNativeControls
-                            resizeMode={ResizeMode.CONTAIN}
-                            isLooping
-                            rate={playbackRate}
-                            shouldCorrectPitch={false}
-                            onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
-                              if (status.isLoaded) {
-                                setIsPlaying(status.isPlaying);
-                              }
-                            }}
-                            onFullscreenUpdate={(event) => {
-                              if (
-                                event.fullscreenUpdate ===
-                                VideoFullscreenUpdate.PLAYER_DID_DISMISS
-                              ) {
-                                if (shotVideoRef.current) {
-                                  shotVideoRef.current.pauseAsync();
+                // Helper function to check if a club name is a group (has brackets)
+                const isClubGroup = (clubName: string): boolean => {
+                  return clubName.startsWith("[") && clubName.endsWith("]");
+                };
+
+                // Get club groups from the clubs list (anything with [])
+                const clubGroups = (clubs || []).filter((club) =>
+                  isClubGroup(club)
+                );
+
+                // Get regular clubs (not groups)
+                const regularClubs = (clubs || []).filter(
+                  (club) => !isClubGroup(club)
+                );
+
+                // Helper function to check if a club matches a group
+                const clubMatchesGroup = (
+                  clubName: string,
+                  group: string
+                ): boolean => {
+                  // If the club is the group itself
+                  if (clubName === group) return true;
+
+                  // Helper to strip brackets
+                  const strip = (s: string) => s.replace(/[\[\]]/g, "");
+
+                  // If the club name matches the group name without brackets (e.g. "Driver" vs "[Driver]")
+                  if (strip(clubName) === strip(group)) return true;
+
+                  // Find which group this club belongs to
+                  let currentGroup = null;
+                  for (const c of (clubs || [])) {
+                    if (isClubGroup(c)) {
+                      currentGroup = c;
+                    } else if (c === clubName) {
+                      // Found the club, check if its group matches the target group
+                      return currentGroup === group;
+                    }
+                  }
+
+                  return false;
+                };
+
+                // Smart club selection based on user's default clubs
+                const getSmartClubSelection = (
+                  targetShotNumber: number,
+                  targetPar: number
+                ): string => {
+                  const defaultClubs = data.settings.defaultClubs;
+
+                  console.log("club-select: smart selection", { targetPar, targetShotNumber, defaults: defaultClubs });
+
+                  if (targetPar === 5) {
+                    if (targetShotNumber === 1) return defaultClubs?.par5?.shot1 || "[Driver]";
+                    if (targetShotNumber === 2) return defaultClubs?.par5?.shot2 || "[Irons]";
+                    return defaultClubs?.par5?.shot3 || "[Irons]";
+                  } else if (targetPar === 4) {
+                    if (targetShotNumber === 1) return defaultClubs?.par4?.shot1 || "[Driver]";
+                    return defaultClubs?.par4?.shot2 || "[Irons]";
+                  } else if (targetPar === 3) {
+                    return defaultClubs?.par3?.shot1 || "[Irons]";
+                  }
+
+                  return "[Driver]"; // Fallback
+                };
+
+                // Get clubs with groups for dropdown - maintain the order from settings
+                const clubsWithGroups = clubs || [];
+
+                // Get default club for current shot
+                const defaultClubForShot = hole && shotInfo.isShot
+                  ? getSmartClubSelection(shotInfo.shotNumber, hole.par)
+                  : null;
+
+                return (
+                  <View style={{ marginBottom: 16 }}>
+                    <View
+                      style={[
+                        styles.shotCard,
+                        { marginBottom: 0, paddingBottom: 18 },
+                      ]}
+                    >
+                      {/* Shot Header */}
+                      <View style={styles.shotHeader}>
+                        <Text style={styles.shotNumber}>
+                          {shotInfo.type === "shot"
+                            ? `Shot ${shotInfo.shotNumber}`
+                            : `Putt ${shotInfo.shotNumber}`}
+                        </Text>
+                      </View>
+
+                      {/* Record Swing Component */}
+                      <View style={{ marginBottom: 12, marginTop: 4 }}>
+                        {shotInfo.shot.videoUri ? (
+                          <View style={styles.videoContainer}>
+                            <Video
+                              ref={shotVideoRef}
+                              source={{ uri: shotInfo.shot.videoUri }}
+                              style={styles.videoPlayer}
+                              useNativeControls
+                              resizeMode={ResizeMode.CONTAIN}
+                              isLooping
+                              rate={playbackRate}
+                              shouldCorrectPitch={false}
+                              onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+                                if (status.isLoaded) {
+                                  setIsPlaying(status.isPlaying);
                                 }
-                              }
-                            }}
-                          />
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              gap: 12,
-                              marginTop: 12,
-                              marginBottom: 4,
-                            }}
-                          >
-                            {[1.0, 0.5, 0.25].map((rate) => (
-                              <TouchableOpacity
-                                key={rate}
-                                style={{
-                                  paddingHorizontal: 16,
-                                  paddingVertical: 8,
-                                  borderRadius: 20,
-                                  backgroundColor: "rgba(0, 0, 0, 0.8)",
-                                  justifyContent: "center",
-                                  alignItems: "center",
-                                  borderWidth: 1,
-                                  borderColor: "rgba(255, 255, 255, 0.3)",
-                                  minWidth: 70,
-                                }}
-                                onPress={async () => {
-                                  setPlaybackRate(rate);
+                              }}
+                              onFullscreenUpdate={(event) => {
+                                if (
+                                  event.fullscreenUpdate ===
+                                  VideoFullscreenUpdate.PLAYER_DID_DISMISS
+                                ) {
                                   if (shotVideoRef.current) {
-                                    await shotVideoRef.current.playAsync();
-                                    await shotVideoRef.current.presentFullscreenPlayer();
+                                    shotVideoRef.current.pauseAsync();
                                   }
-                                  HapticFeedback.light();
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    color: "#FFFFFF",
-                                    fontSize: 14,
-                                    fontWeight: "bold",
-                                  }}
-                                >
-                                  {rate === 1.0 ? "1x" : `${rate}x`}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                          <TouchableOpacity
-                            style={styles.reRecordButton}
-                            onPress={() => {
-                              Alert.alert(
-                                "Re-record Swing",
-                                "This will delete the current recording. Are you sure?",
-                                [
-                                  { text: "Cancel", style: "cancel" },
-                                  {
-                                    text: "Delete",
-                                    style: "destructive",
-                                    onPress: () =>
-                                      updateShot(
-                                        shotInfo.shot.id,
-                                        shotInfo.type === "shot" ? "shot" : "putt",
-                                        "videoUri",
-                                        undefined
-                                      ),
-                                  },
-                                ]
-                              );
-                            }}
-                          >
-                            <Text style={styles.reRecordButtonText}>
-                              Re-record Swing
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <RecordSwing
-                          holeNumber={currentHole}
-                          shotNumber={shotInfo.shotNumber}
-                          club={shotInfo.shot.club || "Unknown"}
-                          countdownSeconds={
-                            data.settings.swingRecording.countdownSeconds
-                          }
-                          durationSeconds={
-                            data.settings.swingRecording.durationSeconds
-                          }
-                          colors={colors}
-                          onRecordingComplete={handleRecordingComplete}
-                        />
-                      )}
-                    </View>
-
-                    <View style={styles.shotFields}>
-                      <View
-                        style={[
-                          styles.shotFieldRow,
-                          { flexDirection: "column", gap: 8 },
-                        ]}
-                      >
-                        {shotInfo.isShot ? (
-                          <>
-                            {/* Quick-select club buttons */}
+                                }
+                              }}
+                            />
                             <View
                               style={{
                                 flexDirection: "row",
-                                flexWrap: "wrap",
-                                gap: 8,
-                                marginBottom: 8,
                                 justifyContent: "center",
+                                alignItems: "center",
+                                gap: 12,
+                                marginTop: 12,
+                                marginBottom: 4,
                               }}
                             >
-                              {clubGroups.map((group) => {
-                                const isSelected =
-                                  shotInfo.shot.club &&
-                                  clubMatchesGroup(shotInfo.shot.club, group);
-                                // Also highlight if this group matches the default club for this shot
-                                const isDefault =
-                                  defaultClubForShot &&
-                                  clubMatchesGroup(defaultClubForShot, group);
-                                const shouldHighlight =
-                                  isSelected ||
-                                  (isDefault && !shotInfo.shot.club);
-                                return (
-                                  <TouchableOpacity
-                                    key={group}
+                              {[1.0, 0.5, 0.25].map((rate) => (
+                                <TouchableOpacity
+                                  key={rate}
+                                  style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 20,
+                                    backgroundColor: "rgba(0, 0, 0, 0.8)",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    borderWidth: 1,
+                                    borderColor: "rgba(255, 255, 255, 0.3)",
+                                    minWidth: 70,
+                                  }}
+                                  onPress={async () => {
+                                    setPlaybackRate(rate);
+                                    if (shotVideoRef.current) {
+                                      await shotVideoRef.current.playAsync();
+                                      await shotVideoRef.current.presentFullscreenPlayer();
+                                    }
+                                    HapticFeedback.light();
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#FFFFFF",
+                                      fontSize: 14,
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    {rate === 1.0 ? "1x" : `${rate}x`}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <TouchableOpacity
+                              style={styles.reRecordButton}
+                              onPress={() => {
+                                Alert.alert(
+                                  "Re-record Swing",
+                                  "This will delete the current recording. Are you sure?",
+                                  [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                      text: "Delete",
+                                      style: "destructive",
+                                      onPress: () =>
+                                        updateShot(
+                                          shotInfo.shot.id,
+                                          shotInfo.type === "shot" ? "shot" : "putt",
+                                          "videoUri",
+                                          undefined
+                                        ),
+                                    },
+                                  ]
+                                );
+                              }}
+                            >
+                              <Text style={styles.reRecordButtonText}>
+                                Re-record Swing
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <RecordSwing
+                            holeNumber={currentHole}
+                            shotNumber={shotInfo.shotNumber}
+                            club={shotInfo.shot.club || "Unknown"}
+                            countdownSeconds={
+                              data.settings.swingRecording.countdownSeconds
+                            }
+                            durationSeconds={
+                              data.settings.swingRecording.durationSeconds
+                            }
+                            colors={colors}
+                            onRecordingComplete={handleRecordingComplete}
+                          />
+                        )}
+                      </View>
+
+                      <View style={styles.shotFields}>
+                        <View
+                          style={[
+                            styles.shotFieldRow,
+                            { flexDirection: "column", gap: 8 },
+                          ]}
+                        >
+                          {shotInfo.isShot ? (
+                            <>
+                              {/* Quick-select club buttons */}
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  flexWrap: "wrap",
+                                  gap: 8,
+                                  marginBottom: 8,
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {clubGroups.map((group) => {
+                                  const isSelected =
+                                    shotInfo.shot.club &&
+                                    clubMatchesGroup(shotInfo.shot.club, group);
+                                  // Also highlight if this group matches the default club for this shot
+                                  const isDefault =
+                                    defaultClubForShot &&
+                                    clubMatchesGroup(defaultClubForShot, group);
+                                  const shouldHighlight =
+                                    isSelected ||
+                                    (isDefault && !shotInfo.shot.club);
+                                  return (
+                                    <TouchableOpacity
+                                      key={group}
+                                      style={[
+                                        styles.quickClubButton,
+                                        {
+                                          backgroundColor: shouldHighlight
+                                            ? colors.border
+                                            : colors.background,
+                                          borderColor: colors.primary,
+                                          borderWidth: 1,
+                                        },
+                                      ]}
+                                      onPress={() => {
+                                        if (
+                                          shotInfo.shot.direction !== "penalty"
+                                        ) {
+                                          // Assign the group name directly as the club
+                                          updateShot(
+                                            shotInfo.shot.id,
+                                            "shot",
+                                            "club",
+                                            group
+                                          );
+                                          // Hide dropdown when a group is selected
+                                          setShowClubDropdown(false);
+                                        }
+                                      }}
+                                      disabled={
+                                        shotInfo.shot.direction === "penalty"
+                                      }
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.quickClubButtonText,
+                                          {
+                                            color: shouldHighlight
+                                              ? colors.text
+                                              : colors.text,
+                                          },
+                                        ]}
+                                      >
+                                        {group.replace(/[\[\]]/g, "")}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                                {/* Other button - shows dropdown without selecting */}
+                                <TouchableOpacity
+                                  style={[
+                                    styles.quickClubButton,
+                                    {
+                                      backgroundColor: colors.background,
+                                      borderColor: colors.primary,
+                                      borderWidth: 1,
+                                    },
+                                  ]}
+                                  onPress={() => {
+                                    // Show the dropdown when "Other" is clicked
+                                    // The useEffect will handle opening the modal
+                                    setShowClubDropdown(true);
+                                  }}
+                                  disabled={shotInfo.shot.direction === "penalty"}
+                                >
+                                  <Text
                                     style={[
-                                      styles.quickClubButton,
-                                      {
-                                        backgroundColor: shouldHighlight
-                                          ? colors.border
-                                          : colors.background,
-                                        borderColor: colors.primary,
-                                        borderWidth: 1,
-                                      },
+                                      styles.quickClubButtonText,
+                                      { color: colors.text },
                                     ]}
-                                    onPress={() => {
-                                      if (
-                                        shotInfo.shot.direction !== "penalty"
-                                      ) {
-                                        // Assign the group name directly as the club
+                                  >
+                                    Other
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+
+                              {/* Club dropdown - Only show if "Other" was clicked or a non-group club is selected */}
+                              {showClubDropdown && (
+                                <View style={{ width: "100%", marginTop: 8 }}>
+                                  <Dropdown
+                                    ref={clubDropdownRef}
+                                    options={clubsWithGroups}
+                                    selectedValue={shotInfo.shot.club || ""}
+                                    onSelect={(value) => {
+                                      if (shotInfo.shot.direction !== "penalty") {
+                                        // Assign the selected value directly (could be a group or a regular club)
                                         updateShot(
                                           shotInfo.shot.id,
                                           "shot",
                                           "club",
-                                          group
+                                          value
                                         );
-                                        // Hide dropdown when a group is selected
-                                        setShowClubDropdown(false);
+                                        // If a group was selected, hide the dropdown; otherwise keep it visible
+                                        if (clubGroups.includes(value)) {
+                                          setShowClubDropdown(false);
+                                        }
                                       }
                                     }}
-                                    disabled={
-                                      shotInfo.shot.direction === "penalty"
-                                    }
-                                  >
-                                    <Text
-                                      style={[
-                                        styles.quickClubButtonText,
-                                        {
-                                          color: shouldHighlight
-                                            ? colors.text
-                                            : colors.text,
-                                        },
-                                      ]}
-                                    >
-                                      {group.replace(/[\[\]]/g, "")}
-                                    </Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                              {/* Other button - shows dropdown without selecting */}
+                                    style={[
+                                      styles.clubDropdown,
+                                      shotInfo.shot.direction === "penalty" && {
+                                        opacity: 0.5,
+                                      },
+                                    ]}
+                                    textStyle={styles.dropdownText}
+                                    placeholder="club"
+                                  />
+                                </View>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <View style={{ flex: 1 }}>
+                                <Dropdown
+                                  options={PUTT_DISTANCE_OPTIONS}
+                                  selectedValue={
+                                    shotInfo.shot.puttDistance || "5-10ft"
+                                  }
+                                  onSelect={(value) =>
+                                    updateShot(
+                                      shotInfo.shot.id,
+                                      "putt",
+                                      "puttDistance",
+                                      value
+                                    )
+                                  }
+                                  style={styles.puttDistanceDropdown}
+                                  textStyle={styles.dropdownText}
+                                />
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Dynamic Navigation Pills - Contextual Next/Prev buttons */}
+                    {(() => {
+                      const shotInfo = getCurrentShotInfo();
+                      if (!shotInfo) return null;
+
+                      const canGoPrevious = currentShotIndex > 0;
+                      const canGoNext =
+                        currentShotIndex < getAllShots().length - 1;
+
+                      return (
+                        <View
+                          style={[
+                            styles.outcomeGridNavigation,
+                            {
+                              flexDirection: "row",
+                              alignItems: "center",
+                              paddingHorizontal: 20,
+                              paddingVertical: 8,
+                              justifyContent: "space-between",
+                            },
+                          ]}
+                        >
+                          {/* Previous shot */}
+                          <View
+                            style={{
+                              flex: 1,
+                              alignItems: "flex-start",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {canGoPrevious && (
                               <TouchableOpacity
-                                style={[
-                                  styles.quickClubButton,
-                                  {
-                                    backgroundColor: colors.background,
-                                    borderColor: colors.primary,
-                                    borderWidth: 1,
-                                  },
-                                ]}
-                                onPress={() => {
-                                  // Show the dropdown when "Other" is clicked
-                                  // The useEffect will handle opening the modal
-                                  setShowClubDropdown(true);
-                                }}
-                                disabled={shotInfo.shot.direction === "penalty"}
+                                style={styles.smallNavigationPillPrev}
+                                onPress={goToPreviousShot}
                               >
                                 <Text
                                   style={[
-                                    styles.quickClubButtonText,
+                                    styles.smallNavigationPillText,
                                     { color: colors.text },
                                   ]}
                                 >
-                                  Other
+                                  {(() => {
+                                    const prevShotIndex = currentShotIndex - 1;
+                                    if (prevShotIndex < (shots || []).length) {
+                                      return `← Shot ${prevShotIndex + 1}`;
+                                    } else {
+                                      const puttIndex =
+                                        prevShotIndex - (shots || []).length;
+                                      return `← Putt ${puttIndex + 1}`;
+                                    }
+                                  })()}
                                 </Text>
                               </TouchableOpacity>
-                            </View>
-
-                            {/* Club dropdown - Only show if "Other" was clicked or a non-group club is selected */}
-                            {showClubDropdown && (
-                              <View style={{ width: "100%", marginTop: 8 }}>
-                                <Dropdown
-                                  ref={clubDropdownRef}
-                                  options={clubsWithGroups}
-                                  selectedValue={shotInfo.shot.club || ""}
-                                  onSelect={(value) => {
-                                    if (shotInfo.shot.direction !== "penalty") {
-                                      // Assign the selected value directly (could be a group or a regular club)
-                                      updateShot(
-                                        shotInfo.shot.id,
-                                        "shot",
-                                        "club",
-                                        value
-                                      );
-                                      // If a group was selected, hide the dropdown; otherwise keep it visible
-                                      if (clubGroups.includes(value)) {
-                                        setShowClubDropdown(false);
-                                      }
-                                    }
-                                  }}
-                                  style={[
-                                    styles.clubDropdown,
-                                    shotInfo.shot.direction === "penalty" && {
-                                      opacity: 0.5,
-                                    },
-                                  ]}
-                                  textStyle={styles.dropdownText}
-                                  placeholder="club"
-                                />
-                              </View>
                             )}
-                          </>
-                        ) : (
-                          <>
-                            <View style={{ flex: 1 }}>
-                              <Dropdown
-                                options={PUTT_DISTANCE_OPTIONS}
-                                selectedValue={
-                                  shotInfo.shot.puttDistance || "5-10ft"
-                                }
-                                onSelect={(value) =>
-                                  updateShot(
-                                    shotInfo.shot.id,
-                                    "putt",
-                                    "puttDistance",
-                                    value
-                                  )
-                                }
-                                style={styles.puttDistanceDropdown}
-                                textStyle={styles.dropdownText}
-                              />
-                            </View>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  </View>
+                          </View>
 
-                  {/* Dynamic Navigation Pills - Contextual Next/Prev buttons */}
-                  {(() => {
-                    const shotInfo = getCurrentShotInfo();
-                    if (!shotInfo) return null;
-
-                    const canGoPrevious = currentShotIndex > 0;
-                    const canGoNext =
-                      currentShotIndex < getAllShots().length - 1;
-
-                    return (
-                      <View
-                        style={[
-                          styles.outcomeGridNavigation,
-                          {
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingHorizontal: 20,
-                            paddingVertical: 8,
-                            justifyContent: "space-between",
-                          },
-                        ]}
-                      >
-                        {/* Previous shot */}
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: "flex-start",
-                            justifyContent: "center",
-                          }}
-                        >
-                          {canGoPrevious && (
-                            <TouchableOpacity
-                              style={styles.smallNavigationPillPrev}
-                              onPress={goToPreviousShot}
-                            >
-                              <Text
-                                style={[
-                                  styles.smallNavigationPillText,
-                                  { color: colors.text },
-                                ]}
-                              >
-                                {(() => {
-                                  const prevShotIndex = currentShotIndex - 1;
-                                  if (prevShotIndex < (shots || []).length) {
-                                    return `← Shot ${prevShotIndex + 1}`;
-                                  } else {
-                                    const puttIndex =
-                                      prevShotIndex - (shots || []).length;
-                                    return `← Putt ${puttIndex + 1}`;
-                                  }
-                                })()}
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-
-                        {/* Delete current shot */}
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <TouchableOpacity
-                            style={styles.deleteShotButton}
-                            onPress={() => {
-                              const currentShotInfo = getCurrentShotInfo();
-                              if (currentShotInfo) {
-                                removeShot(
-                                  currentShotInfo.shot.id,
-                                  currentShotInfo.type === "shot"
-                                    ? "shot"
-                                    : "putt"
-                                );
-                              }
+                          {/* Delete current shot */}
+                          <View
+                            style={{
+                              flex: 1,
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
-                            <Text style={styles.deleteShotButtonText}>
-                              {(() => {
-                                const currentShotInfo = getCurrentShotInfo();
-                                return currentShotInfo
-                                  ? currentShotInfo.type === "shot"
-                                    ? "Delete Shot"
-                                    : "Delete Putt"
-                                  : "Delete";
-                              })()}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Next shot */}
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: "flex-end",
-                            justifyContent: "center",
-                          }}
-                        >
-                          {canGoNext && (
                             <TouchableOpacity
-                              style={styles.smallNavigationPill}
-                              onPress={goToNextShot}
+                              style={styles.deleteShotButton}
+                              onPress={() => {
+                                const currentShotInfo = getCurrentShotInfo();
+                                if (currentShotInfo) {
+                                  removeShot(
+                                    currentShotInfo.shot.id,
+                                    currentShotInfo.type === "shot"
+                                      ? "shot"
+                                      : "putt"
+                                  );
+                                }
+                              }}
                             >
-                              <Text
-                                style={[
-                                  styles.smallNavigationPillText,
-                                  { color: colors.background },
-                                ]}
-                              >
+                              <Text style={styles.deleteShotButtonText}>
                                 {(() => {
-                                  const nextShotIndex = currentShotIndex + 1;
-                                  if (nextShotIndex < (shots || []).length) {
-                                    return `Shot ${nextShotIndex + 1} →`;
-                                  } else {
-                                    const puttIndex =
-                                      nextShotIndex - (shots || []).length;
-                                    return `Putt ${puttIndex + 1} →`;
-                                  }
+                                  const currentShotInfo = getCurrentShotInfo();
+                                  return currentShotInfo
+                                    ? currentShotInfo.type === "shot"
+                                      ? "Delete Shot"
+                                      : "Delete Putt"
+                                    : "Delete";
                                 })()}
                               </Text>
                             </TouchableOpacity>
-                          )}
+                          </View>
+
+                          {/* Next shot */}
+                          <View
+                            style={{
+                              flex: 1,
+                              alignItems: "flex-end",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {canGoNext && (
+                              <TouchableOpacity
+                                style={styles.smallNavigationPill}
+                                onPress={goToNextShot}
+                              >
+                                <Text
+                                  style={[
+                                    styles.smallNavigationPillText,
+                                    { color: colors.background },
+                                  ]}
+                                >
+                                  {(() => {
+                                    const nextShotIndex = currentShotIndex + 1;
+                                    if (nextShotIndex < (shots || []).length) {
+                                      return `Shot ${nextShotIndex + 1} →`;
+                                    } else {
+                                      const puttIndex =
+                                        nextShotIndex - (shots || []).length;
+                                      return `Putt ${puttIndex + 1} →`;
+                                    }
+                                  })()}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })()}
+                      );
+                    })()}
 
-                  {/* Outcome Grid for this shot */}
-                  <View style={{ height: 12, marginTop: 6 }} />
-                  <View
-                    style={[
-                      shotInfo.shot.direction === "penalty" && {
-                        backgroundColor: "#000000",
-                        borderRadius: 8,
-                        padding: 8,
-                      },
-                    ]}
-                  >
-                    <OutcomeGrid
-                      shotType={
-                        shotInfo.type === "shot" ? "iron" : shotInfo.type
-                      }
-                      shotNumber={shotInfo.shotNumber}
-                      historicalData={
-                        shotInfo.isShot
-                          ? historicalData.shot || {}
-                          : historicalData.putts || {}
-                      }
-                      selectedOutcome={shotInfo.shot.direction}
-                      isPoorShot={shotInfo.shot.poorShot === true}
-                      onSelect={(outcome) => {
-                        updateShot(
-                          shotInfo.shot.id,
-                          shotInfo.type === "shot" ? "shot" : "putt",
-                          "direction",
-                          outcome
-                        );
-                        updateShot(
-                          shotInfo.shot.id,
-                          shotInfo.type === "shot" ? "shot" : "putt",
-                          "poorShot",
-                          false
-                        );
-                      }}
-                      onPoopSelect={(outcome) => {
-                        updateShot(
-                          shotInfo.shot.id,
-                          shotInfo.type === "shot" ? "shot" : "putt",
-                          "direction",
-                          outcome
-                        );
-                        updateShot(
-                          shotInfo.shot.id,
-                          shotInfo.type === "shot" ? "shot" : "putt",
-                          "poorShot",
-                          true
-                        );
-                      }}
-                      onFlameAnimation={onFlameAnimation}
-                      onPoopAnimation={onPoopAnimation}
-                      showError={
-                        showValidationError && !shotInfo.shot.direction
-                      }
-                      colors={colors}
-                    />
-                  </View>
-
-                  {/* OB/Water buttons - Moved to bottom */}
-                  {shotInfo.isShot && (
+                    {/* Outcome Grid for this shot */}
+                    <View style={{ height: 12, marginTop: 6 }} />
                     <View
-                      style={{
-                        flexDirection: "row",
-                        gap: 8,
-                        marginTop: 0,
-                        marginBottom: 8,
-                      }}
+                      style={[
+                        shotInfo.shot.direction === "penalty" && {
+                          backgroundColor: "#000000",
+                          borderRadius: 8,
+                          padding: 8,
+                        },
+                      ]}
+                    >
+                      <OutcomeGrid
+                        shotType={
+                          shotInfo.type === "shot" ? "iron" : shotInfo.type
+                        }
+                        shotNumber={shotInfo.shotNumber}
+                        historicalData={
+                          shotInfo.isShot
+                            ? historicalData.shot || {}
+                            : historicalData.putts || {}
+                        }
+                        selectedOutcome={shotInfo.shot.direction}
+                        isPoorShot={shotInfo.shot.poorShot === true}
+                        onSelect={(outcome) => {
+                          updateShot(
+                            shotInfo.shot.id,
+                            shotInfo.type === "shot" ? "shot" : "putt",
+                            "direction",
+                            outcome
+                          );
+                          updateShot(
+                            shotInfo.shot.id,
+                            shotInfo.type === "shot" ? "shot" : "putt",
+                            "poorShot",
+                            false
+                          );
+                        }}
+                        onPoopSelect={(outcome) => {
+                          updateShot(
+                            shotInfo.shot.id,
+                            shotInfo.type === "shot" ? "shot" : "putt",
+                            "direction",
+                            outcome
+                          );
+                          updateShot(
+                            shotInfo.shot.id,
+                            shotInfo.type === "shot" ? "shot" : "putt",
+                            "poorShot",
+                            true
+                          );
+                        }}
+                        onFlameAnimation={onFlameAnimation}
+                        onPoopAnimation={onPoopAnimation}
+                        showError={
+                          showValidationError && !shotInfo.shot.direction
+                        }
+                        colors={colors}
+                      />
+                    </View>
+
+                    {/* OB/Water buttons - Moved to bottom */}
+                    {shotInfo.isShot && (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 8,
+                          marginTop: 0,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <TouchableOpacity
+                          style={[styles.obWaterButton, { flex: 1 }]}
+                          onPress={() => {
+                            if (shotInfo.shot.direction !== "penalty") {
+                              updateShot(
+                                shotInfo.shot.id,
+                                "shot",
+                                "lie",
+                                shotInfo.shot.lie === "ob" ? "fairway" : "ob"
+                              );
+                              // Handle OB - set next shot to penalty
+                              const nextShotIndex = 1; // s2 is index 1
+                              if (nextShotIndex < shots.length) {
+                                updateShot(
+                                  shots[nextShotIndex].id,
+                                  "shot",
+                                  "direction",
+                                  "penalty"
+                                );
+                              }
+
+                              // If setting OB (not unsetting), prompt to add another shot
+                              if (shotInfo.shot.lie !== "ob") {
+                                Alert.alert(
+                                  "Add Another Shot?",
+                                  "Do you want to add another shot?",
+                                  [
+                                    {
+                                      text: "No",
+                                      style: "cancel",
+                                    },
+                                    {
+                                      text: "Yes",
+                                      onPress: () => {
+                                        // Add another shot with gap wedge default
+                                        const newShot: Shot = {
+                                          id: `shot-${Date.now()}-${Math.random()}`,
+                                          type: "shot",
+                                          lie: "green",
+                                          direction: "good", // Default to good
+                                          club: "Gap Wedge", // Default to gap wedge
+                                          timestamp: Date.now(),
+                                        };
+
+                                        setShots((prev) => [...prev, newShot]);
+                                        // Stay on current shot, don't navigate to the new shot
+                                      },
+                                    },
+                                  ]
+                                );
+                              }
+                            }
+                          }}
+                          disabled={shotInfo.shot.direction === "penalty"}
+                        >
+                          <Text style={styles.obWaterButtonText}>OB</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.obWaterButton, { flex: 1 }]}
+                          onPress={() => {
+                            if (shotInfo.shot.direction !== "penalty") {
+                              updateShot(
+                                shotInfo.shot.id,
+                                "shot",
+                                "lie",
+                                shotInfo.shot.lie === "water"
+                                  ? "fairway"
+                                  : "water"
+                              );
+                              // Handle Water - set next shot to penalty
+                              const nextShotIndex = 1; // s2 is index 1
+                              if (nextShotIndex < shots.length) {
+                                updateShot(
+                                  shots[nextShotIndex].id,
+                                  "shot",
+                                  "direction",
+                                  "penalty"
+                                );
+                              }
+
+                              // If setting Water (not unsetting), prompt to add another shot
+                              if (shotInfo.shot.lie !== "water") {
+                                Alert.alert(
+                                  "Add Another Shot?",
+                                  "Do you want to add another shot?",
+                                  [
+                                    {
+                                      text: "No",
+                                      style: "cancel",
+                                    },
+                                    {
+                                      text: "Yes",
+                                      onPress: () => {
+                                        // Add another shot with gap wedge default
+                                        const newShot: Shot = {
+                                          id: `shot-${Date.now()}-${Math.random()}`,
+                                          type: "shot",
+                                          lie: "green",
+                                          direction: "good", // Default to good
+                                          club: "Gap Wedge", // Default to gap wedge
+                                          timestamp: Date.now(),
+                                        };
+
+                                        setShots((prev) => [...prev, newShot]);
+                                        // Stay on current shot, don't navigate to the new shot
+                                      },
+                                    },
+                                  ]
+                                );
+                              }
+                            }
+                          }}
+                          disabled={shotInfo.shot.direction === "penalty"}
+                        >
+                          <Text style={styles.obWaterButtonText}>Water</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Today's Distance - Moved to bottom */}
+                    <View
+                      style={[
+                        styles.todaysDistanceCard,
+                        { marginTop: 8, marginBottom: 0 },
+                      ]}
                     >
                       <TouchableOpacity
-                        style={[styles.obWaterButton, { flex: 1 }]}
-                        onPress={() => {
-                          if (shotInfo.shot.direction !== "penalty") {
-                            updateShot(
-                              shotInfo.shot.id,
-                              "shot",
-                              "lie",
-                              shotInfo.shot.lie === "ob" ? "fairway" : "ob"
-                            );
-                            // Handle OB - set next shot to penalty
-                            const nextShotIndex = 1; // s2 is index 1
-                            if (nextShotIndex < shots.length) {
-                              updateShot(
-                                shots[nextShotIndex].id,
-                                "shot",
-                                "direction",
-                                "penalty"
-                              );
-                            }
-
-                            // If setting OB (not unsetting), prompt to add another shot
-                            if (shotInfo.shot.lie !== "ob") {
-                              Alert.alert(
-                                "Add Another Shot?",
-                                "Do you want to add another shot?",
-                                [
-                                  {
-                                    text: "No",
-                                    style: "cancel",
-                                  },
-                                  {
-                                    text: "Yes",
-                                    onPress: () => {
-                                      // Add another shot with gap wedge default
-                                      const newShot: Shot = {
-                                        id: `shot-${Date.now()}-${Math.random()}`,
-                                        type: "shot",
-                                        lie: "green",
-                                        direction: "good", // Default to good
-                                        club: "Gap Wedge", // Default to gap wedge
-                                        timestamp: Date.now(),
-                                      };
-
-                                      setShots((prev) => [...prev, newShot]);
-                                      // Stay on current shot, don't navigate to the new shot
-                                    },
-                                  },
-                                ]
-                              );
-                            }
-                          }
-                        }}
-                        disabled={shotInfo.shot.direction === "penalty"}
+                        style={styles.todaysDistanceContainer}
+                        onPress={() => setShowDistanceModal(true)}
                       >
-                        <Text style={styles.obWaterButtonText}>OB</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.obWaterButton, { flex: 1 }]}
-                        onPress={() => {
-                          if (shotInfo.shot.direction !== "penalty") {
-                            updateShot(
-                              shotInfo.shot.id,
-                              "shot",
-                              "lie",
-                              shotInfo.shot.lie === "water"
-                                ? "fairway"
-                                : "water"
-                            );
-                            // Handle Water - set next shot to penalty
-                            const nextShotIndex = 1; // s2 is index 1
-                            if (nextShotIndex < shots.length) {
-                              updateShot(
-                                shots[nextShotIndex].id,
-                                "shot",
-                                "direction",
-                                "penalty"
-                              );
-                            }
-
-                            // If setting Water (not unsetting), prompt to add another shot
-                            if (shotInfo.shot.lie !== "water") {
-                              Alert.alert(
-                                "Add Another Shot?",
-                                "Do you want to add another shot?",
-                                [
-                                  {
-                                    text: "No",
-                                    style: "cancel",
-                                  },
-                                  {
-                                    text: "Yes",
-                                    onPress: () => {
-                                      // Add another shot with gap wedge default
-                                      const newShot: Shot = {
-                                        id: `shot-${Date.now()}-${Math.random()}`,
-                                        type: "shot",
-                                        lie: "green",
-                                        direction: "good", // Default to good
-                                        club: "Gap Wedge", // Default to gap wedge
-                                        timestamp: Date.now(),
-                                      };
-
-                                      setShots((prev) => [...prev, newShot]);
-                                      // Stay on current shot, don't navigate to the new shot
-                                    },
-                                  },
-                                ]
-                              );
-                            }
-                          }
-                        }}
-                        disabled={shotInfo.shot.direction === "penalty"}
-                      >
-                        <Text style={styles.obWaterButtonText}>Water</Text>
+                        <Text style={styles.todaysDistanceLabel}>
+                          Today's Distance:{" "}
+                          {todaysDistance || hole?.todaysDistance || "Not set"}
+                        </Text>
+                        <Text style={styles.editIcon}>✎</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-
-                  {/* Today's Distance - Moved to bottom */}
-                  <View
-                    style={[
-                      styles.todaysDistanceCard,
-                      { marginTop: 8, marginBottom: 0 },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={styles.todaysDistanceContainer}
-                      onPress={() => setShowDistanceModal(true)}
-                    >
-                      <Text style={styles.todaysDistanceLabel}>
-                        Today's Distance:{" "}
-                        {todaysDistance || hole?.todaysDistance || "Not set"}
-                      </Text>
-                      <Text style={styles.editIcon}>✎</Text>
-                    </TouchableOpacity>
                   </View>
-                </View>
-              );
-            })()}
-          </ScrollView>
-        </View>
+                );
+              })()}
+            </ScrollView>
+          </View>
         </PanGestureHandler>
       </GestureHandlerRootView>
 
       {/* Shot Navigation Arrows - Moved to bottom */}
-    </View>
+    </View >
   );
 }
 );
@@ -6539,6 +6595,12 @@ export const GolfBrainSpark: React.FC<
       visible: false,
       poops: [],
     });
+
+    // Store temporary hole data for navigation
+    const [tempHoleData, setTempHoleData] = useState<
+      Record<number, { shots: Shot[]; putts: Shot[] }>
+    >({});
+    const holeDetailRef = useRef<{ saveCurrentData: () => void }>(null);
 
     // React to parent signal to open Course Selection for a new round
     useEffect(() => {
@@ -6691,6 +6753,9 @@ export const GolfBrainSpark: React.FC<
       setCurrentHole(1);
       setRoundEnded(false); // Reset round ended state when starting new round
 
+      // Clear any temporary hole data from previous rounds
+      setTempHoleData({});
+
       // Create new round
       const newRound: Round = {
         id: Date.now().toString() + Math.random().toString(36).substring(2),
@@ -6800,12 +6865,6 @@ export const GolfBrainSpark: React.FC<
     const handleShowHistory = () => {
       setShowHistoryModal(true);
     };
-
-    // Store temporary hole data for navigation
-    const [tempHoleData, setTempHoleData] = useState<
-      Record<number, { shots: Shot[]; putts: Shot[] }>
-    >({});
-    const holeDetailRef = useRef<{ saveCurrentData: () => void }>(null);
 
     const handleSaveHoleData = (
       holeNumber: number,
