@@ -130,13 +130,13 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
   const [breakStartTime, setBreakStartTime] = useState('');
   const [breakDuration, setBreakDuration] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Load saved data on mount
   useEffect(() => {
     const savedData = getSparkData('minute-minder');
     if (savedData.activitiesText) {
       setActivitiesText(savedData.activitiesText);
-      parseActivities(savedData.activitiesText);
     }
     if (savedData.timerState) {
       const savedTimerState = savedData.timerState;
@@ -146,6 +146,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
         completedActivities: new Set(savedTimerState.completedActivities || []),
       });
     }
+    setDataLoaded(true);
   }, [getSparkData]);
 
   // Handle Scan Schedule
@@ -277,8 +278,10 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
     }
   }, [currentTime, timerState.isActive]);
 
-  // Save data whenever activities text or timer state change
+  // Save data whenever pharmacies text or timer state change
   useEffect(() => {
+    if (!dataLoaded) return;
+
     setSparkData('minute-minder', {
       activitiesText,
       timerState: {
@@ -288,7 +291,7 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
       },
       lastUsed: new Date().toISOString(),
     });
-  }, [activitiesText, timerState, setSparkData]);
+  }, [activitiesText, timerState, setSparkData, dataLoaded]);
 
   // Parse activities from text input
   const parseActivities = (text: string): Activity[] => {

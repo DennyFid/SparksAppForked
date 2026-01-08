@@ -4,11 +4,11 @@ This document tracks new features, sparks, and major work items between releases
 
 ## Next Release
 
-### New Sparks
-- **Goal Tracker**: Track how many times you do something over a year versus a target. Supports multiple goals, displays cumulative charts showing actual, target, and forecast lines, includes a "+1" button to add entries, and allows editing/deleting entries.
+## Version 1.0.25 released Jan 7, 2026
 
-### Major Work Items
-- **Trip Story Enhancements**: Improved image selection experience with single-column layout for better photo visibility, and added pinch-to-zoom functionality in photo details with pan support when zoomed. Reset zoom button moved to header for better accessibility.
+### New Sparks
+- Improved image selection experience for Trip Story spark with single-column layout for better photo visibility, and added pinch-to-zoom functionality in photo details with pan support when zoomed. Reset zoom button moved to header for better accessibility. Added swing recording experience for Golf Brain spark. Added Goal Tracker spark to track how many times you do a goal over the year. Supports multiple goals and displays cumulative charts showing actual, target, and forecast lines. 
+
 
 ---
 

@@ -35,6 +35,7 @@ interface TranslationCard {
   incorrectCount: number;
   lastAsked: Date | null;
   needsReview: boolean;
+  addedAt?: string; // ISO date string
 }
 
 const defaultTranslations: TranslationCard[] = [
@@ -90,21 +91,29 @@ const defaultTranslations: TranslationCard[] = [
   { id: 50, english: "Good night", spanish: "Buenas noches", correctCount: 0, incorrectCount: 0, lastAsked: null, needsReview: false },
 ];
 
-interface FlashcardSettings {
-  english: string;
-  spanish: string;
-}
-
 const FlashcardSettings: React.FC<{
   cards: TranslationCard[];
   onSave: (cards: TranslationCard[]) => void;
   onClose: () => void;
-}> = ({ cards, onSave, onClose }) => {
+  sparkId?: string;
+}> = ({ cards, onSave, onClose, sparkId = 'flashcards' }) => {
   const { colors } = useTheme();
-  const [customCards, setCustomCards] = useState<TranslationCard[]>(cards);
+  const [customCards, setCustomCards] = useState<TranslationCard[]>(
+    JSON.parse(JSON.stringify(cards))
+  );
+  const [hasChanges, setHasChanges] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCard, setEditingCard] = useState<TranslationCard | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Synchronize local cards with global cards when global cards change
+  // This ensures hydration updates are captured if the settings modal is already open
+  useEffect(() => {
+    if (!hasChanges) {
+      setCustomCards(JSON.parse(JSON.stringify(cards)));
+    }
+  }, [cards, hasChanges]);
 
   const addCustomCard = (newPhrase: Omit<Phrase, 'id'>) => {
     const newTranslationCard: TranslationCard = {
@@ -115,9 +124,11 @@ const FlashcardSettings: React.FC<{
       incorrectCount: 0,
       lastAsked: null,
       needsReview: false,
+      addedAt: new Date().toISOString(),
     };
 
-    setCustomCards([...customCards, newTranslationCard]);
+    setCustomCards([newTranslationCard, ...customCards]);
+    setHasChanges(true);
     HapticFeedback.success();
   };
 
@@ -128,18 +139,19 @@ const FlashcardSettings: React.FC<{
 
   const saveEditCard = (updatedPhrase: { english: string; spanish: string }) => {
     if (!editingCard) return;
-    
-    const updatedCards = customCards.map(card => 
+
+    const updatedCards = customCards.map(card =>
       card.id === editingCard.id
         ? {
-            ...card,
-            english: updatedPhrase.english.trim(),
-            spanish: updatedPhrase.spanish.trim(),
-          }
+          ...card,
+          english: updatedPhrase.english.trim(),
+          spanish: updatedPhrase.spanish.trim(),
+        }
         : card
     );
-    
+
     setCustomCards(updatedCards);
+    setHasChanges(true);
     setEditingCard(null);
     setShowEditModal(false);
     HapticFeedback.success();
@@ -160,6 +172,7 @@ const FlashcardSettings: React.FC<{
           style: 'destructive',
           onPress: () => {
             setCustomCards(customCards.filter(card => card.id !== id));
+            setHasChanges(true);
             HapticFeedback.medium();
           }
         }
@@ -192,21 +205,35 @@ const FlashcardSettings: React.FC<{
           <SettingsButton title="+ Add New Phrase" onPress={() => setShowAddModal(true)} />
         </SettingsSection>
 
+        <SettingsSection title="Search Phrases">
+          <SettingsInput
+            placeholder="Search in English or Spanish..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+        </SettingsSection>
+
         <SettingsSection title={`Your Phrases (${customCards.length})`}>
-          {customCards.map((card) => (
-            <SettingsItem key={card.id}>
-              <TouchableOpacity
-                onPress={() => editCard(card)}
-                style={{ flex: 1 }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <SettingsText>{card.english} → {card.spanish}</SettingsText>
-                  <Text style={{ fontSize: 16 }}>✎</Text>
-                </View>
-              </TouchableOpacity>
-              <SettingsRemoveButton onPress={() => removeCard(card.id)} />
-            </SettingsItem>
-          ))}
+          {customCards
+            .filter(card =>
+              card.english.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              card.spanish.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((card) => (
+              <SettingsItem key={card.id}>
+                <TouchableOpacity
+                  onPress={() => editCard(card)}
+                  style={{ flex: 1 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <SettingsText>{card.english} → {card.spanish}</SettingsText>
+                    <Text style={{ fontSize: 16 }}>✎</Text>
+                  </View>
+                </TouchableOpacity>
+                <SettingsRemoveButton onPress={() => removeCard(card.id)} />
+              </SettingsItem>
+            ))}
         </SettingsSection>
 
         <SaveCancelButtons onSave={saveSettings} onCancel={onClose} />
@@ -277,6 +304,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   const [autoPlayProgress, setAutoPlayProgress] = useState(0); // 0-1 for current phase progress
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCard, setEditingCard] = useState<TranslationCard | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Animation values
   const celebrationAnimation = useRef(new Animated.Value(0)).current;
@@ -291,11 +319,24 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   // Load saved data on mount
   useEffect(() => {
     const savedData = getSparkData('flashcards');
+    let loadedCards = defaultTranslations;
+
     if (savedData.cards && savedData.cards.length > 0) {
-      setCards(savedData.cards);
-    } else {
-      setCards(defaultTranslations);
+      loadedCards = savedData.cards;
     }
+
+    // Migration: ensure addedAt exists and sort by it
+    const migratedCards = loadedCards.map((card: any) => ({
+      ...card,
+      addedAt: card.addedAt || new Date(0).toISOString(), // Use epoch for old cards
+    }));
+
+    // Sort by addedAt descending (newest first)
+    migratedCards.sort((a: TranslationCard, b: TranslationCard) => {
+      return new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime();
+    });
+
+    setCards(migratedCards);
 
     // Restore session if it exists
     if (savedData.session) {
@@ -310,7 +351,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         setAutoPlayActive(session.autoPlayActive || false);
         setAutoPlayPhase(session.autoPlayPhase || null);
         setAutoPlayProgress(session.autoPlayProgress || 0);
-        
+
         // Restore current card if exists
         if (session.currentCard) {
           setCurrentCard(session.currentCard);
@@ -320,20 +361,27 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
         }
       }
     }
+    setDataLoaded(true);
   }, [getSparkData]);
 
   // Save data whenever cards change
   useEffect(() => {
+    if (!dataLoaded) return;
+
     if (cards.length > 0) {
+      const savedData = getSparkData('flashcards') || {};
       setSparkData('flashcards', {
+        ...savedData,
         cards,
         lastPlayed: new Date().toISOString(),
       });
     }
-  }, [cards]);
+  }, [cards, dataLoaded, setSparkData, getSparkData]);
 
   // Save session state whenever it changes
   useEffect(() => {
+    if (!dataLoaded) return;
+
     if (sessionActive || autoPlayActive) {
       const sessionData = {
         active: sessionActive,
@@ -360,8 +408,9 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       // Clear session when not active
       const savedData = getSparkData('flashcards') || {};
       if (savedData.session) {
-        delete savedData.session;
-        setSparkData('flashcards', savedData);
+        const newData = { ...savedData };
+        delete newData.session;
+        setSparkData('flashcards', newData);
       }
     }
   }, [
@@ -379,7 +428,8 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     autoPlayPhase,
     autoPlayProgress,
     setSparkData,
-    getSparkData
+    getSparkData,
+    dataLoaded
   ]);
 
   // Initialize audio session on component mount
@@ -390,14 +440,14 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   // Sync ref with autoPlayActive state and manage keep-awake
   useEffect(() => {
     autoPlayActiveRef.current = autoPlayActive;
-    
+
     // Keep screen awake during auto-play mode
     if (autoPlayActive) {
       activateKeepAwake();
     } else {
       deactivateKeepAwake();
     }
-    
+
     // Cleanup on unmount
     return () => {
       deactivateKeepAwake();
@@ -644,12 +694,23 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
       correctCount: 0,
       incorrectCount: 0,
       lastAsked: null,
-      needsReview: false
+      needsReview: false,
+      addedAt: new Date().toISOString(),
     };
 
-    const updatedCards = [...cards, newCard];
-    setCards(updatedCards);
-    setSparkData('flashcards', { cards: updatedCards });
+    setDataLoaded((prevLoaded) => {
+      if (!prevLoaded) return prevLoaded;
+
+      setCards(prevCards => {
+        const updated = [newCard, ...prevCards];
+        const savedData = getSparkData('flashcards') || {};
+        setSparkData('flashcards', { ...savedData, cards: updated });
+        return updated;
+      });
+      return prevLoaded;
+    });
+
+    HapticFeedback.success();
   };
 
   const handleEditCardDuringSession = (updatedPhrase: { english: string; spanish: string }) => {
@@ -659,10 +720,10 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     const updatedCards = cards.map(card =>
       card.id === editingCard.id
         ? {
-            ...card,
-            english: updatedPhrase.english.trim(),
-            spanish: updatedPhrase.spanish.trim(),
-          }
+          ...card,
+          english: updatedPhrase.english.trim(),
+          spanish: updatedPhrase.spanish.trim(),
+        }
         : card
     );
     setCards(updatedCards);
@@ -680,10 +741,10 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     setSessionQueue(prev => prev.map(card =>
       card.id === editingCard.id
         ? {
-            ...card,
-            english: updatedPhrase.english.trim(),
-            spanish: updatedPhrase.spanish.trim(),
-          }
+          ...card,
+          english: updatedPhrase.english.trim(),
+          spanish: updatedPhrase.spanish.trim(),
+        }
         : card
     ));
 
@@ -870,7 +931,7 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     // Reset animations
     cardSlideAnimation.setValue(0);
     cardFlipAnimation.setValue(0);
-    
+
     // Clear session from storage
     const savedData = getSparkData('flashcards') || {};
     if (savedData.session) {
@@ -891,13 +952,13 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
     // Clear all progress intervals
     progressIntervalsRef.current.forEach(interval => clearInterval(interval));
     progressIntervalsRef.current = [];
-    
+
     // Ensure the answer is shown so user can continue manually
     if (currentCard && !showAnswer) {
       setShowAnswer(true);
       flipCard();
     }
-    
+
     // Ensure countdown is stopped
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
@@ -1144,7 +1205,21 @@ export const FlashcardsSpark: React.FC<FlashcardsSparkProps> = ({
   };
 
   const saveCustomCards = (newCards: TranslationCard[]) => {
-    setCards(newCards);
+    // Ensure all cards have addedAt
+    const updated = newCards.map(card => ({
+      ...card,
+      addedAt: card.addedAt || new Date().toISOString(),
+    }));
+
+    setCards(updated);
+
+    // CRITICAL: Merge with existing data to prevent partial saves from overwriting state
+    const savedData = getSparkData('flashcards') || {};
+    setSparkData('flashcards', {
+      ...savedData,
+      cards: updated,
+      lastPlayed: new Date().toISOString(),
+    });
     HapticFeedback.success();
   };
 
