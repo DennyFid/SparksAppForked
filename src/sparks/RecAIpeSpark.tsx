@@ -190,7 +190,9 @@ Generate the recipe now:`;
             HapticFeedback.success();
         } catch (error: any) {
             console.error('Generate error:', error);
-            Alert.alert('Generation Error', error.message || 'Failed to generate recipe');
+            if (!GeminiService.isApiKeyError(error)) {
+                Alert.alert('Generation Error', error.message || 'Failed to generate recipe');
+            }
         } finally {
             setIsGenerating(false);
         }
@@ -501,10 +503,10 @@ Generate the recipe now:`;
                         </Text>
 
                         <Text style={{ fontSize: 14, color: colors.textSecondary }}>
-                            {apiKeyAvailable === null 
-                                ? '⏳ Checking...' 
-                                : apiKeyAvailable 
-                                    ? '✅ API key configured' 
+                            {apiKeyAvailable === null
+                                ? '⏳ Checking...'
+                                : apiKeyAvailable
+                                    ? '✅ API key configured'
                                     : '❌ API key not configured'}
                         </Text>
                     </View>

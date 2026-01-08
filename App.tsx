@@ -177,8 +177,8 @@ function AppContent() {
       (response) => {
         const data = response.notification.request.content.data;
 
-        // Import navigation ref dynamically to avoid circular dependencies
-        import("./src/navigation/AppNavigator")
+        // Import navigation ref from standalone file to avoid circular dependencies
+        import("./src/navigation/navigationRef")
           .then(({ navigationRef }) => {
             if (navigationRef.isReady()) {
               if (data?.type === "spark-notification" && data?.sparkId) {

@@ -22,6 +22,7 @@ import {
 import { GeminiCommandParser } from "../services/GeminiCommandParser";
 import { CommandExecutor } from "../services/CommandExecutor";
 import { HapticFeedback } from "../utils/haptics";
+import { GeminiService } from "../services/GeminiService";
 import { useNavigation } from "@react-navigation/native";
 import { useSparkStore } from "../store";
 import { getSparkById } from "../components/sparkRegistryData";
@@ -197,7 +198,9 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
         HapticFeedback.error();
       }
     } catch (e) {
-      Alert.alert("Error", "Failed to process command.");
+      if (!GeminiService.isApiKeyError(e)) {
+        Alert.alert("Error", "Failed to process command.");
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -377,8 +380,8 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
           </View>
 
           <SaveCancelButtons
-            onSave={onCloseSettings || (() => {})}
-            onCancel={onCloseSettings || (() => {})}
+            onSave={onCloseSettings || (() => { })}
+            onCancel={onCloseSettings || (() => { })}
             saveText="Done"
             cancelText="Close"
           />
@@ -439,8 +442,8 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
                 {isProcessing
                   ? "ProcessingCommand..."
                   : isListening
-                  ? "Listening..."
-                  : "Tap to speak"}
+                    ? "Listening..."
+                    : "Tap to speak"}
               </Text>
               {/* Live Transcript Display */}
               <Text style={[styles.liveTranscript, { color: colors.text }]}>

@@ -1045,7 +1045,7 @@ const ShortSaverSpark: React.FC<ShortSaverSparkProps> = ({
                   <TouchableOpacity
                     onPress={() => {
                       // Navigate to Friend Spark
-                      const { navigationRef } = require('../navigation/AppNavigator');
+                      const { navigationRef } = require('../navigation/navigationRef');
                       if (navigationRef.isReady()) {
                         navigationRef.navigate('MySparks', {
                           screen: 'Spark',

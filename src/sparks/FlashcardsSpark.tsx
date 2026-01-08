@@ -210,7 +210,6 @@ const FlashcardSettings: React.FC<{
             placeholder="Search in English or Spanish..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            autoCapitalize="none"
           />
         </SettingsSection>
 

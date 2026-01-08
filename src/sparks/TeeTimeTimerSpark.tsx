@@ -729,25 +729,35 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     const totalDuration = defaultActivities.reduce((sum, a) => sum + a.duration, 0);
     return new Date(now.getTime() + (totalDuration + 5) * 60 * 1000);
   });
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load saved data on mount
   useEffect(() => {
-    const savedData = getSparkData('tee-time-timer');
-    if (savedData.activities && savedData.activities.length > 0) {
-      setActivities(savedData.activities);
-    }
-    // Load saved timer state
-    if (savedData.timerState) {
-      const savedTimerState = savedData.timerState;
-      setTimerState({
-        ...savedTimerState,
-        teeTime: savedTimerState.teeTime ? new Date(savedTimerState.teeTime) : null,
-        startTime: savedTimerState.startTime ? new Date(savedTimerState.startTime) : null,
-        completedActivities: new Set(savedTimerState.completedActivities || []),
-      });
-    }
+    const loadData = async () => {
+      try {
+        const savedData = getSparkData('tee-time-timer');
+        if (savedData.activities && savedData.activities.length > 0) {
+          setActivities(savedData.activities);
+        }
+        // Load saved timer state
+        if (savedData.timerState) {
+          const savedTimerState = savedData.timerState;
+          setTimerState({
+            ...savedTimerState,
+            teeTime: savedTimerState.teeTime ? new Date(savedTimerState.teeTime) : null,
+            startTime: savedTimerState.startTime ? new Date(savedTimerState.startTime) : null,
+            completedActivities: new Set(savedTimerState.completedActivities || []),
+          });
+        }
+        setDataLoaded(true);
+      } catch (error) {
+        console.error('Failed to load spark data:', error);
+        setDataLoaded(true); // Still set to true to avoid blocking forever
+      }
+    };
+    loadData();
   }, [getSparkData]);
 
   // Calculate total duration - must be before useEffect that uses it
@@ -760,9 +770,8 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     setSelectedTime(defaultTime);
   }, [totalDuration]);
 
-  // Save data whenever activities or timer state change
   useEffect(() => {
-    if (activities.length > 0) {
+    if (dataLoaded && activities.length > 0) {
       setSparkData('tee-time-timer', {
         activities,
         timerState: {
@@ -774,7 +783,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
         lastUsed: new Date().toISOString(),
       });
     }
-  }, [activities, timerState, setSparkData]);
+  }, [activities, timerState, dataLoaded, setSparkData]);
 
   // Timer logic
   useEffect(() => {

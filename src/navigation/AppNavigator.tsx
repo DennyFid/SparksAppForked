@@ -30,8 +30,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 const MySparksStack = createNativeStackNavigator<MySparkStackParamList>();
 const MarketplaceStack = createNativeStackNavigator<MarketplaceStackParamList>();
 
-// Create navigation ref for programmatic navigation (e.g., from notifications)
-export const navigationRef = createNavigationContainerRef<RootTabParamList>();
+import { navigationRef } from "./navigationRef";
 
 // Helper function to get focused route name
 const getFocusedRouteNameFromRoute = (route: any) => {

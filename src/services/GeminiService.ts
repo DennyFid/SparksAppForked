@@ -1,5 +1,7 @@
 import { RemoteConfigService } from './RemoteConfigService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
+import { navigationRef } from '../navigation/navigationRef';
 
 const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
 
@@ -51,6 +53,60 @@ export const GeminiService = {
         return await getApiKey();
     },
 
+    /**
+     * Checks if an error is related to the API key
+     */
+    isApiKeyError: (error: any): boolean => {
+        if (!error) return false;
+        const message = (error.message || String(error)).toLowerCase();
+
+        const keywords = [
+            'api key',
+            'apikey',
+            'invalid key',
+            'expired key',
+            'key was reported',
+            'leaked',
+            'reported',
+            'unauthenticated',
+            'forbidden',
+            'security reason'
+        ];
+
+        const isMatch = keywords.some(keyword => message.includes(keyword));
+        if (isMatch) {
+            console.log('🛡️ GeminiService: API key error detected in message:', message);
+        }
+        return isMatch;
+    },
+
+    /**
+     * Shows the API key error alert with a link to Settings
+     */
+    handleApiKeyError: (error?: any) => {
+        console.error('🧩 GeminiService: Handling API key error:', error);
+
+        Alert.alert(
+            "API Key Error",
+            "There was a problem with this API key. Provide a new API key in settings.",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Visit Settings",
+                    onPress: () => {
+                        if (navigationRef.isReady()) {
+                            // @ts-ignore - Settings is a valid tab route
+                            navigationRef.navigate('Settings');
+                        }
+                    }
+                }
+            ]
+        );
+    },
+
     generateContent: async (prompt: string, images: string[] = []): Promise<string> => {
         const apiKey = await getApiKey();
 
@@ -99,7 +155,7 @@ export const GeminiService = {
             const errorMsg = data.error?.message || 'API request failed';
             const errorCode = data.error?.code;
             const errorStatus = data.error?.status;
-            
+
             console.error('❌ Gemini API Error Details:', {
                 status: response.status,
                 statusText: response.statusText,
@@ -110,16 +166,18 @@ export const GeminiService = {
                 apiKeyPrefix,
                 apiKeyLength: apiKey?.length,
             });
-            
+
             // Generate curl command for debugging
             const curlCommand = `curl -X POST \\
   'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=YOUR_API_KEY' \\
   -H 'Content-Type: application/json' \\
   -d '${JSON.stringify({ contents }, null, 2)}'`;
-            
-            console.error('📋 Test with this curl command (replace YOUR_API_KEY):');
+
             console.error(curlCommand);
-            
+
+            if (GeminiService.isApiKeyError(errorMsg)) {
+                GeminiService.handleApiKeyError(errorMsg);
+            }
             throw new Error(errorMsg);
         }
 
@@ -234,6 +292,9 @@ Keep the tone warm, insightful, and encouraging. Avoid overly clinical or diagno
             if (!response.ok) {
                 const errorMsg = data.error?.message || 'API request failed';
                 console.error('Gemini transcription error:', errorMsg);
+                if (GeminiService.isApiKeyError(errorMsg)) {
+                    GeminiService.handleApiKeyError(errorMsg);
+                }
                 throw new Error(errorMsg);
             }
 

@@ -205,7 +205,9 @@ export const MinuteMinderSpark: React.FC<MinuteMinderSparkProps> = ({
 
         } catch (error) {
           console.error('Scan error:', error);
-          Alert.alert('Scan Error', 'Failed to process the image. Please try again.');
+          if (!GeminiService.isApiKeyError(error)) {
+            Alert.alert('Scan Error', 'Failed to process the image. Please try again.');
+          }
         } finally {
           setIsScanning(false);
         }
