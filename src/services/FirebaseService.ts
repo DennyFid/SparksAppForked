@@ -26,16 +26,13 @@ try {
 export class FirebaseService {
   private static db = isFirebaseAvailable ? firestore() : null;
 
-  static {
-    console.log('🔥 FirebaseService initialized');
-    console.log('🔥 Firebase available:', isFirebaseAvailable);
-    console.log('🔥 Database instance:', this.db ? 'Connected' : 'Not connected');
-  }
-
   private static _initialized = isFirebaseAvailable;
 
   static async initialize(): Promise<void> {
     console.log('🔥 FirebaseService.initialize() called');
+    console.log('🔥 Firebase available:', isFirebaseAvailable);
+    console.log('🔥 Database instance:', this.db ? 'Connected' : 'Not connected');
+
     if (isFirebaseAvailable) {
       this._initialized = true;
       console.log('✅ Native Firebase available');

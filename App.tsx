@@ -14,6 +14,7 @@ import { FeedbackNotificationService } from "./src/services/FeedbackNotification
 import { ServiceFactory } from "./src/services/ServiceFactory";
 import AuthService from "./src/services/AuthService";
 import { RemoteConfigService } from "./src/services/RemoteConfigService";
+import { navigationRef } from "./src/navigation/navigationRef";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -177,37 +178,31 @@ function AppContent() {
       (response) => {
         const data = response.notification.request.content.data;
 
-        // Import navigation ref from standalone file to avoid circular dependencies
-        import("./src/navigation/navigationRef")
-          .then(({ navigationRef }) => {
-            if (navigationRef.isReady()) {
-              if (data?.type === "spark-notification" && data?.sparkId) {
-                // Navigate to the specific spark
-                // First navigate to MySparks stack, then to the Spark screen
-                (navigationRef as any).navigate("MySparks", {
-                  screen: "Spark",
-                  params: { sparkId: data.sparkId },
-                });
-                console.log(
-                  `✅ Navigated to spark ${data.sparkId} from notification`
-                );
-              } else if (data?.type === "activity-start" && data?.sparkId) {
-                // Legacy activity notifications - navigate to spark
-                (navigationRef as any).navigate("MySparks", {
-                  screen: "Spark",
-                  params: { sparkId: data.sparkId },
-                });
-                console.log(
-                  `✅ Navigated to spark ${data.sparkId} from activity notification`
-                );
-              }
-            } else {
-              console.log("⚠️ Navigation not ready yet, cannot navigate");
-            }
-          })
-          .catch((error) => {
-            console.error("Error navigating from notification:", error);
-          });
+        // Use navigation ref from standalone file to avoid circular dependencies
+        if (navigationRef.isReady()) {
+          if (data?.type === "spark-notification" && data?.sparkId) {
+            // Navigate to the specific spark
+            // First navigate to MySparks stack, then to the Spark screen
+            (navigationRef as any).navigate("MySparks", {
+              screen: "Spark",
+              params: { sparkId: data.sparkId },
+            });
+            console.log(
+              `✅ Navigated to spark ${data.sparkId} from notification`
+            );
+          } else if (data?.type === "activity-start" && data?.sparkId) {
+            // Legacy activity notifications - navigate to spark
+            (navigationRef as any).navigate("MySparks", {
+              screen: "Spark",
+              params: { sparkId: data.sparkId },
+            });
+            console.log(
+              `✅ Navigated to spark ${data.sparkId} from activity notification`
+            );
+          }
+        } else {
+          console.log("⚠️ Navigation not ready yet, cannot navigate");
+        }
       }
     );
 

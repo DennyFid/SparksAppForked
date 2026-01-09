@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, RefreshControl, Linking, Platform, Clipboard, TextInput } from 'react-native';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSparkStore, useAppStore } from '../store';
 import { useTheme } from '../contexts/ThemeContext';
@@ -274,7 +275,9 @@ export const SettingsScreen: React.FC = () => {
       <SettingsScrollView onRefresh={handleRefresh} refreshing={refreshing}>
         <View style={styles.header}>
           <Text style={styles.title}>⚙️ Settings</Text>
-          <Text style={styles.subtitle}>Customize your Sparks experience</Text>
+          <Text style={styles.subtitle}>
+            Customize your Sparks experience • v{Constants.expoConfig?.version || '1.0.0'}
+          </Text>
         </View>
 
         <View style={styles.feedbackSection}>

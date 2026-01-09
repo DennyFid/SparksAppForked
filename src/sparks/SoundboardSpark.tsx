@@ -58,10 +58,23 @@ const parseTaskText = (text: string): { category: string; displayText: string } 
 // Persistent storage helpers
 const SOUNDBOARD_DIR_NAME = 'soundboard/';
 const toAbsoluteUri = (relativeOrAbsolute: string): string => {
+  if (!relativeOrAbsolute) return '';
   if (relativeOrAbsolute.startsWith('file://')) return relativeOrAbsolute;
-  return `${FileSystem.documentDirectory}${relativeOrAbsolute}`;
+
+  // Ensure documentDirectory has a trailing slash and relative path doesn't start with one
+  const docDir = FileSystem.documentDirectory?.endsWith('/')
+    ? FileSystem.documentDirectory
+    : `${FileSystem.documentDirectory}/`;
+
+  const relPath = relativeOrAbsolute.startsWith('/')
+    ? relativeOrAbsolute.substring(1)
+    : relativeOrAbsolute;
+
+  return `${docDir}${relPath}`;
 };
+
 const toRelativePath = (uri: string): string => {
+  if (!uri) return '';
   const idx = uri.lastIndexOf(SOUNDBOARD_DIR_NAME);
   return idx !== -1 ? uri.substring(idx) : uri;
 };
@@ -326,7 +339,10 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   onCloseSettings,
   onStateChange
 }) => {
-  const { getSparkData, setSparkData } = useSparkStore();
+  // Stable store selectors
+  const getSparkData = useSparkStore(state => state.getSparkData);
+  const setSparkData = useSparkStore(state => state.setSparkData);
+  const isHydrated = useSparkStore(state => state.isHydrated);
   const { colors } = useTheme();
 
   const [soundChips, setSoundChips] = useState<SoundChip[]>([]);
@@ -334,6 +350,7 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const hasLoadedRef = useRef(false); // Double-lock guard to prevent overwriting with empty state
 
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('ready');
@@ -669,30 +686,32 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   };
 
   // Load saved data on mount
-  const isHydrated = useSparkStore(state => state.isHydrated);
-
   useEffect(() => {
-    console.log('🔄 SoundboardSpark: Hydration Effect. isHydrated:', isHydrated);
-    if (!isHydrated) return;
+    console.log('🔄 SoundboardSpark: Hydration Effect. isHydrated:', isHydrated, 'hasLoadedRef:', hasLoadedRef.current);
+    if (!isHydrated || dataLoaded || hasLoadedRef.current) return;
 
     const savedData = getSparkData('soundboard') as SoundboardData;
     console.log('📦 SoundboardSpark: Load saved data:', savedData ? 'Found' : 'Not found');
 
     if (savedData?.soundChips) {
       console.log(`📦 SoundboardSpark: Loading ${savedData.soundChips.length} sound chips`);
-      // TODO TEMPORARY - DELETE AFTER MIGRATION:
+
       // Migrate any absolute file:// URIs to relative paths so they survive container moves
       const migrated = savedData.soundChips.map((chip) => {
         const rel = chip.filePath.startsWith('file://') ? toRelativePath(chip.filePath) : chip.filePath;
         return rel !== chip.filePath ? { ...chip, filePath: rel } : chip;
       });
+
       setSoundChips(migrated);
+      hasLoadedRef.current = true;
+
       if (JSON.stringify(migrated) !== JSON.stringify(savedData.soundChips)) {
         console.log('📦 SoundboardSpark: Migrating paths to relative format...');
         setSparkData('soundboard', { ...savedData, soundChips: migrated });
       }
     } else {
       console.log('📦 SoundboardSpark: No sound chips found in store');
+      hasLoadedRef.current = true; // Even if empty, we've "loaded" the empty state correctly
     }
     setDataLoaded(true);
     // Debug file system status
@@ -701,7 +720,10 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
   // Save data whenever soundChips change
   useEffect(() => {
-    if (!dataLoaded) return;
+    if (!dataLoaded || !hasLoadedRef.current) {
+      console.log('📦 SoundboardSpark: Save blocked - data not fully loaded yet');
+      return;
+    }
 
     const categories = Array.from(new Set(soundChips.map(chip => chip.category)));
     const soundboardData: SoundboardData = {
@@ -709,9 +731,11 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
       categories,
       lastUsed: new Date().toISOString(),
     };
+
+    console.log(`📦 SoundboardSpark: Saving ${soundChips.length} chips to store...`);
     setSparkData('soundboard', soundboardData);
     onStateChange?.({ soundCount: soundChips.length, categories: categories.length });
-  }, [soundChips, dataLoaded]);
+  }, [soundChips, dataLoaded, setSparkData, onStateChange]);
 
   // Cleanup audio on unmount
   useEffect(() => {
