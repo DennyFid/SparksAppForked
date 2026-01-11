@@ -710,7 +710,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   onStateChange,
   onComplete
 }) => {
-  const { getSparkData, setSparkData } = useSparkStore();
+  const { getSparkData, setSparkData, isHydrated } = useSparkStore();
   const { colors } = useTheme();
 
   const [activities, setActivities] = useState<Activity[]>(defaultActivities);
@@ -733,32 +733,40 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load saved data on mount
+  // Load saved data on mount - with proper hydration guard
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const savedData = getSparkData('tee-time-timer');
-        if (savedData.activities && savedData.activities.length > 0) {
-          setActivities(savedData.activities);
-        }
-        // Load saved timer state
-        if (savedData.timerState) {
-          const savedTimerState = savedData.timerState;
-          setTimerState({
-            ...savedTimerState,
-            teeTime: savedTimerState.teeTime ? new Date(savedTimerState.teeTime) : null,
-            startTime: savedTimerState.startTime ? new Date(savedTimerState.startTime) : null,
-            completedActivities: new Set(savedTimerState.completedActivities || []),
-          });
-        }
-        setDataLoaded(true);
-      } catch (error) {
-        console.error('Failed to load spark data:', error);
-        setDataLoaded(true); // Still set to true to avoid blocking forever
+    if (!isHydrated) return;
+    if (dataLoaded) return; // Prevent re-running
+
+    console.log('🔄 TeeTimeTimerSpark: Loading data, isHydrated:', isHydrated);
+    try {
+      const savedData = getSparkData('tee-time-timer') as any;
+      
+      if (savedData?.activities && savedData.activities.length > 0) {
+        console.log(`📦 TeeTimeTimerSpark: Loading ${savedData.activities.length} activities`);
+        setActivities(savedData.activities);
+      } else {
+        console.log('📦 TeeTimeTimerSpark: No activities found, using defaults');
       }
-    };
-    loadData();
-  }, [getSparkData]);
+      
+      // Load saved timer state
+      if (savedData?.timerState) {
+        const savedTimerState = savedData.timerState;
+        setTimerState({
+          ...savedTimerState,
+          teeTime: savedTimerState.teeTime ? new Date(savedTimerState.teeTime) : null,
+          startTime: savedTimerState.startTime ? new Date(savedTimerState.startTime) : null,
+          completedActivities: new Set(savedTimerState.completedActivities || []),
+        });
+        console.log('📦 TeeTimeTimerSpark: Loaded timer state');
+      }
+      
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('❌ TeeTimeTimerSpark: Failed to load spark data:', error);
+      setDataLoaded(true); // Still set to true to avoid blocking forever
+    }
+  }, [isHydrated, getSparkData, dataLoaded]);
 
   // Calculate total duration - must be before useEffect that uses it
   const totalDuration = activities.reduce((sum, activity) => sum + activity.duration, 0);
@@ -770,20 +778,27 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     setSelectedTime(defaultTime);
   }, [totalDuration]);
 
+  // Save data whenever activities or timerState change - with dataLoaded guard
   useEffect(() => {
-    if (dataLoaded && activities.length > 0) {
-      setSparkData('tee-time-timer', {
-        activities,
-        timerState: {
-          ...timerState,
-          teeTime: timerState.teeTime ? timerState.teeTime.toISOString() : null,
-          startTime: timerState.startTime ? timerState.startTime.toISOString() : null,
-          completedActivities: Array.from(timerState.completedActivities),
-        },
-        lastUsed: new Date().toISOString(),
-      });
-    }
-  }, [activities, timerState, dataLoaded, setSparkData]);
+    if (!dataLoaded) return; // ✅ Prevent overwriting during hydration
+
+    console.log(`📦 TeeTimeTimerSpark: Saving ${activities.length} activities to store...`);
+    setSparkData('tee-time-timer', {
+      activities,
+      timerState: {
+        ...timerState,
+        teeTime: timerState.teeTime ? timerState.teeTime.toISOString() : null,
+        startTime: timerState.startTime ? timerState.startTime.toISOString() : null,
+        completedActivities: Array.from(timerState.completedActivities),
+      },
+      lastUsed: new Date().toISOString(),
+    });
+    onStateChange?.({
+      activityCount: activities.length,
+      isActive: timerState.isActive,
+      hasTeeTime: timerState.teeTime !== null,
+    });
+  }, [activities, timerState, dataLoaded, setSparkData, onStateChange]);
 
   // Timer logic
   useEffect(() => {

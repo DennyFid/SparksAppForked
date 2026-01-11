@@ -8,7 +8,10 @@ import {
     TextInput,
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSparkStore } from '../store';
 import { SparkProps } from '../types/spark';
@@ -22,6 +25,7 @@ import {
 } from '../components/SettingsComponents';
 import { AISettingsNote } from '../components/AISettingsNote';
 import { HapticFeedback } from '../utils/haptics';
+import { StarRating } from '../components/StarRating';
 
 interface Recipe {
     id: string;
@@ -32,6 +36,7 @@ interface Recipe {
     createdAt: string;
     shoppingChecked: number[];
     cookingChecked: number[];
+    rating?: number;
 }
 
 interface RecAIpeData {
@@ -73,6 +78,7 @@ Cool: Let the cookies cool on the baking sheets for 5 minutes before transferrin
     createdAt: new Date().toISOString(),
     shoppingChecked: [],
     cookingChecked: [],
+    rating: 5,
 };
 
 export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
@@ -91,6 +97,8 @@ export const RecAIpeSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettin
     const [dataLoaded, setDataLoaded] = useState(false);
 
     const isHydrated = useSparkStore(state => state.isHydrated);
+
+    const insets = useSafeAreaInsets();
 
     // Check API key availability
     useEffect(() => {
@@ -175,7 +183,7 @@ IMPORTANT FORMATTING RULES:
 1. The output must consist only of an 'Ingredients' section and an 'Instructions' section, with no introduction or concluding remarks.
 2. In the 'Ingredients' section, each ingredient must be on a single line.
 3. In the 'Instructions' section, the first time an ingredient is mentioned, include its quantity in parentheses immediately following the ingredient name.
-4. Write instructions as clear paragraphs, with each major step as a separate paragraph. Paragraphs are typically 1 or 2 sentences long for these instructions. 
+4. Write instructions as clear paragraphs, with each sentence as its own separate paragraph. Each instruction step should be broken down into individual sentences, making it easy to follow step-by-step and easy to check off when complete.
 5. Include cooking temperature and time where applicable.
 6. Start with a recipe title on the first line.
 
@@ -188,9 +196,11 @@ Ingredients
 1 cup packed brown sugar
 
 Instructions
-Preheat and Prepare: Preheat your oven to 375°F (190°C). Line two baking sheets with parchment paper.
+Preheat your oven to 375°F (190°C).
 
-Cream Butter and Sugars: In a large bowl, cream together the unsalted butter, softened (1 cup/2 sticks), the packed brown sugar (1 cup), and the granulated sugar (1/2 cup) using an electric mixer until light and fluffy.
+Line two baking sheets with parchment paper.
+
+In a large bowl, cream together the unsalted butter (1 cup/2 sticks), the packed brown sugar (1 cup), and the granulated sugar (1/2 cup) using an electric mixer until light and fluffy.
 
 Generate the recipe now:`;
 
@@ -240,6 +250,7 @@ Generate the recipe now:`;
             createdAt: new Date().toISOString(),
             shoppingChecked: [],
             cookingChecked: [],
+            rating: recipe.rating,
         };
 
         const newData = { recipes: [newRecipe, ...data.recipes] };
@@ -304,14 +315,35 @@ Generate the recipe now:`;
         },
         header: {
             padding: 20,
+            paddingTop: Platform.OS === 'ios' ? 10 : 20,
             flexDirection: 'row',
-            justifyContent: 'space-between',
             alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: 64,
         },
         title: {
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: 'bold',
             color: colors.text,
+            flex: 1,
+            textAlign: 'center',
+        },
+        backButton: {
+            position: 'absolute',
+            left: 20,
+            zIndex: 10,
+            padding: 8,
+            marginLeft: -8,
+        },
+        backButtonText: {
+            fontSize: 24,
+            color: colors.primary,
+            fontWeight: '600',
+        },
+        headerRight: {
+            position: 'absolute',
+            right: 20,
+            zIndex: 10,
         },
         addButton: {
             width: 40,
@@ -327,8 +359,12 @@ Generate the recipe now:`;
             fontWeight: 'bold',
         },
         content: {
+            flex: 1,
+        },
+        scrollContent: {
             padding: 20,
             paddingTop: 0,
+            paddingBottom: Math.max(insets.bottom + 40, 60),
         },
         recipeCard: {
             backgroundColor: colors.surface,
@@ -542,16 +578,18 @@ Generate the recipe now:`;
             <View style={styles.container}>
                 <View style={styles.header}>
                     <Text style={styles.title}>🍳 RecAIpe</Text>
-                    <TouchableOpacity style={styles.addButton} onPress={() => {
-                        setCreatePrompt('');
-                        setMode('create');
-                        HapticFeedback.light();
-                    }}>
-                        <Text style={styles.addButtonText}>+</Text>
-                    </TouchableOpacity>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity style={styles.addButton} onPress={() => {
+                            setCreatePrompt('');
+                            setMode('create');
+                            HapticFeedback.light();
+                        }}>
+                            <Text style={styles.addButtonText}>+</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     {data.recipes.length === 0 ? (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyEmoji}>🍳</Text>
@@ -585,10 +623,13 @@ Generate the recipe now:`;
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode('list')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Create Recipe</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <TextInput
                         style={styles.input}
                         multiline
@@ -609,13 +650,6 @@ Generate the recipe now:`;
                             <Text style={styles.buttonText}>Generate Recipe</Text>
                         )}
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode('list')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Cancel</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );
@@ -626,10 +660,16 @@ Generate the recipe now:`;
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => {
+                        setMode('create');
+                        setGeneratedRecipe(null);
+                    }}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Preview Recipe</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <TextInput
                         style={[styles.input, { minHeight: 50 }]}
                         value={generatedRecipe.title}
@@ -637,6 +677,18 @@ Generate the recipe now:`;
                         placeholder="Recipe title"
                         placeholderTextColor={colors.textSecondary}
                     />
+
+                    <View style={{ alignItems: 'center', marginVertical: 20 }}>
+                        <Text style={[styles.sectionTitle, { marginTop: 0, marginBottom: 8 }]}>Initial Rating</Text>
+                        <StarRating
+                            rating={generatedRecipe.rating || 0}
+                            onRatingChange={(newRating) => {
+                                setGeneratedRecipe({ ...generatedRecipe, rating: newRating });
+                                HapticFeedback.success();
+                            }}
+                            size={30}
+                        />
+                    </View>
 
                     <Text style={styles.sectionTitle}>Ingredients</Text>
                     {generatedRecipe.ingredients?.split('\n').filter(l => l.trim()).map((item, i) => (
@@ -680,16 +732,6 @@ Generate the recipe now:`;
                     >
                         <Text style={styles.buttonText}>Save & Make Recipe</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => {
-                            setMode('create');
-                            setGeneratedRecipe(null);
-                        }}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Back</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );
@@ -698,12 +740,19 @@ Generate the recipe now:`;
     // Edit View
     if (mode === 'edit') {
         return (
-            <View style={styles.container}>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode(generatedRecipe ? 'preview' : 'view')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Edit Recipe</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <TextInput
                         style={[styles.input, { minHeight: 400 }]}
                         multiline
@@ -732,15 +781,8 @@ Generate the recipe now:`;
                     >
                         <Text style={styles.buttonText}>Save</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode(generatedRecipe ? 'preview' : 'view')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Cancel</Text>
-                    </TouchableOpacity>
                 </ScrollView>
-            </View>
+            </KeyboardAvoidingView>
         );
     }
 
@@ -753,12 +795,19 @@ Generate the recipe now:`;
                 : '';
 
         return (
-            <View style={styles.container}>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode(generatedRecipe ? 'preview' : 'view')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Refine Recipe</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                     <Text style={styles.sectionTitle}>Current Recipe</Text>
                     <View style={[styles.input, { minHeight: 200 }]}>
                         <Text style={{ color: colors.text }}>{currentRecipeText}</Text>
@@ -785,15 +834,8 @@ Generate the recipe now:`;
                             <Text style={styles.buttonText}>Refine Recipe</Text>
                         )}
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode(generatedRecipe ? 'preview' : 'view')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Cancel</Text>
-                    </TouchableOpacity>
                 </ScrollView>
-            </View>
+            </KeyboardAvoidingView>
         );
     }
 
@@ -802,10 +844,13 @@ Generate the recipe now:`;
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode('list')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>{selectedRecipe.title}</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     <Text style={styles.sectionTitle}>Ingredients</Text>
                     {getIngredientsList(selectedRecipe).map((item, i) => (
                         <View key={i} style={styles.ingredientItem}>
@@ -858,13 +903,6 @@ Generate the recipe now:`;
                     >
                         <Text style={[styles.buttonText, styles.deleteButtonText]}>Delete Recipe</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode('list')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Back to Recipes</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );
@@ -877,10 +915,13 @@ Generate the recipe now:`;
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode('view')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Shopping List</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     <Text style={[styles.sectionTitle, { marginTop: 0 }]}>{selectedRecipe.title}</Text>
 
                     {ingredients.map((item, i) => {
@@ -925,13 +966,6 @@ Generate the recipe now:`;
                     >
                         <Text style={styles.buttonText}>Finish Shopping</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode('view')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Back</Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </View>
         );
@@ -944,10 +978,13 @@ Generate the recipe now:`;
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => setMode('shop')}>
+                        <Text style={styles.backButtonText}>←</Text>
+                    </TouchableOpacity>
                     <Text style={styles.title}>Cooking</Text>
                 </View>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                     <Text style={[styles.sectionTitle, { marginTop: 0 }]}>{selectedRecipe.title}</Text>
 
                     {instructions.map((instruction, i) => {
@@ -991,13 +1028,6 @@ Generate the recipe now:`;
                         }}
                     >
                         <Text style={styles.buttonText}>Finish Recipe</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.buttonSecondary]}
-                        onPress={() => setMode('view')}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonSecondaryText]}>Back</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
