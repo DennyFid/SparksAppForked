@@ -1,6 +1,6 @@
 {
   "name": "sparksapp",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -18,7 +18,8 @@
     "check:version": "./scripts/check-version.sh",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/config-plugins": "~10.1.1",

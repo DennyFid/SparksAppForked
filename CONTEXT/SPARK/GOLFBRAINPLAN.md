@@ -30,3 +30,19 @@
 
 1.  **[x] Locate `RecordSwing` component:** Find the `RecordSwing.tsx` file in the `src/components` directory.
 2.  **[x] Update `recordAsync` options:** In `RecordSwing.tsx`, find the call to `camera.recordAsync()` and ensure the options object includes `mute: false` to enable audio recording.
+
+## NEW PLAN: Round Review Chart Improvements - Jan 11
+
+### 1. Unified Chart Implementation
+- [ ] **Replace Custom Dot Charts:** Transition from the current absolute-positioned `View` dots to the new common `SparkChart` component (defined in `SPARKCHARTSPLAN.md`).
+- [ ] **Add Connecting Lines:** Ensure charts show actual lines connecting hole scores, not just floating data points.
+- [ ] **Dynamic Scaling:** Improve the Y-axis scaling to better handle rounds with high variability in scores.
+
+### 2. Enhanced Visualization
+- [ ] **Emoji Markers:** Maintain and improve the placement of 🔥 (fire) and 💩 (poop) emojis directly on the chart lines.
+- [ ] **Zero Line Support:** Clearly mark the "Even Par" (zero) line for both Gross and Net charts.
+- [ ] **Multi-Line Comparison:** (Optional) Explore showing Gross and Net on the same chart with different colors/styles.
+
+### 3. Polish & Interactive Features
+- [ ] **Tooltips:** Add the ability to tap a data point to see the exact score and details for that hole.
+- [ ] **Consistent Theming:** Ensure chart colors (primary for gross, green for net) are consistently applied through the new component.

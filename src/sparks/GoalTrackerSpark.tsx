@@ -28,6 +28,7 @@ import {
 } from '../components/SettingsComponents';
 import { HapticFeedback } from '../utils/haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { SparkChart, ChartSeries } from '../components/SparkChart';
 
 interface GoalEntry {
   id: string;
@@ -413,142 +414,51 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
   // Chart component - Full Year View
   const GoalChart = ({ goal }: { goal: Goal }) => {
     const stats = calculateStats(goal);
-    const width = Dimensions.get('window').width - 40;
-    const height = 200;
-    const padding = 30;
-
-    // Create data points for the year so far (up to today)
-    const dataPoints: Array<{
-      day: number;
-      actual: number;
-      target: number;
-    }> = [];
-
     const now = new Date();
     const currentYear = now.getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    const todayDate = parseLocalDate(formatDateString(now));
-    const daysToShow = stats.daysSinceStartOfYear; // Truncate to today
+    const daysToShow = stats.daysSinceStartOfYear;
 
-    for (let day = 0; day < daysToShow; day++) {
-      const dayDate = new Date(currentYear, 0, 1);
-      dayDate.setDate(dayDate.getDate() + day);
-      const dayStr = formatDateString(dayDate);
+    const series: ChartSeries[] = useMemo(() => {
+      const dataPoints: Array<{ day: number; actual: number; target: number }> = [];
+      
+      for (let day = 0; day < daysToShow; day++) {
+        const dayDate = new Date(currentYear, 0, 1);
+        dayDate.setDate(dayDate.getDate() + day);
+        
+        const targetValue = 1 + ((goal.targetPerYear - 1) * (day + 1) / stats.daysInYear);
+        const actualValue = goal.entries.filter(e => {
+          const entryDate = parseLocalDate(e.date);
+          return entryDate <= dayDate && entryDate.getFullYear() === currentYear;
+        }).length;
 
-      // Target value: starts at 1 on Jan 1, increases linearly
-      // Formula: 1 + (targetPerYear - 1) * (dayNumber / daysInYear)
-      // day + 1 because day 0 is Jan 1 (first day)
-      const targetValue = 1 + ((goal.targetPerYear - 1) * (day + 1) / stats.daysInYear);
+        dataPoints.push({ day, actual: actualValue, target: targetValue });
+      }
 
-      // Actual value: cumulative count of entries up to this day
-      const actualValue = goal.entries.filter(e => {
-        const entryDate = parseLocalDate(e.date);
-        return entryDate <= dayDate && entryDate.getFullYear() === currentYear;
-      }).length;
+      const isExceeding = stats.forecastForYear >= goal.targetPerYear;
 
-      dataPoints.push({
-        day,
-        actual: actualValue,
-        target: targetValue,
-      });
-    }
-
-    // Find max value for Y-axis scaling
-    const allValues = [
-      ...dataPoints.map(d => d.actual),
-      ...dataPoints.map(d => d.target),
-    ];
-    const maxValue = Math.max(...allValues, 1);
-    const minValue = 0;
-
-    const getX = (day: number) => {
-      if (daysToShow <= 1) return padding + (width - 2 * padding) / 2;
-      return padding + (day / (daysToShow - 1)) * (width - 2 * padding);
-    };
-    const getY = (value: number) => height - padding - ((value - minValue) / (maxValue - minValue)) * (height - 2 * padding);
-
-    // Create path data for each line
-    // Target line
-    const targetPath = dataPoints.map((d, i) =>
-      `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.target)}`
-    ).join(' ');
-
-    // Actual line
-    const actualPath = dataPoints.map((d, i) =>
-      `${i === 0 ? 'M' : 'L'} ${getX(d.day)} ${getY(d.actual)}`
-    ).join(' ');
-
-    // Find today's index for marking
-    const todayIndex = stats.daysSinceStartOfYear;
+      return [
+        {
+          id: 'target',
+          label: 'Target',
+          data: dataPoints.map(d => ({ x: d.day, y: d.target, label: `Target: ${Math.round(d.target)}` })),
+          color: '#000000',
+          style: 'dashed',
+          strokeWidth: 2,
+        },
+        {
+          id: 'actual',
+          label: 'Actual',
+          data: dataPoints.map(d => ({ x: d.day, y: d.actual, label: `Actual: ${d.actual}` })),
+          color: isExceeding ? '#34C759' : '#FF3B30',
+          style: 'solid',
+          strokeWidth: 3,
+        }
+      ];
+    }, [goal, daysToShow, stats.daysInYear, currentYear, stats.forecastForYear]);
 
     return (
-      <View style={{ marginVertical: 20, alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
-        <Svg width={width} height={height}>
-          {/* Axis lines */}
-          <Line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
-          <Line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke={colors.border} strokeWidth="1" />
-
-          {/* Target line (dashed) - Black */}
-          <Path
-            d={targetPath}
-            stroke="#000000"
-            strokeWidth="2"
-            strokeDasharray="4,4"
-            fill="none"
-          />
-
-          {/* Actual line (solid) - Green if forecast exceeds goal, red otherwise */}
-          {dataPoints.length > 0 && (
-            <Path
-              d={actualPath}
-              stroke={stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30'}
-              strokeWidth="3"
-              fill="none"
-            />
-          )}
-
-          {/* Today marker (vertical line) */}
-          {todayIndex < daysToShow && (
-            <Line
-              x1={getX(todayIndex)}
-              y1={padding}
-              x2={getX(todayIndex)}
-              y2={height - padding}
-              stroke={colors.border}
-              strokeWidth="1"
-              strokeDasharray="2,2"
-              opacity={0.5}
-            />
-          )}
-
-          {/* Final point circles */}
-          {dataPoints.length > 0 && (
-            <>
-              <Circle
-                cx={getX(dataPoints[dataPoints.length - 1].day)}
-                cy={getY(dataPoints[dataPoints.length - 1].actual)}
-                r="4"
-                fill={stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30'}
-              />
-              <Circle
-                cx={getX(dataPoints[dataPoints.length - 1].day)}
-                cy={getY(dataPoints[dataPoints.length - 1].target)}
-                r="4"
-                fill="#000000"
-              />
-            </>
-          )}
-        </Svg>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15, marginTop: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 12, height: 3, backgroundColor: stats.forecastForYear >= goal.targetPerYear ? '#34C759' : '#FF3B30', marginRight: 6 }} />
-            <Text style={{ fontSize: 10, color: colors.textSecondary }}>Actual</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 12, height: 3, backgroundColor: '#000000', marginRight: 6, borderStyle: 'dashed', borderWidth: 1, borderColor: '#000000' }} />
-            <Text style={{ fontSize: 10, color: colors.textSecondary }}>Target</Text>
-          </View>
-        </View>
+      <View style={{ marginVertical: 20, padding: 10, backgroundColor: colors.surface, borderRadius: 12 }}>
+        <SparkChart series={series} showZeroLine={false} height={220} />
       </View>
     );
   };

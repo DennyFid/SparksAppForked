@@ -79,7 +79,11 @@ Use these existing services and components instead of recreating them:
 - **Location**: `src/components/StarRating.tsx`
 - **Usage**: Interactive or read-only star ratings.
 
-### 5. Feedback (`SettingsFeedbackSection`)
+### 5. Charts (`SparkChart`)
+- **Location**: `src/components/SparkChart.tsx`
+- **Usage**: Standardized line charts with support for multiple series, dashed/solid lines, and emoji markers. Supports touch tooltips.
+
+### 6. Feedback (`SettingsFeedbackSection`)
 - **Location**: `src/components/SettingsComponents.tsx`
 - **Usage**: **REQUIRED** in every spark's settings screen. Handles user ratings and text feedback to Firebase.
 

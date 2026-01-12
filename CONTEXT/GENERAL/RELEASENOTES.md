@@ -4,6 +4,20 @@ This document tracks new features, sparks, and major work items between releases
 
 ## Next Release
 
+## Version 1.0.26 released Jan 11, 2026
+
+### Major Work Items
+
+Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in Tee Time Timer and Soundboard spark. Added audio to Golf Brain's golf swing recorder. 
+
+
+- **RecAIpe Spark Overhaul**: Redesigned navigation with top headers, improved keyboard handling, and added star ratings for each recipe. Updated AI engine to generate more granular, step-by-step instructions.
+- **Enhanced Visual Celebrations**: Created a reusable `CelebrationOverlay` component supporting high-quality Confetti, Fire (🔥), and Poop (💩) animations across all sparks.
+- **Settings UI Polish**: Optimized safe area spacing for iPhone Dynamic Island/notch, fixed modal keyboard styling, and resolved double-tap requirements for feedback submission.
+- **Native Module Stability**: Implemented proactive Expo Go detection to prevent native module crashes and fixed critical iOS recording errors in Soundboard spark.
+- **Developer Experience**: Renamed and centralized agent instructions in `AGENTS.md`, including a new "COMMON CODE" reference for reusable services and components.
+- **Reliability & Performance**: Fixed data persistence issues in Tee Time Timer and resolved New Architecture build failures by optimizing library dependencies.
+
 ## Version 1.0.25 released Jan 7, 2026
 
 ### New Sparks
