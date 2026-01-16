@@ -101,7 +101,7 @@ export class ServiceFactory {
         // Fallback to Web SDK if Native is not available or not initialized
         if (isWebFirebaseAvailable) {
           const { getFirebaseApp } = require('./firebaseConfig');
-          const app = getFirebaseApp();
+          const app = await getFirebaseApp();
           
           if (app) {
             const { getFirestore } = require('firebase/firestore');

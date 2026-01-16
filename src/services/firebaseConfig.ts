@@ -3,10 +3,9 @@ import { getFirestore, Firestore } from "firebase/firestore";
 import { RemoteConfigService } from "./RemoteConfigService";
 
 /**
- * Shared Firebase configuration object
- * All Firebase services should import and use this config instead of duplicating it
+ * Shared Firebase configuration object (Build-time defaults)
  */
-export const firebaseConfig = {
+const firebaseConfigDefaults = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
@@ -17,38 +16,63 @@ export const firebaseConfig = {
 };
 
 /**
+ * Gets the effective Firebase configuration, checking Remote Config first
+ */
+export function getEffectiveFirebaseConfig(): any {
+  // Try individual overrides from Remote Config
+  const config = {
+    apiKey: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_API_KEY') || firebaseConfigDefaults.apiKey,
+    authDomain: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN') || firebaseConfigDefaults.authDomain,
+    projectId: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_PROJECT_ID') || firebaseConfigDefaults.projectId,
+    storageBucket: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET') || firebaseConfigDefaults.storageBucket,
+    messagingSenderId: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID') || firebaseConfigDefaults.messagingSenderId,
+    appId: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID') || firebaseConfigDefaults.appId,
+    measurementId: RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID') || firebaseConfigDefaults.measurementId,
+  };
+
+  return config;
+}
+
+/**
  * Validates Firebase configuration
  * @returns true if config is valid, false otherwise
  */
-export function validateFirebaseConfig(config: any = firebaseConfig): boolean {
-  if (!config.apiKey || !config.projectId) {
+export function validateFirebaseConfig(config: any): boolean {
+  if (!config || !config.apiKey || !config.projectId) {
     return false;
   }
   return true;
 }
 
 /**
- * Gets or initializes the Firebase app instance
- * Ensures Firebase is only initialized once
+ * Gets or initializes the Firebase app instance asynchronously
+ * Ensures Remote Config is fetched before initialization
  * @returns Firebase app instance or undefined if initialization fails
  */
-export function getFirebaseApp(): FirebaseApp | undefined {
+export async function getFirebaseApp(): Promise<FirebaseApp | undefined> {
+  // Check if already initialized (fast path)
+  const existingApp = getFirebaseAppSync();
+  if (existingApp) {
+    return existingApp;
+  }
+
   try {
-    if (getApps().length > 0) {
-      return getApp();
+    // Ensure Remote Config is initialized and fetched before we try to use it
+    await RemoteConfigService.ensureInitialized();
+    await RemoteConfigService.fetchAndActivate();
+
+    // 1. Try full JSON config from Remote Config
+    const remoteConfigJson = RemoteConfigService.getWebFirebaseConfig();
+    if (remoteConfigJson && validateFirebaseConfig(remoteConfigJson)) {
+      console.log("🔥 Initializing Firebase with Remote Config JSON");
+      return initializeApp(remoteConfigJson);
     }
 
-    // 1. Try Remote Config first (allows overriding broken/stale build-time env vars)
-    const remoteConfig = RemoteConfigService.getWebFirebaseConfig();
-    if (remoteConfig && validateFirebaseConfig(remoteConfig)) {
-      console.log("🔥 Initializing Firebase with Remote Config (Primary)");
-      return initializeApp(remoteConfig);
-    }
-
-    // 2. Fallback to environment variables (standard build-time config)
-    if (validateFirebaseConfig(firebaseConfig)) {
-      console.log("🔥 Initializing Firebase with env variables (Fallback)");
-      return initializeApp(firebaseConfig);
+    // 2. Try individual overrides or env variables
+    const effectiveConfig = getEffectiveFirebaseConfig();
+    if (validateFirebaseConfig(effectiveConfig)) {
+      console.log("🔥 Initializing Firebase with effective configuration (Remote Overrides + Env)");
+      return initializeApp(effectiveConfig);
     }
 
     console.warn(
@@ -62,11 +86,22 @@ export function getFirebaseApp(): FirebaseApp | undefined {
 }
 
 /**
+ * Synchronous version of getFirebaseApp
+ * Returns the app only if it's already been initialized
+ */
+export function getFirebaseAppSync(): FirebaseApp | undefined {
+  if (getApps().length > 0) {
+    return getApp();
+  }
+  return undefined;
+}
+
+/**
  * Gets or initializes Firestore database instance
  * @returns Firestore instance or null if initialization fails
  */
-export function getFirestoreDb(): Firestore | null {
-  const app = getFirebaseApp();
+export async function getFirestoreDb(): Promise<Firestore | null> {
+  const app = await getFirebaseApp();
   if (!app) {
     return null;
   }
@@ -78,6 +113,11 @@ export function getFirestoreDb(): Firestore | null {
   }
 }
 
-// Legacy export for backward compatibility (if anything was using the old db export)
-export const db = getFirestoreDb() || (null as unknown as Firestore);
+// Legacy export for backward compatibility
+export let db: Firestore | null = null;
+
+// Initialize the legacy db export asynchronously
+getFirestoreDb().then(database => {
+  db = database;
+});
 

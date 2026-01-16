@@ -2,7 +2,32 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
-## Next Release
+## Version 1.0.29 released Jan 15, 2026
+
+### Major Work Items
+
+Significant UX improvements to the Dream Catcher spark including rich text rendering and unified scrolling. Resolved stability and rendering issues in the Final Clock spark. Implemented dynamic configuration via Firebase Remote Config.
+
+- **Dream Catcher UX Overhaul**:
+    - Implemented a unified scrolling experience where the entire interpretation and action buttons scroll together, maximizing screen usage.
+    - Added rich text (Markdown) rendering for interpretations, automatically formatting headers and key terms in bold.
+    - Refined navigation with a "← List" back button and a centered "Interpretation" header for a cleaner look.
+    - Introduced in-place editing for interpretations with a dynamic "Edit Interpretation" toggle that transforms into a "Save" button.
+    - Renamed "Back to Edit" to "✨ Re-Interpret Dream" to better describe the action.
+- **Final Clock Stability & UI Fixes**:
+    - Resolved a critical "Rendered more hooks" React error by standardizing hook placement at the top of the component.
+    - Eliminated rapid flickering when toggling Dark Mode by optimizing state change propagation.
+    - Fixed a "white screen" bug by restoring accidentally removed rendering logic.
+    - Corrected the navigation bar color logic to ensure it remains white until Dark Mode is explicitly active.
+    - Fixed a TypeScript linter error in the settings header by adding the required `subtitle` prop.
+- **Dynamic Configuration (Remote Config)**:
+    - Expanded use of Firebase Remote Config to allow dynamic updates of both the Gemini API key and the entire Firebase Web SDK configuration without a new build.
+    - Created `REMOTE_CONFIG_VALUES.md` in `CONTEXT/GENERAL` to document these values for administrators.
+- **Performance & State Management**:
+    - Optimized `SparkScreen` to prevent redundant re-renders when a spark updates its internal state (like dark mode).
+    - Synchronized versions and updated release tracking structure.
+
+---
 
 ## Version 1.0.28 released Jan 14, 2026
 
@@ -30,6 +55,15 @@ Improved Dream Catcher spark to store dream interpreation so it can be read late
 
 ---
 
+## Version 1.0.30
+
+### New Sparks
+- (Add new sparks here)
+
+### Major Work Items
+- (Add major work items here as they're completed)
+
+
 ## Version 1.0.26 released Jan 11, 2026
 
 ### Major Work Items
@@ -52,6 +86,15 @@ Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in
 
 ---
 
+## Version 1.0.31
+
+### New Sparks
+- (Add new sparks here)
+
+### Major Work Items
+- (Add major work items here as they're completed)
+
+
 ## Version 1.0.24
 
 ### Major Work Items
@@ -61,6 +104,15 @@ Adjusted RecAIpe spark to provide better step by step instructions. Bug fixes in
 - Added AI and Shareable property filters to Marketplace
 
 ---
+
+## Next Release
+
+### New Sparks
+- (Add new sparks here)
+
+### Major Work Items
+- (Add major work items here as they're completed)
+
 
 ## Version 1.0.23
 

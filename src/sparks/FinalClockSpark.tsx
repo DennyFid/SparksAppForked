@@ -447,7 +447,12 @@ export const FinalClockSpark: React.FC<FinalClockSparkProps> = ({ showSettings =
         return (
             <SettingsContainer>
                 <SettingsScrollView>
-                    <SettingsHeader title="Final Clock Settings" icon="☠️" sparkId="final-clock" />
+                    <SettingsHeader 
+                        title="Final Clock Settings" 
+                        subtitle="Configure your life expectancy and display preferences"
+                        icon="☠️" 
+                        sparkId="final-clock" 
+                    />
                     <SettingsFeedbackSection sparkName="Final Clock" sparkId="final-clock" />
                     <View style={[styles.formGroup, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 }]}>
                         <Text style={styles.label}>Dark Mode</Text>

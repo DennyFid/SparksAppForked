@@ -7,7 +7,15 @@ This document outlines the values that can be dynamically updated in the Sparks 
 | Parameter Key | Type | Description |
 | :--- | :--- | :--- |
 | `gemini_api_key` | String | The primary API key used for all Gemini AI features (RecAIpe, Dream Catcher, etc.). |
-| `web_firebase_config` | JSON | A JSON object containing the Firebase Web SDK configuration. Used as the primary config source for Firestore, Analytics, and Feedback. |
+| `web_firebase_config` | JSON | A JSON object containing the full Firebase Web SDK configuration. **Primary override method.** |
+| `EXPO_PUBLIC_FIREBASE_API_KEY` | String | Individual override for the Firebase API Key. |
+| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | String | Individual override for the Firebase Project ID. |
+| `EXPO_PUBLIC_FIREBASE_APP_ID` | String | Individual override for the Firebase App ID (also used for Google Sign-In). |
+| `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | String | Individual override for the Firebase Auth Domain. |
+| `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET` | String | Individual override for the Firebase Storage Bucket. |
+| `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | String | Individual override for the Firebase Messaging Sender ID. |
+| `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID` | String | Individual override for the Firebase Measurement ID. |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | String | Individual override for the Google Web Client ID (usually same as App ID). |
 
 ---
 
@@ -23,7 +31,7 @@ The app follows a specific hierarchy to find the Gemini API key:
 
 ---
 
-## 🔥 Firebase Web SDK Overwrite
+## 🔥 Firebase Web SDK Overwrite (JSON)
 **Key**: `web_firebase_config`  
 **Value**: (JSON Object)
 
@@ -45,7 +53,17 @@ The value must be a valid JSON object. You can copy these values from the **Fire
 ```
 
 ### How it works:
-The app now prioritizes this Remote Config JSON over the environment variables set during the build process. This is specifically designed to fix "Firebase not initialized" errors caused by missing or expired environment variables in production.
+The app prioritizes this Remote Config JSON over any other source. If this JSON is valid, it will be used to initialize the Firebase Web SDK.
+
+---
+
+## 🔧 Individual Key Overwrites
+If you don't want to use the full JSON object, you can override keys individually using their environment variable names as Remote Config keys (e.g., `EXPO_PUBLIC_FIREBASE_APP_ID`).
+
+**Priority Hierarchy for Firebase Config:**
+1. `web_firebase_config` (Remote Config JSON)
+2. Individual Remote Config overrides (e.g., `EXPO_PUBLIC_FIREBASE_API_KEY`)
+3. Build-time environment variables (`.env`)
 
 ---
 
@@ -54,8 +72,8 @@ The app now prioritizes this Remote Config JSON over the environment variables s
 1.  Go to the [Firebase Console](https://console.firebase.google.com/).
 2.  Select your project and go to **Run > Remote Config**.
 3.  Click **Add Parameter**.
-4.  Enter the **Parameter Key** (e.g., `gemini_api_key`).
-5.  Set the **Value** (ensure `web_firebase_config` is set to the "JSON" type in the console if available, otherwise "String" works as long as the text is valid JSON).
+4.  Enter the **Parameter Key** (e.g., `gemini_api_key` or `EXPO_PUBLIC_FIREBASE_APP_ID`).
+5.  Set the **Value** (ensure `web_firebase_config` is set to the "JSON" type in the console if available).
 6.  Click **Save**.
 7.  **IMPORTANT**: Click the **Publish Changes** button at the top of the screen to make them live.
 

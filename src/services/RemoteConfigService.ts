@@ -11,6 +11,7 @@ import { Platform } from "react-native";
 export class RemoteConfigService {
     private static _remoteConfig: any = null;
     private static _initialized: boolean = false;
+    private static _initializing: Promise<void> | null = null;
     private static _lastFetchTime: number = 0;
     private static readonly FETCH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -23,44 +24,55 @@ export class RemoteConfigService {
             return;
         }
 
-        try {
-            if (Platform.OS === 'web') {
-                // Dynamic import to avoid top-level browser checks
-                const { getRemoteConfig } = await import("firebase/remote-config");
-
-                // Get Firebase app instance
-                const app = getApp();
-
-                // Initialize Remote Config
-                this._remoteConfig = getRemoteConfig(app);
-
-                // Set minimum fetch interval
-                this._remoteConfig.settings.minimumFetchIntervalMillis = this.FETCH_INTERVAL_MS;
-
-                console.log('✅ Remote Config initialized (Web)');
-            } else {
-                // Native initialization
-                const remoteConfig = require("@react-native-firebase/remote-config").default;
-                this._remoteConfig = remoteConfig();
-
-                // Set config settings
-                await this._remoteConfig.setConfigSettings({
-                    minimumFetchIntervalMillis: this.FETCH_INTERVAL_MS,
-                });
-
-                console.log('✅ Remote Config initialized (Native)');
-            }
-
-            // Fetch and activate in background
-            this.fetchAndActivate().catch((error) => {
-                console.warn('⚠️ Remote Config initial fetch failed:', error.message);
-            });
-
-            this._initialized = true;
-        } catch (error: any) {
-            console.log(`⚠️ Failed to initialize Remote Config (${Platform.OS}):`, error.message);
-            this._initialized = true; // Mark as initialized so we don't keep retrying
+        if (this._initializing) {
+            return this._initializing;
         }
+
+        this._initializing = (async () => {
+            try {
+                if (Platform.OS === 'web') {
+                    // Dynamic import to avoid top-level browser checks
+                    const { getRemoteConfig } = await import("firebase/remote-config");
+
+                    // Get Firebase app instance
+                    const { getApp } = require("firebase/app");
+                    const app = getApp();
+
+                    // Initialize Remote Config
+                    this._remoteConfig = getRemoteConfig(app);
+
+                    // Set minimum fetch interval
+                    this._remoteConfig.settings.minimumFetchIntervalMillis = this.FETCH_INTERVAL_MS;
+
+                    console.log('✅ Remote Config initialized (Web)');
+                } else {
+                    // Native initialization
+                    const remoteConfig = require("@react-native-firebase/remote-config").default;
+                    this._remoteConfig = remoteConfig();
+
+                    // Set config settings
+                    await this._remoteConfig.setConfigSettings({
+                        minimumFetchIntervalMillis: this.FETCH_INTERVAL_MS,
+                    });
+
+                    console.log('✅ Remote Config initialized (Native)');
+                }
+
+                // Fetch and activate in background
+                await this.fetchAndActivate();
+
+                this._initialized = true;
+            } catch (error: any) {
+                console.log(`⚠️ Failed to initialize Remote Config (${Platform.OS}):`, error.message);
+                // We still mark as initialized so we don't block the app, 
+                // but _remoteConfig will be null
+                this._initialized = true; 
+            } finally {
+                this._initializing = null;
+            }
+        })();
+
+        return this._initializing;
     }
 
     /**
@@ -97,40 +109,45 @@ export class RemoteConfigService {
     }
 
     /**
-     * Get Gemini API key from Remote Config
-     * Returns null if not available
+     * Get a string value from Remote Config
+     * Returns null if not available or is default
      */
-    static getGeminiApiKey(): string | null {
+    static getString(key: string): string | null {
         if (!this._remoteConfig) {
             return null;
         }
 
         try {
-            let key: string | null = null;
+            let val: string | null = null;
             let source: string | null = null;
 
             if (Platform.OS === 'web') {
                 const { getValue } = require("firebase/remote-config");
-                const value = getValue(this._remoteConfig, 'gemini_api_key');
-                key = value.asString();
+                const value = getValue(this._remoteConfig, key);
+                val = value.asString();
                 source = value.getSource();
             } else {
-                // Native getValue
-                const value = this._remoteConfig.getValue('gemini_api_key');
-                key = value.asString();
+                const value = this._remoteConfig.getValue(key);
+                val = value.asString();
                 source = value.getSource();
             }
 
-            if (source === 'remote' && key && key.trim() !== '') {
-                console.log('🔑 Using Remote Config key (source: remote)');
-                return key.trim();
+            if (val && val.trim() !== '' && val !== '{}') {
+                return val.trim();
             }
 
             return null;
         } catch (error: any) {
-            console.warn('⚠️ Error getting Remote Config value:', error.message);
             return null;
         }
+    }
+
+    /**
+     * Get Gemini API key from Remote Config
+     * Returns null if not available
+     */
+    static getGeminiApiKey(): string | null {
+        return this.getString('gemini_api_key');
     }
 
     /**

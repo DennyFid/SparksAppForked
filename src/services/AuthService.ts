@@ -22,7 +22,8 @@ import {
   getDoc,
   Timestamp,
 } from "firebase/firestore";
-import { getFirebaseApp } from "./firebaseConfig";
+import { getFirebaseApp, getFirebaseAppSync } from "./firebaseConfig";
+import { RemoteConfigService } from "./RemoteConfigService";
 
 // Gracefully handle GoogleSignin in Expo Go (where native modules aren't available)
 let GoogleSignin: any = null;
@@ -95,17 +96,22 @@ class AuthService {
       await ServiceFactory.ensureFirebaseInitialized();
 
       // Configure Google Sign-In
-      // Use EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID if set, otherwise fall back to EXPO_PUBLIC_FIREBASE_APP_ID
-      const webClientId =
+      // Use EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID if set, otherwise fall back to EXPO_PUBLIC_FIREBASE_APP_ID or Remote Config
+      let webClientId =
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
         process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
 
       if (!webClientId) {
+        // Fallback to Remote Config
+        webClientId = RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID');
+        if (webClientId) {
+          console.log("🔑 [AuthService] Using client ID from Remote Config");
+        }
+      }
+
+      if (!webClientId) {
         console.warn(
-          "⚠️ Neither EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID nor EXPO_PUBLIC_FIREBASE_APP_ID is set. Google Sign-In will not work."
-        );
-        console.warn(
-          "⚠️ Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in your .env file or EAS secrets."
+          "⚠️ Google Sign-In not configured. Checked environment variables and Remote Config."
         );
         // Don't configure Google Sign-In if webClientId is missing
         this._initialized = true;
@@ -122,8 +128,8 @@ class AuthService {
       }
 
       console.log(
-        "✅ AuthService: Configuring Google Sign-In with webClientId:",
-        webClientId.substring(0, 20) + "..."
+        "✅ AuthService: Configuring Google Sign-In with client ID starting with:",
+        webClientId.substring(0, 10) + "..."
       );
 
       GoogleSignin.configure({
@@ -133,9 +139,9 @@ class AuthService {
       });
 
       // Set up auth state listener
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
-        console.warn("⚠️ AuthService: Web Firebase app not available. Auth will be disabled.");
+        console.warn("⚠️ AuthService: Web Firebase app not available. Auth will be limited.");
         this._initialized = true;
         return;
       }
@@ -203,10 +209,12 @@ class AuthService {
 
     const webClientId =
       process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+      process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
+      RemoteConfigService.getString('EXPO_PUBLIC_FIREBASE_APP_ID');
+
     if (!webClientId) {
       throw new Error(
-        "Google Sign-In not configured. Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)."
+        "Google Sign-In not configured. Please set EXPO_PUBLIC_FIREBASE_APP_ID (or EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) in environment or Remote Config."
       );
     }
 
@@ -216,7 +224,7 @@ class AuthService {
       // Web platform uses Firebase's signInWithPopup
       if (Platform.OS === "web") {
         const { initializeApp, getApps } = require("firebase/app");
-        const app = getFirebaseApp();
+        const app = await getFirebaseApp();
         if (!app) {
           throw new Error("Failed to initialize Firebase app");
         }
@@ -260,7 +268,7 @@ class AuthService {
       const googleCredential = GoogleAuthProvider.credential(idToken);
 
       // Sign in to Firebase with the Google credential
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         throw new Error("Failed to initialize Firebase app");
       }
@@ -349,7 +357,7 @@ class AuthService {
       });
 
       // Sign in to Firebase with the Apple credential
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         throw new Error("Failed to initialize Firebase app");
       }
@@ -419,7 +427,7 @@ class AuthService {
       }
 
       // Sign out from Firebase
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         throw new Error("Failed to initialize Firebase app");
       }
@@ -446,7 +454,7 @@ class AuthService {
    */
   static getCurrentUser(): User | null {
     try {
-      const app = getFirebaseApp();
+      const app = getFirebaseAppSync();
       if (!app) {
         return null;
       }
@@ -542,7 +550,7 @@ class AuthService {
     uid: string
   ): Promise<UserProfile | null> {
     try {
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         return null;
       }
@@ -568,7 +576,7 @@ class AuthService {
     firebaseUser: FirebaseUser
   ): Promise<void> {
     try {
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         throw new Error("Failed to initialize Firebase app");
       }

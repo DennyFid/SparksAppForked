@@ -353,7 +353,7 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
               other Sparks. Powered by Gemini AI.
             </Text>
             <Text style={{ fontSize: 14, color: colors.textSecondary }}>
-              {process.env.EXPO_PUBLIC_GEMINI_API_KEY
+              {GeminiService.getApiKey()
                 ? "✅ Gemini API Key Configured"
                 : "❌ Missing API Key"}
             </Text>

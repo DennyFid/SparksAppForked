@@ -27,7 +27,7 @@ export class WebAnalyticsService {
       }
 
       // Initialize Firebase if not already initialized
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         throw new Error("Failed to initialize Firebase app");
       }

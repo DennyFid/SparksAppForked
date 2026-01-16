@@ -37,7 +37,7 @@ import {
   AnalyticsData,
   SessionData,
 } from "../types/analytics";
-import { getFirebaseApp } from "./firebaseConfig";
+import { getFirebaseApp, validateFirebaseConfig } from "./firebaseConfig";
 
 export class WebFirebaseService {
   private static _initialized: boolean = false;
@@ -50,7 +50,7 @@ export class WebFirebaseService {
 
     try {
       // Initialize Firebase if not already initialized
-      const app = getFirebaseApp();
+      const app = await getFirebaseApp();
       if (!app) {
         console.warn("⚠️ WebFirebaseService: Web Firebase app not available.");
         this._initialized = true; // Mark as initialized to avoid repeat attempts
@@ -191,7 +191,7 @@ export class WebFirebaseService {
       throw new Error(
         `Firebase not initialized. ${
           !configValid 
-            ? "Missing configuration (check .env file)." 
+            ? "Missing configuration (check .env file or Remote Config)." 
             : "Initialization failed (check logs)."
         }`
       );

@@ -31,7 +31,7 @@ export class GolfWisdomAdminService {
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            const app = getFirebaseApp();
+            const app = await getFirebaseApp();
             if (!app) {
                 throw new Error('Failed to initialize Firebase app');
             }
@@ -79,7 +79,7 @@ export class GolfWisdomAdminService {
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            const app = getFirebaseApp();
+            const app = await getFirebaseApp();
             if (!app) {
                 throw new Error('Failed to initialize Firebase app');
             }
@@ -113,7 +113,7 @@ export class GolfWisdomAdminService {
             const { getAuth } = require('firebase/auth');
 
             // Get or initialize Firebase app
-            const app = getFirebaseApp();
+            const app = await getFirebaseApp();
             if (!app) {
                 throw new Error('Failed to initialize Firebase app');
             }

@@ -26,7 +26,7 @@ export const fetchWisdomPages = async (): Promise<WisdomQuote[]> => {
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        const app = getFirebaseApp();
+        const app = await getFirebaseApp();
         if (!app) {
             throw new Error('Failed to initialize Firebase app');
         }
@@ -93,7 +93,7 @@ export const checkForUpdates = async (): Promise<boolean> => {
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        const app = getFirebaseApp();
+        const app = await getFirebaseApp();
         if (!app) {
             throw new Error('Failed to initialize Firebase app');
         }
@@ -203,7 +203,7 @@ export const submitWisdomSuggestion = async (suggestion: {
         const { getAuth, signInAnonymously } = require('firebase/auth');
 
         // Get or initialize Firebase app
-        const app = getFirebaseApp();
+        const app = await getFirebaseApp();
         if (!app) {
             throw new Error('Failed to initialize Firebase app');
         }
