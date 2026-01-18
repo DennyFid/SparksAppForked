@@ -121,6 +121,7 @@ async function main() {
   const expoProcess = spawn("npx", expoArgs, {
     stdio: "inherit",
     env: process.env,
+    shell: true,
   });
 
   // Handle process termination

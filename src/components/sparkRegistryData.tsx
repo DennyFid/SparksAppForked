@@ -38,6 +38,7 @@ import TripodSpark from "../sparks/TripodSpark";
 import MemorySpark from "../sparks/MemorySpark";
 import { DreamCatcherSpark } from "../sparks/DreamCatcherSpark";
 import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
+import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -497,6 +498,18 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       rating: 4.5,
     },
     component: GoalTrackerSpark,
+  },
+  scorecard: {
+    metadata: {
+      id: "scorecard",
+      title: "Scorecard",
+      description: "Simple Scorecard Spark",
+      icon: "⛳",
+      category: "golf",
+      createdAt: "2026-01-17T00:00:00.000Z",
+      rating: 4.5,
+    },
+    component: ScorecardSpark,
   },
 };
 
