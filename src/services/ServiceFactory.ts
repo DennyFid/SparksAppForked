@@ -42,14 +42,14 @@ export class ServiceFactory {
 
   static getFirebaseService() {
     if (useNativeFirebase) {
-      console.log('📱 Using Native Firebase Service');
+      // console.log('📱 Using Native Firebase Service');
       return NativeFirebaseService;
     }
     if (isWebFirebaseAvailable) {
-      console.log('🌐 Using Web Firebase Service');
+      // console.log('🌐 Using Web Firebase Service');
       return WebFirebaseService;
     }
-    console.log('⚠️ Using Mock Firebase Service');
+    // console.log('⚠️ Using Mock Firebase Service');
     return MockFirebaseService;
   }
 
@@ -102,7 +102,7 @@ export class ServiceFactory {
         if (isWebFirebaseAvailable) {
           const { getFirebaseApp } = require('./firebaseConfig');
           const app = await getFirebaseApp();
-          
+
           if (app) {
             const { getFirestore } = require('firebase/firestore');
             const db = getFirestore(app);

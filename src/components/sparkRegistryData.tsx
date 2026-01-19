@@ -154,7 +154,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       id: "tee-time-timer",
       title: "Tee Time Timer",
       description: "Nail your golf prep routine",
-      icon: "⛳",
+      icon: "⛳️⏰",
       category: "golf",
       createdAt: "2024-01-09T00:00:00.000Z",
       rating: 4.0,
@@ -403,7 +403,7 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       id: "big-denny",
       title: "Skins",
       description: "Track who wins holes on the course",
-      icon: "⛳",
+      icon: "⛳️💰",
       category: "golf",
       createdAt: "2025-12-08T00:00:00.000Z",
       rating: 4.5,
@@ -500,18 +500,19 @@ export const sparkRegistry: Record<string, BaseSpark> = {
     },
     component: GoalTrackerSpark,
   },
-  scorecard: {
+  "scorecard": {
     metadata: {
       id: "scorecard",
       title: "Scorecard",
       description: "Simple Scorecard Spark",
-      icon: "⛳",
+      icon: "⛳🔢",
       category: "golf",
       createdAt: "2026-01-17T00:00:00.000Z",
       rating: 4.5,
     },
     component: ScorecardSpark,
-  ideas: {
+  },
+  "ideas": {
     metadata: {
       id: "ideas",
       title: "Ideas",

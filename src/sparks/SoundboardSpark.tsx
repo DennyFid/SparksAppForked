@@ -36,6 +36,8 @@ interface SoundChip {
   createdDate: string;
   lastPlayed?: string;
   playCount: number;
+  trimStart?: number; // in milliseconds
+  trimEnd?: number;   // in milliseconds
 }
 
 interface SoundboardData {
@@ -86,9 +88,17 @@ const SoundboardSettings: React.FC<{
   onClose: () => void;
 }> = ({ soundChips, onSave, onClose }) => {
   const { colors } = useTheme();
-  const [editingSoundChips, setEditingSoundChips] = useState<SoundChip[]>([...soundChips]);
+  const [editingSoundChips, setEditingSoundChips] = useState<SoundChip[]>([]);
   const [shareSelectionVisible, setShareSelectionVisible] = useState(false);
-  const [selectedShareId, setSelectedShareId] = useState<string | null>(editingSoundChips[0]?.id || null);
+  const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
+
+  // Sync editingSoundChips when soundChips prop changes (handles hydration delay)
+  useEffect(() => {
+    if (soundChips.length > 0 && editingSoundChips.length === 0) {
+      setEditingSoundChips([...soundChips]);
+      setSelectedShareId(soundChips[0]?.id || null);
+    }
+  }, [soundChips]);
 
 
   const deleteSoundChip = async (id: string) => {
@@ -361,10 +371,13 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedDuration, setRecordedDuration] = useState<number>(0);
   const [newSoundName, setNewSoundName] = useState('');
+  const [trimStart, setTrimStart] = useState(0); // in milliseconds
+  const [trimEnd, setTrimEnd] = useState(0);     // in milliseconds
 
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const recordingRef = useRef<NodeJS.Timeout | null>(null);
   const recordingObjectRef = useRef<Audio.Recording | null>(null);
+  const preloadedSoundsRef = useRef<Record<string, Audio.Sound>>({});
 
   // Cleanup on unmount
   useEffect(() => {
@@ -656,6 +669,8 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
         setRecordedUri(uri);
         setRecordedDuration(actualDuration);
+        setTrimStart(0);
+        setTrimEnd(Math.floor(actualDuration * 1000));
         console.log('✅ Setting recording state to recorded. URI:', uri);
         setRecordingState('recorded');
         setRecording(null);
@@ -677,12 +692,33 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         await setupAudioMode(false);
 
         if (sound) {
-          await sound.unloadAsync();
+          const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
+          if (isPreloaded) {
+            await sound.stopAsync();
+          } else {
+            try { await sound.unloadAsync(); } catch (e) { }
+          }
+          setSound(null);
         }
 
-        const { sound: newSound } = await Audio.Sound.createAsync({ uri: recordedUri });
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: recordedUri },
+          { positionMillis: trimStart, shouldPlay: true }
+        );
         setSound(newSound);
-        await newSound.playAsync();
+
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded) {
+            if (status.positionMillis >= trimEnd) {
+              newSound.stopAsync();
+            }
+            if (status.didJustFinish) {
+              // Reset for next play
+              newSound.setPositionAsync(trimStart);
+            }
+          }
+        });
+
         HapticFeedback.light();
       }
     } catch (error) {
@@ -730,6 +766,8 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
         filePath: toRelativePath(newPath),
         createdDate: new Date().toISOString(),
         playCount: 0,
+        trimStart,
+        trimEnd,
       };
 
       setSoundChips([...soundChips, newSoundChip]);
@@ -753,7 +791,12 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     setNewSoundName('');
     setRecordedDuration(0);
     if (sound) {
-      sound.unloadAsync();
+      const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
+      if (isPreloaded) {
+        sound.stopAsync().catch(() => { });
+      } else {
+        sound.unloadAsync().catch(() => { });
+      }
       setSound(null);
     }
   };
@@ -835,11 +878,66 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
     onStateChange?.({ soundCount: soundChips.length, categories: categories.length });
   }, [soundChips, dataLoaded, setSparkData, onStateChange]);
 
-  // Cleanup audio on unmount
+  // Pre-load sounds for fast playback
+  useEffect(() => {
+    if (!dataLoaded) return;
+
+    const preload = async () => {
+      console.log('🏹 SoundboardSpark: Pre-loading sounds...');
+
+      // Cleanup sounds that are no longer in soundChips
+      const currentIds = new Set(soundChips.map(c => c.id));
+      for (const id in preloadedSoundsRef.current) {
+        if (!currentIds.has(id)) {
+          console.log(`🧹 Unloading removed sound: ${id}`);
+          preloadedSoundsRef.current[id].unloadAsync().catch(() => { });
+          delete preloadedSoundsRef.current[id];
+        }
+      }
+
+      // Load new sounds
+      for (const chip of soundChips) {
+        if (!preloadedSoundsRef.current[chip.id]) {
+          try {
+            const absoluteUri = toAbsoluteUri(chip.filePath);
+            const { sound: newSound } = await Audio.Sound.createAsync(
+              { uri: absoluteUri },
+              { shouldPlay: false }
+            );
+            preloadedSoundsRef.current[chip.id] = newSound;
+            console.log(`✅ Pre-loaded sound: ${chip.displayName}`);
+          } catch (error) {
+            console.warn(`❌ Failed to pre-load sound ${chip.id}:`, error);
+          }
+        }
+      }
+    };
+
+    preload();
+
+    return () => {
+      // We don't necessarily want to unload everything on every chip change, 
+      // just when the component unmounts. Unmount cleanup is in its own useEffect.
+    };
+  }, [soundChips, dataLoaded]);
+
+  // Cleanup all pre-loaded sounds on unmount
+  useEffect(() => {
+    return () => {
+      console.log('🧹 Cleaning up all pre-loaded sounds...');
+      Object.values(preloadedSoundsRef.current).forEach(s => s.unloadAsync().catch(() => { }));
+      preloadedSoundsRef.current = {};
+    };
+  }, []);
+
+  // Cleanup temporary audio (like recorded previews) on unmount or change
   useEffect(() => {
     return () => {
       if (sound) {
-        sound.unloadAsync();
+        const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
+        if (!isPreloaded) {
+          sound.unloadAsync().catch(() => { });
+        }
       }
     };
   }, [sound]);
@@ -865,7 +963,12 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       // Stop any currently playing sound
       if (sound) {
-        await sound.unloadAsync();
+        const isPreloaded = Object.values(preloadedSoundsRef.current).some(s => s === sound);
+        if (isPreloaded) {
+          await sound.stopAsync();
+        } else {
+          await sound.unloadAsync().catch(() => { });
+        }
         setSound(null);
       }
 
@@ -878,16 +981,35 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
 
       setCurrentlyPlaying(chip.id);
 
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri: toAbsoluteUri(chip.filePath) });
-      setSound(newSound);
+      let playbackSound = preloadedSoundsRef.current[chip.id];
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
+      if (!playbackSound) {
+        console.log(`⚠️ Sound ${chip.id} not pre-loaded, loading now...`);
+        const { sound: newSound } = await Audio.Sound.createAsync({ uri: toAbsoluteUri(chip.filePath) });
+        playbackSound = newSound;
+      } else {
+        // Reset to start/trim position
+        await playbackSound.setPositionAsync(chip.trimStart || 0);
+      }
+
+      setSound(playbackSound);
+
+      playbackSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          if (chip.trimEnd && status.positionMillis >= chip.trimEnd) {
+            playbackSound?.stopAsync();
+            setCurrentlyPlaying(null);
+          }
+          if (status.didJustFinish) {
+            setCurrentlyPlaying(null);
+          }
+        } else if (status.error) {
+          console.warn(`Playback error for ${chip.id}:`, status.error);
           setCurrentlyPlaying(null);
         }
       });
 
-      await newSound.playAsync();
+      await playbackSound.playAsync();
 
       // Update play count
       setSoundChips(prev => prev.map(c =>
@@ -1093,21 +1215,87 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
                 Recording complete! Duration: {recordedDuration.toFixed(1)}s
               </Text>
 
-              <View style={recordingStyles.playbackControls}>
-                <TouchableOpacity style={recordingStyles.playButton} onPress={playRecordedSound}>
-                  <Text style={recordingStyles.playButtonText}>▶ Play</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={recordingStyles.reRecordButton} onPress={reRecord}>
-                  <Text style={recordingStyles.reRecordButtonText}>Re-record</Text>
-                </TouchableOpacity>
-              </View>
-
               <TextInput
                 style={recordingStyles.nameInput}
                 placeholder="Enter Sound Name"
                 value={newSoundName}
                 onChangeText={setNewSoundName}
               />
+
+              <View style={recordingStyles.playbackControls}>
+                <TouchableOpacity style={recordingStyles.playButton} onPress={playRecordedSound}>
+                  <Text style={recordingStyles.playButtonText}>▶ Play</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={recordingStyles.reRecordButton} onPress={reRecord}>
+                  <Text style={recordingStyles.reRecordButtonText}>↺ Re-record</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Trimming Section */}
+              <View style={{ alignSelf: 'stretch', marginTop: 10, marginBottom: 20 }}>
+                <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, width: '100%', position: 'relative' }}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      height: 4,
+                      backgroundColor: colors.primary,
+                      borderRadius: 2,
+                      left: `${(trimStart / (recordedDuration * 1000)) * 100}%`,
+                      right: `${100 - (trimEnd / (recordedDuration * 1000)) * 100}%`
+                    }}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 }}>
+                  {/* Head Trimming */}
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTrimStart(Math.max(0, trimStart - 100));
+                        HapticFeedback.light();
+                      }}
+                      style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: colors.text }}>◀</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTrimStart(Math.min(trimEnd - 100, trimStart + 100));
+                        HapticFeedback.light();
+                      }}
+                      style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: colors.text }}>▶</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Tail Trimming */}
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTrimEnd(Math.max(trimStart + 100, trimEnd - 100));
+                        HapticFeedback.light();
+                      }}
+                      style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: colors.text }}>◀</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTrimEnd(Math.min(Math.floor(recordedDuration * 1000), trimEnd + 100));
+                        HapticFeedback.light();
+                      }}
+                      style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: colors.text }}>▶</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>Start: {(trimStart / 1000).toFixed(1)}s</Text>
+                  <Text style={{ fontSize: 10, color: colors.textSecondary }}>End: {(trimEnd / 1000).toFixed(1)}s</Text>
+                </View>
+              </View>
 
               <Text style={recordingStyles.categoryHelpText}>
                 {newSoundName.trim() ? (
