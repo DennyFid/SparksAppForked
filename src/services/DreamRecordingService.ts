@@ -9,7 +9,7 @@ export interface RecordingResult {
 class DreamRecordingServiceClass {
   private recording: Audio.Recording | null = null;
   private recordingTimer: NodeJS.Timeout | null = null;
-  private maxDuration: number = 30; // 30 seconds max
+  private maxDuration: number = 120; // 120 seconds max
 
   /**
    * Setup audio mode for recording
@@ -56,7 +56,7 @@ class DreamRecordingServiceClass {
   /**
    * Start recording with optional duration limit
    */
-  async startRecording(maxDurationSeconds: number = 30): Promise<void> {
+  async startRecording(maxDurationSeconds: number = 120): Promise<void> {
     try {
       // Check permissions
       const hasPermissions = await this.hasPermissions();

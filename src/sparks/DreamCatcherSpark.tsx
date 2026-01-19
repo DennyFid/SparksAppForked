@@ -29,13 +29,15 @@ import {
 } from '../components/SettingsComponents';
 import { AISettingsNote } from '../components/AISettingsNote';
 
-type RecordingState = 'idle' | 'recording' | 'recorded' | 'transcribing' | 'transcribed' | 'interpreting' | 'interpreted';
+type RecordingState = 'idle' | 'countdown' | 'recording' | 'recorded' | 'transcribing' | 'transcribed' | 'interpreting' | 'interpreted';
 
 export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseSettings }) => {
   const { colors } = useTheme();
 
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [countdown, setCountdown] = useState(3);
+  const [recordingCountdown, setRecordingCountdown] = useState(120);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedDuration, setRecordedDuration] = useState(0);
@@ -57,6 +59,7 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,6 +71,9 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
@@ -126,9 +132,36 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
         }
       }
 
-      await DreamRecordingService.startRecording(30);
+      setRecordingState('countdown');
+      setCountdown(3);
+      HapticFeedback.light();
+
+      countdownTimerRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            if (countdownTimerRef.current) {
+              clearInterval(countdownTimerRef.current);
+              countdownTimerRef.current = null;
+            }
+            beginRecording();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (error: any) {
+      console.error('Failed to start recording process:', error);
+      Alert.alert('Error', error.message || 'Failed to start recording');
+      setRecordingState('idle');
+    }
+  };
+
+  const beginRecording = async () => {
+    try {
+      await DreamRecordingService.startRecording(120);
       setRecordingState('recording');
       setRecordingDuration(0);
+      setRecordingCountdown(120);
       setRecordedUri(null);
       setTranscription('');
       setGeminiInterpretation(null);
@@ -139,7 +172,11 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
         const status = await DreamRecordingService.getStatus();
         setRecordingDuration(status.duration);
 
-        if (status.duration >= 30) {
+        // Update countdown based on actual duration from service
+        const remaining = Math.max(0, Math.ceil(120 - status.duration));
+        setRecordingCountdown(remaining);
+
+        if (status.duration >= 120) {
           stopRecording();
         }
       }, 100);
@@ -288,7 +325,17 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
   };
 
   const resetState = () => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
     setRecordingState('idle');
+    setCountdown(3);
+    setRecordingCountdown(120);
     setRecordingDuration(0);
     setRecordedUri(null);
     setRecordedDuration(0);
@@ -302,6 +349,17 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
       setSound(null);
     }
     setIsPlaying(false);
+  };
+
+  const reRecord = () => {
+    HapticFeedback.light();
+    resetState();
+    startRecording();
+  };
+
+  const discardRecording = () => {
+    HapticFeedback.light();
+    resetState();
   };
 
   const formatDuration = (seconds: number): string => {
@@ -505,6 +563,26 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
           </TouchableOpacity>
         )}
 
+        {/* Countdown State */}
+        {recordingState === 'countdown' && (
+          <View style={styles.recordingContainer}>
+            <Text style={[styles.countdownText, { color: colors.primary }]}>
+              {countdown}
+            </Text>
+            <Text style={[styles.recordingText, { color: colors.text }]}>
+              Get ready to record...
+            </Text>
+            <TouchableOpacity
+              style={[styles.secondaryButton, { borderColor: colors.border }]}
+              onPress={resetState}
+            >
+              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Recording State */}
         {recordingState === 'recording' && (
           <View style={styles.recordingContainer}>
@@ -518,13 +596,16 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
               <Text style={styles.recordingButtonText}>●</Text>
             </Animated.View>
             <Text style={[styles.recordingText, { color: colors.text }]}>
-              Recording... {formatDuration(recordingDuration)}
+              Recording...
+            </Text>
+            <Text style={[styles.countdownText, { color: colors.primary, fontSize: 48, marginBottom: 20 }]}>
+              {recordingCountdown}s
             </Text>
             <TouchableOpacity
               style={[styles.stopButton, { backgroundColor: '#FF4444' }]}
               onPress={stopRecording}
             >
-              <Text style={styles.stopButtonText}>Stop</Text>
+              <Text style={styles.stopButtonText}>Stop Recording</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -546,20 +627,30 @@ export const DreamCatcherSpark: React.FC<SparkProps> = ({ showSettings, onCloseS
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: colors.border }]}
+                onPress={reRecord}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                  🔄 Re-record
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primary }]}
                 onPress={transcribeRecording}
               >
                 <Text style={styles.actionButtonText}>📝 Transcribe</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, { borderColor: colors.border }]}
+                onPress={discardRecording}
+              >
+                <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                  🗑️ Discard
+                </Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: colors.border }]}
-              onPress={resetState}
-            >
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                Start Over
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -801,7 +892,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  countdownText: {
+    fontSize: 72,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
   recordedContainer: {
+    alignItems: 'center',
     marginBottom: 20,
   },
   sectionTitle: {
