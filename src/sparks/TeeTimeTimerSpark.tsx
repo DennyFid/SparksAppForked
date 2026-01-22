@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { activateKeepAwake, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSparkStore } from '../store';
@@ -725,7 +725,8 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
     completedActivities: new Set(),
   });
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showTimePicker, setShowTimePicker] = useState(true);
+  const [showTeeTimeCard, setShowTeeTimeCard] = useState(true);
+  const [showNativePicker, setShowNativePicker] = useState(false);
   // Initialize with default time (current time + total duration + 5 minutes)
   const [selectedTime, setSelectedTime] = useState(() => {
     const now = new Date();
@@ -1022,6 +1023,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
 
 
   const startTimer = async (teeTime: Date, startTime: Date) => {
+    setShowTeeTimeCard(false);
     setTimerState({
       teeTime,
       startTime,
@@ -1124,7 +1126,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       currentActivityIndex: 0,
       completedActivities: new Set(),
     });
-    setShowTimePicker(true);
+    setShowTeeTimeCard(true);
     HapticFeedback.medium();
   };
 
@@ -1233,17 +1235,53 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
       marginBottom: 24,
       letterSpacing: 0.3,
     },
-    timePickerWrapper: {
+    timeDisplayButton: {
       width: '100%',
+      backgroundColor: colors.background,
+      paddingVertical: 18,
+      paddingHorizontal: 16,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 24,
-      borderRadius: 16,
-      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
     },
-    timePicker: {
+    timeDisplayText: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: '90%',
+      maxWidth: 400,
+      alignItems: 'center',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       width: '100%',
-      height: 120, // Give it more height if needed, though 'default' usually dictates it
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
     },
     startButton: {
       backgroundColor: colors.primary,
@@ -1437,19 +1475,66 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
             </View>
           </View>
 
-          {showTimePicker && (
+          {showTeeTimeCard && (
             <View style={styles.timePickerContainer}>
               <Text style={styles.timePickerTitle}>Select Tee Time</Text>
-              <View style={styles.timePickerWrapper}>
+
+              <TouchableOpacity
+                style={styles.timeDisplayButton}
+                onPress={() => setShowNativePicker(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.timeDisplayText}>
+                  {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Native Picker Trigger */}
+              {Platform.OS === 'android' && showNativePicker && (
                 <DateTimePicker
                   value={selectedTime}
                   mode="time"
                   display="default"
-                  onChange={handleTimePickerChange}
-                  themeVariant={isDarkMode ? 'dark' : 'light'}
-                  style={styles.timePicker}
+                  onChange={(event, date) => {
+                    setShowNativePicker(false);
+                    if (date) setSelectedTime(date);
+                  }}
                 />
-              </View>
+              )}
+
+              {/* iOS Centered Spinner Modal */}
+              {Platform.OS === 'ios' && (
+                <Modal
+                  visible={showNativePicker}
+                  transparent={true}
+                  animationType="fade"
+                >
+                  <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowNativePicker(false)}
+                  >
+                    <View style={styles.modalContent}>
+                      <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Set Tee Time</Text>
+                        <TouchableOpacity onPress={() => setShowNativePicker(false)}>
+                          <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={selectedTime}
+                        mode="time"
+                        display="spinner"
+                        onChange={(event, date) => {
+                          if (date) setSelectedTime(date);
+                        }}
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              )}
+
               <TouchableOpacity
                 style={styles.startButton}
                 onPress={handleConfirmTeeTime}
