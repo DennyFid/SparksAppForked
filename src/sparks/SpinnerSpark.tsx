@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
-import { Picker } from '@react-native-picker/picker';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import {
@@ -317,6 +316,159 @@ interface SpinnerSettingsProps {
   onClose: () => void;
 }
 
+interface WeightDropdownProps {
+  selectedValue: number;
+  onValueChange: (value: number) => void;
+  style?: any;
+  textStyle?: any;
+}
+
+const WeightDropdown: React.FC<WeightDropdownProps> = ({
+  selectedValue,
+  onValueChange,
+  style,
+  textStyle,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { colors } = useTheme();
+
+  const options = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
+
+  const getLabel = (value: number) => {
+    if (value === 1) return '1 (Small)';
+    if (value === 10) return '10 (Large)';
+    return `${value}`;
+  };
+
+  const dropdownStyles = StyleSheet.create({
+    touchable: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      minHeight: 44,
+      flex: 1, // To make it expand
+    },
+    text: {
+      color: colors.text,
+      fontSize: 16,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      margin: 20,
+      maxHeight: '70%',
+      minWidth: '80%',
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      textAlign: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      color: colors.text,
+    },
+    optionItem: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    selectedOptionItem: {
+      backgroundColor: colors.primary + '20',
+    },
+    optionText: {
+      color: colors.text,
+      fontSize: 16,
+    },
+    selectedOptionText: {
+      fontWeight: '600',
+      color: colors.primary,
+    },
+  });
+
+  return (
+    <View style={style}>
+      <TouchableOpacity
+        onPress={() => setIsOpen(true)}
+        style={[dropdownStyles.touchable, style]}
+        activeOpacity={0.7}
+      >
+        <Text style={[dropdownStyles.text, textStyle]}>{getLabel(selectedValue)}</Text>
+        <Text style={[dropdownStyles.text, { fontSize: 12 }]}>{'▼'}</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={dropdownStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsOpen(false)}
+        >
+          <View
+            style={dropdownStyles.modalContent}
+            onStartShouldSetResponder={() => true} // Prevent closing when tapping inside modal content
+          >
+            <Text style={dropdownStyles.modalTitle}>Select Weight</Text>
+            <ScrollView
+              style={{ maxHeight: 300 }}
+              showsVerticalScrollIndicator={true}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => {
+                    onValueChange(option);
+                    setIsOpen(false);
+                  }}
+                  style={[
+                    dropdownStyles.optionItem,
+                    selectedValue === option && dropdownStyles.selectedOptionItem,
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      dropdownStyles.optionText,
+                      selectedValue === option && dropdownStyles.selectedOptionText,
+                    ]}
+                  >
+                    {getLabel(option)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
+
 const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ name, options, onSave, onClose }) => {
   const [editingName, setEditingName] = useState(name);
   const [editingOptions, setEditingOptions] = useState<SpinnerOption[]>([...options]);
@@ -378,11 +530,17 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ name, options, onSave
   };
 
   const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingHorizontal: 20, // Consistent with SettingsScrollView padding
+      backgroundColor: colors.surface, // Match CommonModal's content background
+    },
     label: {
       fontSize: 16,
       color: colors.text,
       fontWeight: '600',
       marginBottom: 8,
+      marginTop: 20,
     },
     optionContainer: {
       marginBottom: 20,
@@ -395,81 +553,62 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ name, options, onSave
       alignItems: 'center',
       justifyContent: 'space-between',
       marginTop: 12,
-    },
-    pickerContainer: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      backgroundColor: colors.background,
-      marginRight: 12,
-    },
-    picker: {
-      color: colors.text,
+      gap: 12,
     },
   });
 
   return (
-    <SettingsContainer>
-      <SettingsScrollView>
-        <SettingsHeader
-          icon="🎡"
-          title="Spinner Settings"
-          subtitle="Customize your wheel options and weights"
-        />
-        
-        <Text style={styles.label}>Name</Text>
-        <SettingsInput
-          placeholder="Enter spinner name"
-          value={editingName}
-          onChangeText={setEditingName}
-        />
+    <View style={styles.container}>
+      <SettingsHeader
+        icon="🎡"
+        title="Spinner Settings"
+        subtitle="Customize your wheel options and weights"
+      />
+      
+      <Text style={styles.label}>Name</Text>
+      <SettingsInput
+        placeholder="Enter spinner name"
+        value={editingName}
+        onChangeText={setEditingName}
+      />
 
-        <View style={{ marginTop: 20 }}>
-          {editingOptions.map((option, index) => (
-            <View key={index} style={styles.optionContainer}>
-              <Text style={styles.label}>Option {index + 1}</Text>
-              <SettingsInput
-                placeholder="Enter option name"
-                value={option.label}
-                onChangeText={(text) => updateOption(index, 'label', text)}
+      <View style={{ marginTop: 20 }}>
+        {editingOptions.map((option, index) => (
+          <View key={index} style={styles.optionContainer}>
+            <Text style={styles.label}>Option {index + 1}</Text>
+            <SettingsInput
+              placeholder="Enter option name"
+              value={option.label}
+              onChangeText={(text) => updateOption(index, 'label', text)}
+            />
+            <View style={styles.weightRow}>
+              <WeightDropdown
+                selectedValue={option.weight}
+                onValueChange={(itemValue) => updateOption(index, 'weight', itemValue)}
               />
-              <View style={styles.weightRow}>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={option.weight}
-                    onValueChange={(itemValue) => updateOption(index, 'weight', itemValue)}
-                    style={styles.picker}
-                  >
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
-                      <Picker.Item key={val} label={val === 1 ? '1 (Small)' : val === 10 ? '10 (Large)' : `${val}`} value={val} />
-                    ))}
-                  </Picker>
-                </View>
-                <SettingsRemoveButton
-                  onPress={() => deleteOption(index)}
-                />
-              </View>
+              <SettingsRemoveButton
+                onPress={() => deleteOption(index)}
+              />
             </View>
-          ))}
-        </View>
+          </View>
+        ))}
+      </View>
 
-        <SettingsButton
-          title="Add Option"
-          onPress={addOption}
-          variant="primary"
-        />
-        
-        <View style={{height: 20}} />
+      <SettingsButton
+        title="Add Option"
+        onPress={addOption}
+        variant="primary"
+      />
+      
+      <View style={{height: 20}} />
 
-        <SaveCancelButtons
-          onSave={handleSave}
-          onCancel={onClose}
-          saveText="Save Changes"
-          cancelText="Cancel"
-        />
-      </SettingsScrollView>
-    </SettingsContainer>
+      <SaveCancelButtons
+        onSave={handleSave}
+        onCancel={onClose}
+        saveText="Save Changes"
+        cancelText="Cancel"
+      />
+    </View>
   );
 };
 
