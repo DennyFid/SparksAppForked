@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, TextInput, ScrollView, Alert } from 'react-native';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
+import { Picker } from '@react-native-picker/picker';
 import { useSparkStore } from '../store';
 import { HapticFeedback } from '../utils/haptics';
 import {
@@ -272,7 +273,7 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
           <SettingsButton
             title="Close"
             onPress={onClose}
-            variant="primary"
+            variant="secondary"
           />
         </SettingsScrollView>
       </SettingsContainer>
@@ -288,10 +289,11 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
       >
         {setBeingEdited && (
           <SpinnerSettings
+            name={setBeingEdited.name}
             options={setBeingEdited.options}
-            onSave={(newOptions) => {
+            onSave={({ name, options: newOptions }) => {
               const updated = decisionSets.map(set =>
-                set.id === editingSet ? { ...set, options: newOptions } : set
+                set.id === editingSet ? { ...set, name, options: newOptions } : set
               );
               onUpdate(updated);
               setShowEditModal(false);
@@ -309,12 +311,14 @@ const DecisionSetManager: React.FC<DecisionSetManagerProps> = ({ decisionSets, o
 };
 
 interface SpinnerSettingsProps {
+  name: string;
   options: SpinnerOption[];
-  onSave: (options: SpinnerOption[]) => void;
+  onSave: (data: { name: string; options: SpinnerOption[] }) => void;
   onClose: () => void;
 }
 
-const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onClose }) => {
+const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ name, options, onSave, onClose }) => {
+  const [editingName, setEditingName] = useState(name);
   const [editingOptions, setEditingOptions] = useState<SpinnerOption[]>([...options]);
   const { colors } = useTheme();
 
@@ -359,57 +363,49 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
   };
 
   const handleSave = () => {
-    // Validate that all options have labels
     const validOptions = editingOptions.filter(option => option.label.trim().length > 0);
-
     if (validOptions.length < 2) {
       Alert.alert('Invalid Configuration', 'You need at least 2 valid options with names.');
       return;
     }
-
+    if (editingName.trim().length === 0) {
+      Alert.alert('Invalid Configuration', 'The spinner must have a name.');
+      return;
+    }
     HapticFeedback.success();
-    onSave(validOptions);
+    onSave({ name: editingName, options: validOptions });
     onClose();
   };
 
-  const colorPickerStyles = StyleSheet.create({
-    colorPicker: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      marginTop: 8,
-    },
-    colorOption: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    selectedColor: {
-      borderColor: colors.text,
-      borderWidth: 3,
-    },
-    weightInput: {
-      width: 80,
-      marginRight: 8,
-    },
-    weightHelp: {
-      flex: 1,
-      fontSize: 12,
-      color: colors.textSecondary,
-      fontStyle: 'italic',
-    },
-    inputRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    inputLabel: {
-      width: 60,
+  const styles = StyleSheet.create({
+    label: {
       fontSize: 16,
       color: colors.text,
       fontWeight: '600',
+      marginBottom: 8,
+    },
+    optionContainer: {
+      marginBottom: 20,
+      padding: 12,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+    },
+    weightRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    pickerContainer: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+      marginRight: 12,
+    },
+    picker: {
+      color: colors.text,
     },
   });
 
@@ -421,73 +417,50 @@ const SpinnerSettings: React.FC<SpinnerSettingsProps> = ({ options, onSave, onCl
           title="Spinner Settings"
           subtitle="Customize your wheel options and weights"
         />
+        
+        <Text style={styles.label}>Name</Text>
+        <SettingsInput
+          placeholder="Enter spinner name"
+          value={editingName}
+          onChangeText={setEditingName}
+        />
 
-        <SettingsSection title="Options">
+        <View style={{ marginTop: 20 }}>
           {editingOptions.map((option, index) => (
-            <View key={index} style={{ marginBottom: 20 }}>
-              <SettingsItem>
-                <SettingsText>Option {index + 1}</SettingsText>
+            <View key={index} style={styles.optionContainer}>
+              <Text style={styles.label}>Option {index + 1}</Text>
+              <SettingsInput
+                placeholder="Enter option name"
+                value={option.label}
+                onChangeText={(text) => updateOption(index, 'label', text)}
+              />
+              <View style={styles.weightRow}>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={option.weight}
+                    onValueChange={(itemValue) => updateOption(index, 'weight', itemValue)}
+                    style={styles.picker}
+                  >
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
+                      <Picker.Item key={val} label={val === 1 ? '1 (Small)' : val === 10 ? '10 (Large)' : `${val}`} value={val} />
+                    ))}
+                  </Picker>
+                </View>
                 <SettingsRemoveButton
                   onPress={() => deleteOption(index)}
                 />
-              </SettingsItem>
-
-              <View style={colorPickerStyles.inputRow}>
-                <Text style={colorPickerStyles.inputLabel}>Label:</Text>
-                <View style={{ flex: 1 }}>
-                  <SettingsInput
-                    placeholder="Enter option name"
-                    value={option.label}
-                    onChangeText={(text) => updateOption(index, 'label', text)}
-                  />
-                </View>
-              </View>
-
-              <View style={colorPickerStyles.inputRow}>
-                <Text style={colorPickerStyles.inputLabel}>Weight:</Text>
-                <View style={colorPickerStyles.weightInput}>
-                  <SettingsInput
-                    placeholder="1"
-                    value={option.weight.toString()}
-                    onChangeText={(text) => {
-                      const weight = parseFloat(text) || 1;
-                      updateOption(index, 'weight', Math.max(0.1, weight));
-                    }}
-                  />
-                </View>
-                <Text style={colorPickerStyles.weightHelp}>Higher = bigger slice</Text>
-              </View>
-
-              <View style={colorPickerStyles.inputRow}>
-                <Text style={colorPickerStyles.inputLabel}>Color:</Text>
-                <View style={{ flex: 1 }}>
-                  <View style={colorPickerStyles.colorPicker}>
-                    {colorOptions.map((color) => (
-                      <TouchableOpacity
-                        key={color}
-                        style={[
-                          colorPickerStyles.colorOption,
-                          { backgroundColor: color },
-                          option.color === color && colorPickerStyles.selectedColor,
-                        ]}
-                        onPress={() => {
-                          updateOption(index, 'color', color);
-                          HapticFeedback.light();
-                        }}
-                      />
-                    ))}
-                  </View>
-                </View>
               </View>
             </View>
           ))}
+        </View>
 
-          <SettingsButton
-            title="Add Option"
-            onPress={addOption}
-            variant="primary"
-          />
-        </SettingsSection>
+        <SettingsButton
+          title="Add Option"
+          onPress={addOption}
+          variant="primary"
+        />
+        
+        <View style={{height: 20}} />
 
         <SaveCancelButtons
           onSave={handleSave}
@@ -556,13 +529,13 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
       backgroundColor: 'transparent',
       borderStyle: 'solid',
       borderTopWidth: 12.5,
-      borderRightWidth: 0,
+      borderRightWidth: 25,
       borderBottomWidth: 12.5,
-      borderLeftWidth: 25,
+      borderLeftWidth: 0,
       borderTopColor: 'transparent',
-      borderRightColor: 'transparent',
+      borderRightColor: colors.text,
       borderBottomColor: 'transparent',
-      borderLeftColor: colors.text,
+      borderLeftColor: 'transparent',
       zIndex: 10,
     },
     controls: {
@@ -618,6 +591,7 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const spinValue = useRef(new Animated.Value(0)).current;
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Get the active decision set
   const activeSet = decisionSets.find(set => set.active);
@@ -627,15 +601,17 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
   // Load saved decision sets on mount
   useEffect(() => {
     const savedData = getSparkData('spinner');
-    if (savedData.decisionSets && savedData.decisionSets.length > 0) {
+    if (savedData && savedData.decisionSets && savedData.decisionSets.length > 0) {
       setDecisionSets(savedData.decisionSets);
     }
+    setDataLoaded(true);
   }, [getSparkData]);
 
   // Save decision sets whenever they change
   useEffect(() => {
+    if (!dataLoaded) return;
     setSparkData('spinner', { decisionSets });
-  }, [decisionSets, setSparkData]);
+  }, [decisionSets, setSparkData, dataLoaded]);
 
   const spin = () => {
     if (isSpinning) return;
@@ -656,10 +632,8 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
       duration: 4500, // Slower spinning for better visibility
       useNativeDriver: true,
     }).start(() => {
-      // Calculate result based on final angle (right position at 90 degrees)
-      const normalizedAngle = (finalAngle % 360);
-      // Find which segment is at 90 degrees (right side)
-      const selectedOption = getSelectedOptionAt0Degrees(normalizedAngle);
+      const normalizedAngle = finalAngle % 360;
+      const selectedOption = getSelectedOption(normalizedAngle);
 
       setResult(selectedOption.label);
       setIsSpinning(false);
@@ -667,32 +641,27 @@ export const SpinnerSpark: React.FC<SpinnerSparkProps> = ({
     });
   };
 
-  const getSelectedOptionAt0Degrees = (wheelRotation: number) => {
+  const getSelectedOption = (wheelRotation: number) => {
     const totalWeight = options.reduce((sum, option) => sum + option.weight, 0);
+    // Segments are drawn CW. Animation is CW. Pointer is at 0 degrees.
+    // A segment at angle A is now at A + wheelRotation. We want A + wheelRotation = 0 (mod 360).
+    // So, A = -wheelRotation (mod 360).
+    const targetAngle = (360 - (wheelRotation % 360)) % 360;
 
     let currentAngle = 0;
-    for (let i = 0; i < options.length; i++) {
-      const segmentAngle = (options[i].weight / totalWeight) * 360;
-      const startDegrees = currentAngle;
-      const endDegrees = currentAngle + segmentAngle;
+    for (const option of options) {
+      const segmentAngle = (option.weight / totalWeight) * 360;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + segmentAngle;
 
-      // Calculate where this segment is after rotation
-      const rotatedStart = (startDegrees + wheelRotation) % 360;
-      const rotatedEnd = (endDegrees + wheelRotation) % 360;
-
-      // Check if this segment contains the 0-degree position
-      const contains0 = (rotatedStart <= 0 && rotatedEnd > 0) ||
-        (rotatedStart > rotatedEnd && (rotatedStart <= 0 || 0 < rotatedEnd));
-
-      if (contains0) {
-        return options[i];
+      if (targetAngle >= startAngle && targetAngle < endAngle) {
+        return option;
       }
-
-      currentAngle = endDegrees;
+      currentAngle = endAngle;
     }
 
-    // Fallback to first option
-    return options[0];
+    // Fallback for floating point weirdness, especially near 360
+    return options[options.length - 1];
   };
 
   const updateActiveSetOptions = (newOptions: SpinnerOption[]) => {
