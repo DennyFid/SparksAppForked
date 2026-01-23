@@ -2,6 +2,10 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
+### Version 1.0.36 released Jan 22, 2026
+
+Big upgrades to the Soundboard Spark including precision trimming, visual playback feedback, and instant-play performance optimizations. Improvements to RecAIpe spark including embedded timers to keep your cooking on track. Bug fixes for Coming Up, Minute Minder, and Tee Time Timer sparks.
+
 ## Version 1.0.35 released Jan 19, 2026
 
 ### Major Work Items
