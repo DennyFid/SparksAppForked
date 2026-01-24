@@ -1511,19 +1511,6 @@ const ScoringView: React.FC<ScoringViewProps> = ({
               color={colors.primary}
             />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleToggleMic}
-            style={[
-              styles.micButtonSmall,
-              isRecording && { backgroundColor: colors.danger },
-            ]}
-          >
-            <Ionicons
-              name={isRecording ? "mic" : "mic-outline"}
-              size={18}
-              color="#fff"
-            />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -1550,18 +1537,33 @@ const ScoringView: React.FC<ScoringViewProps> = ({
             {indexText}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[
-            styles.completeRoundHeaderButton,
-            !canComplete && { backgroundColor: "#cccccc", opacity: 70 },
-          ]}
-          onPress={() => markRoundComplete(activeRoundId!)}
-          disabled={!canComplete}
-        >
-          <Text style={styles.completeRoundHeaderButtonText}>
-            COMPLETE ROUND
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          <TouchableOpacity
+            style={[
+              styles.completeRoundHeaderButton,
+              !canComplete && { backgroundColor: "#cccccc", opacity: 0.7 },
+            ]}
+            onPress={() => markRoundComplete(activeRoundId!)}
+            disabled={!canComplete}
+          >
+            <Text style={styles.completeRoundHeaderButtonText}>
+              COMPLETE ROUND
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleToggleMic}
+            style={[
+              styles.micButtonSmall,
+              isRecording && { backgroundColor: colors.danger },
+            ]}
+          >
+            <Ionicons
+              name={isRecording ? "mic" : "mic-outline"}
+              size={24}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Consolidated Time Row */}
@@ -2681,9 +2683,9 @@ const getStyles = (colors: any) =>
     },
     closeHelpButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
     micButtonSmall: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 60,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: colors.primary,
       justifyContent: "center",
       alignItems: "center",
