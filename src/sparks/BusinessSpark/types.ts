@@ -80,7 +80,7 @@ export interface BusinessState {
     game_over: boolean;
 }
 
-export const INITIAL_BUSINESS_STATE: BusinessState = {
+export const getInitialBusinessState = (): BusinessState => ({
     cash: 0,
     ledger: [],
     week: 0,
@@ -93,4 +93,4 @@ export const INITIAL_BUSINESS_STATE: BusinessState = {
     turn_history: [],
     is_loading: false,
     game_over: false,
-};
+});

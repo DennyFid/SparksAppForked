@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
-import { BusinessState, INITIAL_BUSINESS_STATE, GameTurnResponse } from './types';
+import { BusinessState, getInitialBusinessState, GameTurnResponse } from './types';
 import { LedgerEngine } from './services/LedgerEngine';
 import { BusinessGeminiSystem } from './services/BusinessGeminiSystem';
 
 export const useBusinessEngine = () => {
-    const [state, setState] = useState<BusinessState>(INITIAL_BUSINESS_STATE);
+    const [state, setState] = useState<BusinessState>(getInitialBusinessState());
     const [error, setError] = useState<string | null>(null);
 
     const processTurn = useCallback(async (userAction: string) => {
@@ -50,7 +50,7 @@ export const useBusinessEngine = () => {
     }, [state]);
 
     const resetGame = useCallback(() => {
-        setState(INITIAL_BUSINESS_STATE);
+        setState(getInitialBusinessState());
         setError(null);
     }, []);
 
@@ -59,7 +59,7 @@ export const useBusinessEngine = () => {
         // are present even if loading old data.
         // Also ensure we NEVER start in a loading state.
         setState({
-            ...INITIAL_BUSINESS_STATE,
+            ...getInitialBusinessState(),
             ...loadedState,
             is_loading: false
         });

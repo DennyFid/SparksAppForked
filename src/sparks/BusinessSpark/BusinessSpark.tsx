@@ -5,6 +5,7 @@ import { NarrativeFeed } from './components/NarrativeFeed';
 import { ActionDeck } from './components/ActionDeck';
 import { IncomeStatement, BalanceSheet, CashFlowStatement } from './components/FinancialStatements';
 import { LedgerEngine } from './services/LedgerEngine';
+import { getInitialBusinessState } from './types';
 import { useSparkStore } from '../../store';
 import {
     SettingsContainer,
@@ -73,7 +74,12 @@ const BusinessSpark: React.FC<BusinessSparkProps> = ({
                     text: 'Restart',
                     style: 'destructive',
                     onPress: () => {
+                        const initialState = getInitialBusinessState();
+                        // 1. Reset local hook state
                         resetGame();
+                        // 2. FORCE persistence update immediately
+                        setSparkData('empire', { businessState: initialState });
+                        // 3. UI cleanup
                         setActivePanel('options');
                         if (onCloseSettings) onCloseSettings();
                     }
