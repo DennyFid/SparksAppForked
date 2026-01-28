@@ -41,6 +41,7 @@ import { GoalTrackerSpark } from "../sparks/GoalTrackerSpark";
 import { ScorecardSpark } from "../sparks/ScorecardSpark";
 import { IdeasSpark } from "../sparks/IdeasSpark";
 import BusinessSpark from "../sparks/BusinessSpark/BusinessSpark";
+import { InfiniteSpark } from "../sparks/InfiniteSpark";
 import styled from "styled-components/native";
 
 const PlaceholderContainer = styled.View`
@@ -534,16 +535,52 @@ export const sparkRegistry: Record<string, BaseSpark> = {
       category: "productivity",
       createdAt: "2026-01-23T00:00:00.000Z",
       rating: 4.5,
-      properties: ["AI"],
+      properties: ["AI", "Beta"],
     },
     component: BusinessSpark,
   },
+  infinite: {
+    metadata: {
+      id: "infinite",
+      title: "Infinite",
+      description: "The gateway to dynamic, on-demand sparklets.",
+      icon: "♾️",
+      category: "community",
+      createdAt: "2026-01-27T00:00:00.000Z",
+      rating: 4.5,
+      properties: ["Beta"],
+    },
+    component: InfiniteSpark,
+  },
 };
 
+// Memoization cache for enhanced spark objects
+const memoizedSparks: Record<string, BaseSpark> = {};
+
 export const getSparkById = (id: string): BaseSpark | undefined => {
-  return sparkRegistry[id];
+  if (memoizedSparks[id]) return memoizedSparks[id];
+
+  const spark = sparkRegistry[id];
+  if (!spark) return undefined;
+
+  // Dynamically add beta suffix if it has the Beta property
+  const isBeta = spark.metadata.properties?.includes("Beta");
+  if (isBeta && !spark.metadata.title.toLowerCase().includes("beta")) {
+    const enhancedSpark = {
+      ...spark,
+      metadata: {
+        ...spark.metadata,
+        title: `${spark.metadata.title} (beta)`
+      }
+    };
+    memoizedSparks[id] = enhancedSpark;
+    return enhancedSpark;
+  }
+
+  memoizedSparks[id] = spark;
+  return spark;
 };
 
 export const getAllSparks = (): BaseSpark[] => {
-  return Object.values(sparkRegistry);
+  return Object.keys(sparkRegistry).map(id => getSparkById(id)!);
 };

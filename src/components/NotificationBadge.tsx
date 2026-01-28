@@ -8,17 +8,21 @@ interface NotificationBadgeProps {
   sparkId?: string;
   size?: "small" | "medium" | "large";
   showZero?: boolean;
+  isBeta?: boolean;
 }
 
 export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   sparkId,
   size = "medium",
   showZero = false,
+  isBeta = false,
 }) => {
   const { colors } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    if (isBeta) return;
+
     const loadUnreadCount = async () => {
       try {
         let count = 0;
@@ -72,9 +76,9 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
     const interval = setInterval(loadUnreadCount, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
-  }, [sparkId]);
+  }, [sparkId, isBeta]);
 
-  if (unreadCount === 0 && !showZero) {
+  if (!isBeta && unreadCount === 0 && !showZero) {
     return null;
   }
 
@@ -107,7 +111,7 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
       style={[
         styles.badge,
         {
-          backgroundColor: colors.error || "#FF3B30",
+          backgroundColor: isBeta ? "#ff9500" : (colors.error || "#FF3B30"),
           minWidth: currentSize.minWidth,
           height: currentSize.height,
           borderRadius: currentSize.borderRadius,
@@ -118,12 +122,12 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
         style={[
           styles.badgeText,
           {
-            color: colors.background,
+            color: '#fff',
             fontSize: currentSize.fontSize,
           },
         ]}
       >
-        {unreadCount > 99 ? "99+" : unreadCount.toString()}
+        {isBeta ? "b" : (unreadCount > 99 ? "99+" : unreadCount.toString())}
       </Text>
     </View>
   );
@@ -140,7 +144,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   badgeText: {
-    fontWeight: "600",
+    fontWeight: "bold",
     textAlign: "center",
   },
 });

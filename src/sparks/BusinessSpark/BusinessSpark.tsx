@@ -14,6 +14,8 @@ import {
     SettingsFeedbackSection,
     SettingsButton,
 } from '../../components/SettingsComponents';
+import { getSparkById } from '../../components/SparkRegistry';
+import { BetaBadge } from '../../components/BetaBadge';
 
 interface BusinessSparkProps {
     showSettings?: boolean;
@@ -42,6 +44,9 @@ const BusinessSpark: React.FC<BusinessSparkProps> = ({
     onStateChange,
     onComplete
 }) => {
+    const sparkRecord = getSparkById('business-spark');
+    const displayTitle = sparkRecord?.metadata.title || 'Empire';
+    const isBeta = sparkRecord?.metadata.properties?.includes('Beta');
     const { getSparkData, setSparkData } = useSparkStore();
     const [dataLoaded, setDataLoaded] = useState(false);
     const { state, error, processTurn, resetGame, loadState, stopLoading } = useBusinessEngine();
@@ -94,10 +99,10 @@ const BusinessSpark: React.FC<BusinessSparkProps> = ({
             <SettingsContainer>
                 <SettingsScrollView>
                     <SettingsHeader
-                        title="Empire Settings"
+                        title={`${displayTitle} Settings`}
                         subtitle="Build your 3D printing business empire"
                         icon="💼"
-                        sparkId="empire"
+                        sparkId="business-spark"
                     />
                     <SettingsFeedbackSection sparkName="Empire" sparkId="empire" />
 

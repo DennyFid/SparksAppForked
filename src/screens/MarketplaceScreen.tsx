@@ -137,7 +137,11 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                         ) : (
                           <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                         )}
-                        <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                        <NotificationBadge
+                          sparkId={spark.metadata.id}
+                          size="small"
+                          isBeta={spark.metadata.properties?.includes("Beta")}
+                        />
                       </View>
                       <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                     </View>
@@ -165,7 +169,11 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                         ) : (
                           <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                         )}
-                        <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                        <NotificationBadge
+                          sparkId={spark.metadata.id}
+                          size="small"
+                          isBeta={spark.metadata.properties?.includes("Beta")}
+                        />
                       </View>
                       <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                       <View style={styles.ratingContainer}>
@@ -239,11 +247,18 @@ export const MarketplaceScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={() => handleSparkPress(spark.metadata.id)}
               >
                 <View style={styles.sparkCardContent}>
-                  {spark.metadata.iconImage ? (
-                    <Image source={spark.metadata.iconImage} style={{ width: 32, height: 32, resizeMode: 'contain', marginBottom: 4 }} />
-                  ) : (
-                    <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
-                  )}
+                  <View style={styles.sparkIconContainer}>
+                    {spark.metadata.iconImage ? (
+                      <Image source={spark.metadata.iconImage} style={{ width: 32, height: 32, resizeMode: 'contain', marginBottom: 4 }} />
+                    ) : (
+                      <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
+                    )}
+                    <NotificationBadge
+                      sparkId={spark.metadata.id}
+                      size="small"
+                      isBeta={spark.metadata.properties?.includes("Beta")}
+                    />
+                  </View>
                   <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                 </View>
               </TouchableOpacity>

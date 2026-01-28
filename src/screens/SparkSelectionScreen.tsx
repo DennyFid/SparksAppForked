@@ -90,7 +90,11 @@ export const SparkSelectionScreen: React.FC<Props> = ({ navigation }) => {
                       ) : (
                         <Text style={styles.sparkIcon}>{spark.metadata.icon}</Text>
                       )}
-                      <NotificationBadge sparkId={spark.metadata.id} size="small" />
+                      <NotificationBadge
+                        sparkId={spark.metadata.id}
+                        size="small"
+                        isBeta={spark.metadata.properties?.includes("Beta")}
+                      />
                     </View>
                     <Text style={styles.sparkTitle} numberOfLines={2}>{spark.metadata.title}</Text>
                   </View>
