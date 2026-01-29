@@ -60,7 +60,7 @@ interface OddMathSparkProps {
 
 // --- Constants & Data ---
 
-const VERSION = "2.0.0";
+const VERSION = "2.0.2";
 
 const CATEGORIES: { id: Category; name: string; icon: string }[] = [
     { id: 'arithmetic', name: 'Arithmetic', icon: '➕' },
@@ -832,7 +832,7 @@ Difficulty should strictly match: ${selectedDifficulty}.`;
                 style={{ marginTop: 20, alignSelf: 'center' }}
                 onPress={() => setGameState('age')}
             >
-                <Subtitle>← Back to Age Selection</Subtitle>
+                <Subtitle>← Back to Challenge Selection</Subtitle>
             </TouchableOpacity>
         </Content>
     );
