@@ -2,6 +2,25 @@
 
 This document tracks new features, sparks, and major work items between releases.
 
+### Version 1.0.38 released Jan 29, 2026
+
+Significant upgrades to the Infinite Spark engine, transforming it into a general-purpose platform for building any Sparklet. Major feature additions and UX refinements for Goal Tracker and Golf Brain sparks.
+
+- **Infinite Spark Engine (Universal Engine)**:
+    - **Full JS Expressions**: Upgraded interpolation to support full JavaScript expressions inside `{{ }}` (e.g., `{{state.list.join(', ')}}`), moving complex logic out of the app and into the Sparklet definitions.
+    - **Conditional UI Rendering**: Added a `visible` property to all elements, enabling dynamic screen transitions and state-dependent visibility.
+    - **Generalization & Decoupling**: Removed hardcoded game logic from the engine, making it a pure rendering platform that can support anything from complex games to utility tools.
+    - **Container Layouts**: Added support for nested containers, allowing for horizontal layouts and complex UI grids.
+- **Goal Tracker Spark**:
+    - **Associated Sparks**: Goals can now be linked to other Sparks (e.g., a "Learn Spanish" goal can link to the "Flashcards" Spark), creating a direct path from objective to action.
+    - **Smart Launcher**: Added a quick-access button on goal cards that launches the linked Spark with one tap.
+    - **Complete Goal Editing**: Added the ability to edit existing goal names, targets, dates, and associations through a new subtle edit menu (✎).
+    - **Keyboard & Modal UX**: Implemented "tap-to-dismiss" keyboard handling and refined modal layouts to ensure the interface remains responsive during input.
+- **Golf Brain Spark**:
+    - **Smart Navigation**: Updated data-clearing logic; removing the last shot of a hole now correctly transitions to the Round Summary for a better high-level view of the round.
+
+---
+
 ### Version 1.0.37 released Jan 26, 2026
 
 Revised the Business Simulator spark into the CFO Simulator spark, a narrative-driven business simulation where you learn accounting by running a 3D printing company. Powered by a new "AI Dungeon Master" architecture that combines creative storytelling with strict double-entry bookkeeping validation. Try it out and learn the basics of running the books for a small business. 

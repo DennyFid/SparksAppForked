@@ -91,14 +91,15 @@ const SoundboardSettings: React.FC<{
   const [editingSoundChips, setEditingSoundChips] = useState<SoundChip[]>(soundChips);
   const [shareSelectionVisible, setShareSelectionVisible] = useState(false);
   const [selectedShareId, setSelectedShareId] = useState<string | null>(soundChips[0]?.id || null);
-  const hasInitializedRef = useRef(soundChips.length > 0);
+  const hasEverInitializedRef = useRef(false);
 
-  // Still sync if we started empty but now have chips (handles hydration delay)
+  // Sync with props if they change (e.g. hydration finishes) 
+  // but only if we haven't started user-initiated changes yet
   useEffect(() => {
-    if (!hasInitializedRef.current && soundChips.length > 0) {
+    if (!hasEverInitializedRef.current && soundChips.length > 0) {
       setEditingSoundChips([...soundChips]);
       setSelectedShareId(soundChips[0]?.id || null);
-      hasInitializedRef.current = true;
+      hasEverInitializedRef.current = true;
     }
   }, [soundChips]);
 
@@ -137,7 +138,8 @@ const SoundboardSettings: React.FC<{
   };
 
   const handleSave = () => {
-    onSave(editingSoundChips);
+    console.log('💾 SoundboardSettings: Saving changes...', editingSoundChips.length, 'chips');
+    onSave([...editingSoundChips]);
     onClose();
   };
 
@@ -1040,7 +1042,18 @@ export const SoundboardSpark: React.FC<SoundboardSparkProps> = ({
   };
 
   const saveSoundChips = (newSoundChips: SoundChip[]) => {
+    console.log('💾 SoundboardSpark: apply new sound chips state', newSoundChips.length);
     setSoundChips(newSoundChips);
+
+    // Explicitly update store to ensure persistence even if unmounted soon
+    const categories = Array.from(new Set(newSoundChips.map(chip => chip.category)));
+    const soundboardData: SoundboardData = {
+      soundChips: newSoundChips,
+      categories,
+      lastUsed: new Date().toISOString(),
+    };
+    setSparkData('soundboard', soundboardData);
+
     HapticFeedback.success();
   };
 

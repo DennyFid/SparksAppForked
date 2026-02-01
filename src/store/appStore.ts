@@ -7,21 +7,22 @@ interface UserPreferences {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   dailyNotificationsEnabled: boolean;
+  customGeminiApiKey?: string;
 }
 
 interface AppState {
   // User preferences
   preferences: UserPreferences;
   setPreferences: (preferences: Partial<UserPreferences>) => void;
-  
+
   // App state
   isFirstLaunch: boolean;
   setIsFirstLaunch: (isFirst: boolean) => void;
-  
+
   // Current spark state
   currentSparkId: string | null;
   setCurrentSparkId: (sparkId: string | null) => void;
-  
+
   // Recent sparks for quick switching
   recentSparks: string[];
   addRecentSpark: (sparkId: string) => void;
@@ -41,24 +42,24 @@ export const useAppStore = create<AppState>()(
       isFirstLaunch: true,
       currentSparkId: null,
       recentSparks: [],
-      
+
       // Actions
       setPreferences: (newPreferences) =>
         set((state) => ({
           preferences: { ...state.preferences, ...newPreferences },
         })),
-      
+
       setIsFirstLaunch: (isFirst) => set({ isFirstLaunch: isFirst }),
-      
+
       setCurrentSparkId: (sparkId) => set({ currentSparkId: sparkId }),
-      
+
       addRecentSpark: (sparkId) =>
         set((state) => {
           const filtered = state.recentSparks.filter(id => id !== sparkId);
           const updated = [sparkId, ...filtered].slice(0, 5); // Keep only 5 most recent
           return { recentSparks: updated };
         }),
-      
+
       clearRecentSparks: () => set({ recentSparks: [] }),
     }),
     {

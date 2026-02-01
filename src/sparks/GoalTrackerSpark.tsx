@@ -68,7 +68,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
   showSettings,
   onCloseSettings,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
   const navigation = useNavigation();
 
@@ -926,6 +926,32 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       borderRadius: 8,
       alignItems: 'center',
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContentSmall: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: '90%',
+      maxWidth: 400,
+      alignItems: 'center',
+    },
+    modalHeaderInner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 20,
+    },
+    modalTitleSmall: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
   });
 
   // Settings screen
@@ -1236,36 +1262,54 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                 </Text>
                 <Text>📅</Text>
               </TouchableOpacity>
-              {showStartDatePicker && (
-                <View style={styles.datePickerContainer}>
-                  <DateTimePicker
-                    value={newGoalStartDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    onChange={(event, selectedDate) => {
-                      if (Platform.OS === 'android') {
-                        setShowStartDatePicker(false);
+              {/* Start Date Picker */}
+              {Platform.OS === 'android' && showStartDatePicker && (
+                <DateTimePicker
+                  value={newGoalStartDate}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowStartDatePicker(false);
+                    if (selectedDate) {
+                      setNewGoalStartDate(selectedDate);
+                      if (selectedDate > newGoalEndDate) {
+                        const newEndDate = new Date(selectedDate);
+                        newEndDate.setMonth(newEndDate.getMonth() + 12);
+                        setNewGoalEndDate(newEndDate);
                       }
-                      if (selectedDate) {
-                        setNewGoalStartDate(selectedDate);
-                        // Auto-adjust end date if it's before the new start date
-                        if (selectedDate > newGoalEndDate) {
-                          const newEndDate = new Date(selectedDate);
-                          newEndDate.setMonth(newEndDate.getMonth() + 12);
-                          setNewGoalEndDate(newEndDate);
-                        }
-                      }
-                    }}
-                  />
-                </View>
+                    }
+                  }}
+                />
               )}
-              {showStartDatePicker && Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  style={[styles.button, { marginTop: 10 }]}
-                  onPress={() => setShowStartDatePicker(false)}
-                >
-                  <Text style={styles.buttonText}>Done</Text>
-                </TouchableOpacity>
+              {Platform.OS === 'ios' && (
+                <Modal visible={showStartDatePicker} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStartDatePicker(false)}>
+                    <View style={styles.modalContentSmall}>
+                      <View style={styles.modalHeaderInner}>
+                        <Text style={styles.modalTitleSmall}>Start Date</Text>
+                        <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
+                          <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newGoalStartDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) {
+                            setNewGoalStartDate(selectedDate);
+                            if (selectedDate > newGoalEndDate) {
+                              const newEndDate = new Date(selectedDate);
+                              newEndDate.setMonth(newEndDate.getMonth() + 12);
+                              setNewGoalEndDate(newEndDate);
+                            }
+                          }
+                        }}
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
               )}
 
               <Text style={styles.inputLabel}>End Date</Text>
@@ -1278,28 +1322,41 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                 </Text>
                 <Text>📅</Text>
               </TouchableOpacity>
-              {showEndDatePicker && (
-                <View style={styles.datePickerContainer}>
-                  <DateTimePicker
-                    value={newGoalEndDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    onChange={(event, selectedDate) => {
-                      if (Platform.OS === 'android') {
-                        setShowEndDatePicker(false);
-                      }
-                      if (selectedDate) setNewGoalEndDate(selectedDate);
-                    }}
-                  />
-                </View>
+
+              {/* End Date Picker */}
+              {Platform.OS === 'android' && showEndDatePicker && (
+                <DateTimePicker
+                  value={newGoalEndDate}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowEndDatePicker(false);
+                    if (selectedDate) setNewGoalEndDate(selectedDate);
+                  }}
+                />
               )}
-              {showEndDatePicker && Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  style={[styles.button, { marginTop: 10 }]}
-                  onPress={() => setShowEndDatePicker(false)}
-                >
-                  <Text style={styles.buttonText}>Done</Text>
-                </TouchableOpacity>
+              {Platform.OS === 'ios' && (
+                <Modal visible={showEndDatePicker} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowEndDatePicker(false)}>
+                    <View style={styles.modalContentSmall}>
+                      <View style={styles.modalHeaderInner}>
+                        <Text style={styles.modalTitleSmall}>End Date</Text>
+                        <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                          <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newGoalEndDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) setNewGoalEndDate(selectedDate);
+                        }}
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
               )}
 
               <Text style={[styles.inputLabel, { fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginTop: 8 }]}>

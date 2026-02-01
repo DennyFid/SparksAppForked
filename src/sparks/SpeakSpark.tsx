@@ -212,6 +212,13 @@ export const SpeakSpark: React.FC<SparkProps & { autoRecord?: boolean }> = ({
 
       if (result.success) {
         HapticFeedback.success();
+
+        // Handle navigation if requested
+        if ((result as any).openSparkId) {
+          setTimeout(() => {
+            navigateToSpark((result as any).openSparkId);
+          }, 800); // Give user time to see the success message
+        }
       } else {
         HapticFeedback.error();
       }

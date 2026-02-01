@@ -146,8 +146,8 @@ export class RemoteConfigService {
      * Get Gemini API key from Remote Config
      * Returns null if not available
      */
-    static getGeminiApiKey(): string | null {
-        return this.getString('gemini_api_key');
+    static getDefaultGeminiApiKey(): string | null {
+        return this.getString('default_gemini_api_key');
     }
 
     /**

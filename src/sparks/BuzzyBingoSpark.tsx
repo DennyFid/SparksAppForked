@@ -206,10 +206,11 @@ Chocolate Cake
       console.error("Gemini generation error:", error);
       const errorMessage = error?.message || "Failed to generate words. Please check your internet connection and try again.";
 
-      if (errorMessage.includes("Missing EXPO_PUBLIC_GEMINI_API_KEY")) {
+      if (GeminiService.isApiKeyError(errorMessage)) {
         Alert.alert(
-          "Configuration Error",
-          "Gemini API key not configured. Please add EXPO_PUBLIC_GEMINI_API_KEY to your .env file."
+          "API Key Error",
+          "There was a problem with your Gemini API key. Please check your configuration in the main App Settings.",
+          [{ text: "OK" }]
         );
       } else {
         Alert.alert("Error", errorMessage);
