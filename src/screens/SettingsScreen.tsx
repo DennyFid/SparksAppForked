@@ -20,6 +20,7 @@ import { ServiceFactory } from '../services/ServiceFactory';
 import { FeedbackService } from '../services/FeedbackService';
 import { getSparkById } from '../components/SparkRegistry';
 import { GeminiService } from '../services/GeminiService';
+import { GeminiApiKeyModal } from '../components/GeminiApiKeyModal';
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -88,9 +89,7 @@ export const SettingsScreen: React.FC = () => {
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
 
   // Gemini API Key state
-  const [customApiKey, setCustomApiKey] = useState<string>('');
-  const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
-  const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Initialize analytics service
   useEffect(() => {
@@ -137,20 +136,6 @@ export const SettingsScreen: React.FC = () => {
     initializeAnalytics();
   }, [isAdmin]);
 
-  // Load custom API key
-  useEffect(() => {
-    const loadCustomApiKey = async () => {
-      try {
-        const key = await AsyncStorage.getItem(CUSTOM_API_KEY_STORAGE_KEY);
-        setCustomApiKey(key || '');
-      } catch (error) {
-        console.error('Error loading custom API key:', error);
-      } finally {
-        setIsLoadingApiKey(false);
-      }
-    };
-    loadCustomApiKey();
-  }, []);
 
 
 
@@ -231,8 +216,7 @@ export const SettingsScreen: React.FC = () => {
       console.log('🔄 SettingsScreen: Starting refresh...');
 
       // Refresh analytics initialization
-      const AnalyticsService = ServiceFactory.getAnalyticsService();
-      await AnalyticsService.initialize();
+      await ServiceFactory.ensureAnalyticsInitialized();
 
       // Refresh admin status
       const adminStatus = await AdminResponseService.isAdmin();
@@ -291,94 +275,30 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Gemini API Key Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🤖 AI Settings</Text>
-          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-            Some Sparks use AI powered by Google's Gemini. You can use your own API key for better control and usage limits.
-          </Text>
+          <Text style={styles.sectionTitle}>🤖 AI Configuration</Text>
 
-          <TouchableOpacity
-            style={[styles.linkButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => Linking.openURL('https://aistudio.google.com/app/api-keys')}
-          >
-            <Text style={[styles.linkButtonText, { color: colors.primary }]}>
-              🔗 Create Your Own API Key
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.apiKeyContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Custom Gemini API Key (Optional)</Text>
-            <Text style={[styles.inputHint, { color: colors.textSecondary }]}>
-              Leave empty to use the default key. Your custom key takes priority.
-            </Text>
-            {isLoadingApiKey ? (
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
-            ) : (
-              <TextInput
-                style={[styles.apiKeyInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Enter your Gemini API key"
-                placeholderTextColor={colors.textSecondary}
-                value={customApiKey}
-                onChangeText={setCustomApiKey}
-                secureTextEntry={true}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            )}
-            <View style={styles.apiKeyActions}>
-              <TouchableOpacity
-                style={[styles.apiKeyButton, { backgroundColor: colors.primary }]}
-                onPress={async () => {
-                  try {
-                    if (customApiKey.trim()) {
-                      await AsyncStorage.setItem(CUSTOM_API_KEY_STORAGE_KEY, customApiKey.trim());
-                      HapticFeedback.success();
-                      Alert.alert('Success', 'API key saved successfully!');
-                    } else {
-                      await AsyncStorage.removeItem(CUSTOM_API_KEY_STORAGE_KEY);
-                      HapticFeedback.success();
-                      Alert.alert('Success', 'API key removed. Using default key.');
-                    }
-                  } catch (error) {
-                    HapticFeedback.error();
-                    Alert.alert('Error', 'Failed to save API key.');
-                  }
-                }}
-              >
-                <Text style={styles.apiKeyButtonText}>Save</Text>
-              </TouchableOpacity>
-              {customApiKey && (
-                <TouchableOpacity
-                  style={[styles.apiKeyButton, { backgroundColor: colors.error }]}
-                  onPress={async () => {
-                    Alert.alert(
-                      'Remove API Key',
-                      'Are you sure you want to remove your custom API key?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Remove',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              await AsyncStorage.removeItem(CUSTOM_API_KEY_STORAGE_KEY);
-                              setCustomApiKey('');
-                              HapticFeedback.success();
-                              Alert.alert('Success', 'API key removed.');
-                            } catch (error) {
-                              HapticFeedback.error();
-                              Alert.alert('Error', 'Failed to remove API key.');
-                            }
-                          }
-                        }
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.apiKeyButtonText}>Remove</Text>
-                </TouchableOpacity>
-              )}
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Gemini API Key</Text>
+              <Text style={styles.settingDescription}>
+                {preferences.customGeminiApiKey ? 'Using custom key' : 'Using default Sparks key'}
+              </Text>
             </View>
+            <TouchableOpacity
+              style={[styles.smallActionButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setShowApiKeyModal(true);
+                HapticFeedback.light();
+              }}
+            >
+              <Text style={styles.smallActionButtonText}>Configure</Text>
+            </TouchableOpacity>
           </View>
+
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary, marginTop: 8 }]}>
+            Sparks uses Google's Gemini AI for features like RecAIpe and Minute Minder.
+            By default, we provide a shared API key. You can add your own key to avoid rate limits.
+          </Text>
         </View>
 
         {/* Debug Section - Remove after testing */}
@@ -873,6 +793,11 @@ export const SettingsScreen: React.FC = () => {
             }
           }}
         />
+        {/* Gemini API Key Modal */}
+        <GeminiApiKeyModal
+          visible={showApiKeyModal}
+          onClose={() => setShowApiKeyModal(false)}
+        />
       </SettingsScrollView>
     </View>
   );
@@ -958,6 +883,18 @@ const createStyles = (colors: any, insets: { top: number }) => StyleSheet.create
   actionButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  smallActionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallActionButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   adminBadge: {

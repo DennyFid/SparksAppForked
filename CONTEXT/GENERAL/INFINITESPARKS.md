@@ -84,3 +84,30 @@ To manage user expectations for this hyper-beta feature:
 
 ### Step 5: Registry Integration
 - Add the Infinite Spark (♾️) to the main `sparkRegistryData.tsx`.
+
+## 7. Security & Publishing Workflow 🛡️
+
+To prevent malicious code injection and community poisoning, we implement an ownership and publication model.
+
+### Ownership Model
+- **Owner ID**: Every Sparklet is tagged with an `ownerId`. This defaults to the user's `deviceId` (retrieved via `SimpleAnalyticsService`) or their `userId` if signed in.
+*   **Access Control**: 
+    - Users can see all **Published** Sparklets in the Discover screen.
+    - Users can see their own **Draft/Pending** Sparklets in a "My Sparklets" section.
+    - Users cannot see or edit other users' unpublished Sparklets.
+
+### Lifecycle & Statuses
+1.  **Draft**: The initial state. Only the owner can see and edit.
+2.  **Pending**: Owner has clicked "Request Publication". Still only owner can see/edit. Admin (Matt) reviews in Firebase.
+3.  **Published**: Visible to everyone in the Discover screen. **Read-only** for everyone (including the owner) to ensure the reviewed code remains safe.
+
+### Publishing Workflow for Owners
+- **Request Publication**: A button in the Sparklet Editor settings allows owners to submit their draft for review.
+- **Editing Published Work**: To edit a published Sparklet, the owner must first **Unpublish** it (returning it to Draft status). This removes it from the public Discover screen, allowing safe modification before re-submitting for review.
+
+### UI Enhancements
+- **Discover Screen**: Split into "Community Sparklets" (Published) and "My Sparklets" (Drafts/Pending).
+*   **Editor**: 
+    - Display current status (Draft, Pending, Published).
+    - Provide "Publish Request" and "Unpublish" buttons.
+    - Disable save/AI-refine when status is "Published".

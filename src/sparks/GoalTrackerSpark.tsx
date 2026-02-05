@@ -10,6 +10,8 @@ import {
   TextInput,
   Modal,
   Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Svg, Path, Circle, Line } from 'react-native-svg';
@@ -30,6 +32,7 @@ import {
 import { HapticFeedback } from '../utils/haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { SparkChart, ChartSeries } from '../components/SparkChart';
+import { getAllSparks, getSparkById } from '../components/SparkRegistry';
 
 interface GoalEntry {
   id: string;
@@ -46,6 +49,7 @@ interface Goal {
   startDate?: string; // YYYY-MM-DD format, defaults to today
   endDate?: string;   // YYYY-MM-DD format, defaults to startDate + 12 months
   durationLabel?: string; // e.g., "year", "6 months"
+  associatedSparkId?: string; // Optional link to another spark
 }
 
 interface GoalTrackerData {
@@ -64,7 +68,7 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
   showSettings,
   onCloseSettings,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { getSparkData, setSparkData } = useSparkStore();
   const navigation = useNavigation();
 
@@ -80,6 +84,8 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
   const [editingEntry, setEditingEntry] = useState<GoalEntry | null>(null);
   const [newGoalName, setNewGoalName] = useState('');
   const [newGoalTarget, setNewGoalTarget] = useState('');
+  const [newGoalSparkId, setNewGoalSparkId] = useState<string | undefined>(undefined);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editEntryDate, setEditEntryDate] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const confettiRef = React.useRef<any>(null);
@@ -132,8 +138,19 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     HapticFeedback.light();
   };
 
-  // Add new goal
-  const handleAddGoal = () => {
+  const handleEditGoal = (goal: Goal) => {
+    setEditingGoalId(goal.id);
+    setNewGoalName(goal.name);
+    setNewGoalTarget(goal.targetPerYear.toString());
+    setNewGoalStartDate(getGoalStartDate(goal));
+    setNewGoalEndDate(getGoalEndDate(goal));
+    setNewGoalSparkId(goal.associatedSparkId);
+    setShowAddGoalModal(true);
+    HapticFeedback.light();
+  };
+
+  // Save goal (add or update)
+  const handleSaveGoal = () => {
     const name = newGoalName.trim();
     const target = parseInt(newGoalTarget.trim());
 
@@ -147,24 +164,52 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       return;
     }
 
-    const newGoal: Goal = {
-      id: `goal_${Date.now()}`,
-      name,
-      targetPerYear: target,
-      entries: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      startDate: formatDateString(newGoalStartDate),
-      endDate: formatDateString(newGoalEndDate),
-      durationLabel: calculateDurationLabel(newGoalStartDate, newGoalEndDate),
-    };
+    if (editingGoalId) {
+      // Update existing goal
+      const updatedGoals = data.goals.map(g => {
+        if (g.id === editingGoalId) {
+          return {
+            ...g,
+            name,
+            targetPerYear: target,
+            updatedAt: new Date().toISOString(),
+            startDate: formatDateString(newGoalStartDate),
+            endDate: formatDateString(newGoalEndDate),
+            durationLabel: calculateDurationLabel(newGoalStartDate, newGoalEndDate),
+            associatedSparkId: newGoalSparkId,
+          };
+        }
+        return g;
+      });
 
-    saveData({
-      ...data,
-      goals: [...data.goals, newGoal],
-      currentGoalId: newGoal.id,
-      currentScreen: 'goal-detail',
-    });
+      saveData({
+        ...data,
+        goals: updatedGoals,
+      });
+    } else {
+      // Create new goal
+      const newGoal: Goal = {
+        id: `goal_${Date.now()}`,
+        name,
+        targetPerYear: target,
+        entries: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        startDate: formatDateString(newGoalStartDate),
+        endDate: formatDateString(newGoalEndDate),
+        durationLabel: calculateDurationLabel(newGoalStartDate, newGoalEndDate),
+        associatedSparkId: newGoalSparkId,
+      };
+
+      saveData({
+        ...data,
+        goals: [...data.goals, newGoal],
+        currentGoalId: newGoal.id,
+        currentScreen: 'goal-detail',
+      });
+      setCurrentScreen('goal-detail');
+      triggerCelebration();
+    }
 
     setNewGoalName('');
     setNewGoalTarget('');
@@ -174,10 +219,10 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       date.setMonth(date.getMonth() + 12);
       return date;
     });
+    setNewGoalSparkId(undefined);
+    setEditingGoalId(null);
     setShowAddGoalModal(false);
-    setCurrentScreen('goal-detail');
     HapticFeedback.success();
-    triggerCelebration();
   };
 
   // Add +1 entry
@@ -881,6 +926,32 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
       borderRadius: 8,
       alignItems: 'center',
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContentSmall: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: '90%',
+      maxWidth: 400,
+      alignItems: 'center',
+    },
+    modalHeaderInner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 20,
+    },
+    modalTitleSmall: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
   });
 
   // Settings screen
@@ -944,19 +1015,26 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
     );
   }
 
-  // Goal detail screen
-  if (currentScreen === 'goal-detail' && currentGoal) {
-    const stats = calculateStats(currentGoal);
-
-    return (
-      <View style={styles.container}>
+  // Main Navigation / Screen Logic
+  const renderContent = () => {
+    if (currentScreen === 'goal-detail' && currentGoal) {
+      const stats = calculateStats(currentGoal);
+      return (
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackToHome}>
             <Text style={styles.backButtonText}>← Back to Goals</Text>
           </TouchableOpacity>
 
           <View style={styles.goalDetailHeader}>
-            <Text style={styles.goalDetailTitle}>{currentGoal.name}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={[styles.goalDetailTitle, { marginBottom: 0 }]}>{currentGoal.name}</Text>
+              <TouchableOpacity
+                onPress={() => handleEditGoal(currentGoal)}
+                style={{ marginLeft: 8, padding: 4 }}
+              >
+                <Text style={{ fontSize: 18, color: colors.textSecondary }}>✎</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 16, textAlign: 'center' }}>
               {stats.goalStartDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {stats.goalEndDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </Text>
@@ -1018,52 +1096,11 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
             )}
           </View>
         </ScrollView>
+      );
+    }
 
-        {/* Celebration Confetti */}
-        {showCelebration && (
-          <ConfettiCannon
-            ref={confettiRef}
-            count={50}
-            origin={{ x: Dimensions.get('window').width / 2, y: -20 }}
-            autoStart={false}
-            fadeOut={true}
-            onAnimationEnd={() => setShowCelebration(false)}
-          />
-        )}
-
-        {/* Edit Entry Modal */}
-        <Modal visible={showEditEntryModal} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Entry Date</Text>
-              <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="2025-01-15"
-                placeholderTextColor={colors.textSecondary}
-                value={editEntryDate}
-                onChangeText={setEditEntryDate}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <SaveCancelButtons
-                onSave={handleSaveEditEntry}
-                onCancel={() => {
-                  setShowEditEntryModal(false);
-                  setEditingEntry(null);
-                  setEditEntryDate('');
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
-      </View>
-    );
-  }
-
-  // Home screen
-  return (
-    <View style={styles.container}>
+    // Home Screen
+    return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Goal Tracker 🎯</Text>
@@ -1098,6 +1135,33 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                   <Text style={[styles.goalStats, { color: stats.forecastColor, marginBottom: 0 }]}>
                     Forecast: {stats.forecastForYear} for the {goal.durationLabel || 'year'}
                   </Text>
+                  {goal.associatedSparkId && (
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: colors.surface,
+                        padding: 6,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignSelf: 'flex-start'
+                      }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        HapticFeedback.light();
+                        (navigation as any).navigate('Spark', { sparkId: goal.associatedSparkId });
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, marginRight: 4 }}>
+                        {getSparkById(goal.associatedSparkId)?.metadata.icon || '✨'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+                        Open {getSparkById(goal.associatedSparkId)?.metadata.title || 'Spark'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
 
                 {!hasEntryForToday(goal) && (
@@ -1124,56 +1188,90 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
           <Text style={styles.addGoalButtonText}>+ Add New Goal</Text>
         </TouchableOpacity>
       </ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {renderContent()}
+
+      {/* Edit Entry Modal */}
+      <Modal visible={showEditEntryModal} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Entry Date</Text>
+              <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="2025-01-15"
+                placeholderTextColor={colors.textSecondary}
+                value={editEntryDate}
+                onChangeText={setEditEntryDate}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <SaveCancelButtons
+                onSave={handleSaveEditEntry}
+                onCancel={() => {
+                  setShowEditEntryModal(false);
+                  setEditingEntry(null);
+                  setEditEntryDate('');
+                  Keyboard.dismiss();
+                }}
+              />
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Add Goal Modal */}
       <Modal visible={showAddGoalModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create New Goal</Text>
-            <Text style={styles.inputLabel}>Goal Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Golf"
-              placeholderTextColor={colors.textSecondary}
-              value={newGoalName}
-              onChangeText={setNewGoalName}
-              autoCapitalize="words"
-            />
-            <Text style={styles.inputLabel}>
-              Target Per {calculateDurationLabel(newGoalStartDate, newGoalEndDate).charAt(0).toUpperCase() + calculateDurationLabel(newGoalStartDate, newGoalEndDate).slice(1)}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 100"
-              placeholderTextColor={colors.textSecondary}
-              value={newGoalTarget}
-              onChangeText={setNewGoalTarget}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.inputLabel}>Start Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowStartDatePicker(!showStartDatePicker)}
-            >
-              <Text style={styles.dateButtonText}>
-                {newGoalStartDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{editingGoalId ? 'Edit Goal' : 'Create New Goal'}</Text>
+              <Text style={styles.inputLabel}>Goal Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Golf"
+                placeholderTextColor={colors.textSecondary}
+                value={newGoalName}
+                onChangeText={setNewGoalName}
+                autoCapitalize="words"
+              />
+              <Text style={styles.inputLabel}>
+                Target Per {calculateDurationLabel(newGoalStartDate, newGoalEndDate).charAt(0).toUpperCase() + calculateDurationLabel(newGoalStartDate, newGoalEndDate).slice(1)}
               </Text>
-              <Text>📅</Text>
-            </TouchableOpacity>
-            {showStartDatePicker && (
-              <View style={styles.datePickerContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., 100"
+                placeholderTextColor={colors.textSecondary}
+                value={newGoalTarget}
+                onChangeText={setNewGoalTarget}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.inputLabel}>Start Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartDatePicker(!showStartDatePicker)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {newGoalStartDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+                </Text>
+                <Text>📅</Text>
+              </TouchableOpacity>
+              {/* Start Date Picker */}
+              {Platform.OS === 'android' && showStartDatePicker && (
                 <DateTimePicker
                   value={newGoalStartDate}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  display="default"
                   onChange={(event, selectedDate) => {
-                    if (Platform.OS === 'android') {
-                      setShowStartDatePicker(false);
-                    }
+                    setShowStartDatePicker(false);
                     if (selectedDate) {
                       setNewGoalStartDate(selectedDate);
-                      // Auto-adjust end date if it's before the new start date
                       if (selectedDate > newGoalEndDate) {
                         const newEndDate = new Date(selectedDate);
                         newEndDate.setMonth(newEndDate.getMonth() + 12);
@@ -1182,64 +1280,147 @@ export const GoalTrackerSpark: React.FC<SparkProps> = ({
                     }
                   }}
                 />
-              </View>
-            )}
-            {showStartDatePicker && Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={[styles.button, { marginTop: 10 }]}
-                onPress={() => setShowStartDatePicker(false)}
-              >
-                <Text style={styles.buttonText}>Done</Text>
-              </TouchableOpacity>
-            )}
+              )}
+              {Platform.OS === 'ios' && (
+                <Modal visible={showStartDatePicker} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStartDatePicker(false)}>
+                    <View style={styles.modalContentSmall}>
+                      <View style={styles.modalHeaderInner}>
+                        <Text style={styles.modalTitleSmall}>Start Date</Text>
+                        <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
+                          <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newGoalStartDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) {
+                            setNewGoalStartDate(selectedDate);
+                            if (selectedDate > newGoalEndDate) {
+                              const newEndDate = new Date(selectedDate);
+                              newEndDate.setMonth(newEndDate.getMonth() + 12);
+                              setNewGoalEndDate(newEndDate);
+                            }
+                          }
+                        }}
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              )}
 
-            <Text style={styles.inputLabel}>End Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowEndDatePicker(!showEndDatePicker)}
-            >
-              <Text style={styles.dateButtonText}>
-                {newGoalEndDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
-              </Text>
-              <Text>📅</Text>
-            </TouchableOpacity>
-            {showEndDatePicker && (
-              <View style={styles.datePickerContainer}>
+              <Text style={styles.inputLabel}>End Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndDatePicker(!showEndDatePicker)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {newGoalEndDate.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+                </Text>
+                <Text>📅</Text>
+              </TouchableOpacity>
+
+              {/* End Date Picker */}
+              {Platform.OS === 'android' && showEndDatePicker && (
                 <DateTimePicker
                   value={newGoalEndDate}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  display="default"
                   onChange={(event, selectedDate) => {
-                    if (Platform.OS === 'android') {
-                      setShowEndDatePicker(false);
-                    }
+                    setShowEndDatePicker(false);
                     if (selectedDate) setNewGoalEndDate(selectedDate);
                   }}
                 />
-              </View>
-            )}
-            {showEndDatePicker && Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={[styles.button, { marginTop: 10 }]}
-                onPress={() => setShowEndDatePicker(false)}
-              >
-                <Text style={styles.buttonText}>Done</Text>
-              </TouchableOpacity>
-            )}
+              )}
+              {Platform.OS === 'ios' && (
+                <Modal visible={showEndDatePicker} transparent animationType="fade">
+                  <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowEndDatePicker(false)}>
+                    <View style={styles.modalContentSmall}>
+                      <View style={styles.modalHeaderInner}>
+                        <Text style={styles.modalTitleSmall}>End Date</Text>
+                        <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                          <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newGoalEndDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, selectedDate) => {
+                          if (selectedDate) setNewGoalEndDate(selectedDate);
+                        }}
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              )}
 
-            <Text style={[styles.inputLabel, { fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginTop: 8 }]}>
-              Default: 12 months from start date
-            </Text>
-            <SaveCancelButtons
-              onSave={handleAddGoal}
-              onCancel={() => {
-                setShowAddGoalModal(false);
-                setNewGoalName('');
-                setNewGoalTarget('');
-              }}
-            />
+              <Text style={[styles.inputLabel, { fontSize: 12, fontStyle: 'italic', color: colors.textSecondary, marginTop: 8 }]}>
+                Default: 12 months from start date
+              </Text>
+
+              <View style={{ marginTop: 16 }}>
+                <Text style={styles.inputLabel}>Associate with Spark (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 20,
+                      backgroundColor: !newGoalSparkId ? colors.primary : colors.surface,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      marginRight: 8
+                    }}
+                    onPress={() => setNewGoalSparkId(undefined)}
+                  >
+                    <Text style={{ color: !newGoalSparkId ? '#fff' : colors.text, fontSize: 12, fontWeight: '600' }}>None</Text>
+                  </TouchableOpacity>
+                  {getAllSparks()
+                    .filter(s => s.metadata.id !== 'goal-tracker')
+                    .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title))
+                    .map(spark => (
+                      <TouchableOpacity
+                        key={spark.metadata.id}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 20,
+                          backgroundColor: newGoalSparkId === spark.metadata.id ? colors.primary : colors.surface,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          marginRight: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setNewGoalSparkId(spark.metadata.id)}
+                      >
+                        <Text style={{ marginRight: 4, fontSize: 12 }}>{spark.metadata.icon}</Text>
+                        <Text style={{ color: newGoalSparkId === spark.metadata.id ? '#fff' : colors.text, fontSize: 12, fontWeight: '600' }}>
+                          {spark.metadata.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              </View>
+              <SaveCancelButtons
+                onSave={handleSaveGoal}
+                onCancel={() => {
+                  setShowAddGoalModal(false);
+                  setNewGoalName('');
+                  setNewGoalTarget('');
+                  setNewGoalSparkId(undefined);
+                  setEditingGoalId(null);
+                  Keyboard.dismiss();
+                }}
+              />
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {showCelebration && (

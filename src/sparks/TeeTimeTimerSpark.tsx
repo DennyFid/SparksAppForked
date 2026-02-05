@@ -960,7 +960,7 @@ export const TeeTimeTimerSpark: React.FC<TeeTimeTimerSparkProps> = ({
   };
 
   const handleConfirmTeeTime = () => {
-    setShowTimePicker(false);
+    setShowNativePicker(false);
 
     const today = new Date();
     const teeTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(),

@@ -6,6 +6,18 @@ export const CommandExecutor = {
     const { getSparkData, setSparkData } = useSparkStore.getState();
 
     try {
+      if (command.action === 'open') {
+        const sparkId = command.targetSpark;
+        if (sparkId === 'unknown') {
+          return { success: false, message: "I'm not sure which spark you want to open." };
+        }
+        return {
+          success: true,
+          message: `Opening ${sparkId}...`,
+          openSparkId: sparkId
+        };
+      }
+
       switch (command.targetSpark) {
         case 'todo':
           return handleTodoCommand(command, getSparkData, setSparkData);
