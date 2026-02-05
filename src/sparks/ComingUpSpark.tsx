@@ -34,7 +34,7 @@ interface ComingUpSparkProps {
 }
 
 const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSettings }) => {
-    const { colors } = useTheme();
+    const { colors, isDarkMode } = useTheme();
     const getSparkData = useSparkStore(state => state.getSparkData);
     const setSparkData = useSparkStore(state => state.setSparkData);
     const [events, setEvents] = useState<Event[]>([]);
@@ -658,6 +658,32 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
             fontSize: 16,
             fontWeight: '600',
         },
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        modalContent: {
+            backgroundColor: colors.surface,
+            borderRadius: 24,
+            padding: 24,
+            width: '90%',
+            maxWidth: 400,
+            alignItems: 'center',
+        },
+        modalHeaderInner: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            width: '100%',
+            marginBottom: 20,
+        },
+        modalTitleSmall: {
+            fontSize: 18,
+            fontWeight: '600',
+            color: colors.text,
+        },
     });
 
     if (showSettings) {
@@ -813,28 +839,50 @@ const ComingUpSpark: React.FC<ComingUpSparkProps> = ({ showSettings, onCloseSett
                                 </Text>
                                 <Text>📅</Text>
                             </TouchableOpacity>
-                            {showDatePicker && (
-                                <View style={styles.datePickerContainer}>
-                                    <DateTimePicker
-                                        value={date}
-                                        mode="date"
-                                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                                        onChange={(event, selectedDate) => {
-                                            if (Platform.OS === 'android') {
-                                                setShowDatePicker(false);
-                                            }
-                                            if (selectedDate) setDate(selectedDate);
-                                        }}
-                                    />
-                                </View>
+                            {/* Android Picker */}
+                            {Platform.OS === 'android' && showDatePicker && (
+                                <DateTimePicker
+                                    value={date}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, selectedDate) => {
+                                        setShowDatePicker(false);
+                                        if (selectedDate) setDate(selectedDate);
+                                    }}
+                                />
                             )}
-                            {showDatePicker && Platform.OS === 'ios' && (
-                                <TouchableOpacity
-                                    style={[styles.button, { marginTop: 10 }]}
-                                    onPress={() => setShowDatePicker(false)}
+
+                            {/* iOS Modal Picker */}
+                            {Platform.OS === 'ios' && (
+                                <Modal
+                                    visible={showDatePicker}
+                                    transparent={true}
+                                    animationType="fade"
                                 >
-                                    <Text style={styles.buttonText}>Done</Text>
-                                </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.modalOverlay}
+                                        activeOpacity={1}
+                                        onPress={() => setShowDatePicker(false)}
+                                    >
+                                        <View style={styles.modalContent}>
+                                            <View style={styles.modalHeaderInner}>
+                                                <Text style={styles.modalTitleSmall}>Select Date</Text>
+                                                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                                                    <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <DateTimePicker
+                                                value={date}
+                                                mode="date"
+                                                display="spinner"
+                                                onChange={(event, selectedDate) => {
+                                                    if (selectedDate) setDate(selectedDate);
+                                                }}
+                                                themeVariant={isDarkMode ? 'dark' : 'light'}
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+                                </Modal>
                             )}
                         </View>
 

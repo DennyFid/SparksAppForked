@@ -1,32 +1,26 @@
 import { RemoteConfigService } from './RemoteConfigService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppStore } from '../store/appStore';
 import { Alert } from 'react-native';
 import { navigationRef } from '../navigation/navigationRef';
 
-const CUSTOM_API_KEY_STORAGE_KEY = 'sparks_custom_gemini_api_key';
-
 /**
  * Get the API key using the resolution hierarchy:
- * 1. User custom key (if configured)
+ * 1. User custom key (if configured in App Store)
  * 2. Firebase Remote Config key
  * 3. Environment variable (fallback)
  */
 async function getApiKey(): Promise<string> {
-    // 1. Check for user's custom key
-    try {
-        const customKey = await AsyncStorage.getItem(CUSTOM_API_KEY_STORAGE_KEY);
-        if (customKey && customKey.trim()) {
-            console.log('🔑 Using custom Gemini API key');
-            return customKey.trim();
-        }
-    } catch (error) {
-        console.warn('⚠️ Failed to check custom API key:', error);
+    // 1. Check for user's custom key in App Store
+    const customKey = useAppStore.getState().preferences.customGeminiApiKey;
+    if (customKey && customKey.trim()) {
+        console.log('🔑 Using custom Gemini API key from store');
+        return customKey.trim();
     }
 
     // 2. Check Firebase Remote Config
     try {
         await RemoteConfigService.ensureInitialized();
-        const remoteKey = RemoteConfigService.getGeminiApiKey();
+        const remoteKey = RemoteConfigService.getDefaultGeminiApiKey();
         if (remoteKey && remoteKey.trim()) {
             console.log('🔑 Using Remote Config Gemini API key');
             return remoteKey.trim();

@@ -5,6 +5,9 @@ export interface SparkletMetadata {
     icon: string;
     category: string;
     isBeta?: boolean;
+    ownerId?: string;
+    isPublished?: boolean;
+    status?: 'draft' | 'pending' | 'published';
 }
 
 export interface Sparklet {

@@ -15,6 +15,7 @@ import { FirebaseService as NativeFirebaseService } from './FirebaseService';
 import { SimpleAnalyticsService } from './SimpleAnalyticsService';
 import { Platform } from 'react-native';
 import { isExpoGo } from '../utils/expoGoDetection';
+import { RemoteConfigService } from './RemoteConfigService';
 
 // Detect available Firebase implementations
 let isWebFirebaseAvailable = false;
@@ -74,6 +75,14 @@ export class ServiceFactory {
 
         // Wait a bit to ensure Firebase is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Initialize Remote Config
+        try {
+          await RemoteConfigService.initialize();
+          console.log('✅ Remote Config initialized via ServiceFactory');
+        } catch (rcError) {
+          console.warn('⚠️ Remote Config initialization failed (non-critical):', rcError);
+        }
       } catch (error) {
         console.error('❌ Failed to initialize Web Firebase service:', error);
         throw error; // Rethrow to inform the caller

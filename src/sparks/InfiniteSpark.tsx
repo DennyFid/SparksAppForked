@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Sparklet } from '../types/sparklet';
 import { HapticFeedback } from '../utils/haptics';
 import { SparkletService } from '../services/SparkletService';
+import { SimpleAnalyticsService } from '../services/SimpleAnalyticsService';
 import { useSparkStore } from '../store';
 import { SparkletWizard } from './InfiniteSpark/SparkletWizard';
 import { SparkletEditor } from './InfiniteSpark/SparkletEditor';
@@ -247,7 +248,7 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
             >
                 <View style={styles.discoverHeader}>
                     <Text style={[styles.discoverTitle, { color: colors.text }]}>Discover Sparklets</Text>
-                    <Text style={[styles.discoverSubtitle, { color: colors.textSecondary }]}>The dynamic expansion zone</Text>
+                    <Text style={[styles.discoverSubtitle, { color: colors.textSecondary }]}>An ever-expanding collection of good stuff.</Text>
                 </View>
 
                 {error && (
@@ -259,21 +260,59 @@ export const InfiniteSpark: React.FC<InfiniteSparkProps> = ({
                     </View>
                 )}
 
-                <View style={styles.grid}>
-                    {sparklets.map((sparklet) => (
-                        <TouchableOpacity
-                            key={sparklet.metadata.id}
-                            style={[styles.card, { backgroundColor: colors.surface }]}
-                            onPress={() => handleSparkletPress(sparklet)}
-                        >
-                            <View style={styles.cardContent}>
-                                <Text style={styles.cardIcon}>{sparklet.metadata.icon}</Text>
-                                <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-                                    {sparklet.metadata.title} {sparklet.metadata.isBeta && <Text style={styles.betaBadge}>b</Text>}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                {/* My Sparklets Section */}
+                {sparklets.filter(s => s.metadata.ownerId === (SimpleAnalyticsService.getUserId() || SimpleAnalyticsService.getDeviceId())).length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>My Sparklets</Text>
+                        <View style={styles.grid}>
+                            {sparklets
+                                .filter(s => s.metadata.ownerId === (SimpleAnalyticsService.getUserId() || SimpleAnalyticsService.getDeviceId()))
+                                .map((sparklet) => (
+                                    <TouchableOpacity
+                                        key={sparklet.metadata.id}
+                                        style={[styles.card, { backgroundColor: colors.surface }]}
+                                        onPress={() => handleSparkletPress(sparklet)}
+                                    >
+                                        <View style={styles.cardContent}>
+                                            <Text style={styles.cardIcon}>{sparklet.metadata.icon}</Text>
+                                            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                                                {sparklet.metadata.title} {sparklet.metadata.isBeta && <Text style={styles.betaBadge}>b</Text>}
+                                            </Text>
+                                            {sparklet.metadata.status && sparklet.metadata.status !== 'published' && (
+                                                <View style={[styles.statusBadge, { backgroundColor: sparklet.metadata.status === 'pending' ? colors.warning + '20' : colors.border }]}>
+                                                    <Text style={[styles.statusText, { color: sparklet.metadata.status === 'pending' ? colors.warning : colors.textSecondary }]}>
+                                                        {sparklet.metadata.status.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* Community Sparklets Section */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Community Sparklets</Text>
+                    <View style={styles.grid}>
+                        {sparklets
+                            .filter(s => s.metadata.isPublished)
+                            .map((sparklet) => (
+                                <TouchableOpacity
+                                    key={sparklet.metadata.id}
+                                    style={[styles.card, { backgroundColor: colors.surface }]}
+                                    onPress={() => handleSparkletPress(sparklet)}
+                                >
+                                    <View style={styles.cardContent}>
+                                        <Text style={styles.cardIcon}>{sparklet.metadata.icon}</Text>
+                                        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                                            {sparklet.metadata.title} {sparklet.metadata.isBeta && <Text style={styles.betaBadge}>b</Text>}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                    </View>
                 </View>
 
                 {isLoading && sparklets.length === 0 && (
@@ -308,13 +347,28 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
     }, [definitionJson]);
 
     const [state, setState] = useState(config.initialState || {});
+    const stateRef = useRef(state);
+    const timers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+
+    // Sync ref with state
+    useEffect(() => {
+        stateRef.current = state;
+    }, [state]);
+
+    // Cleanup timers on unmount
+    useEffect(() => {
+        const currentTimers = timers.current;
+        return () => {
+            Object.values(currentTimers).forEach(t => clearTimeout(t));
+        };
+    }, []);
 
     // Helper Evaluator
     const runHelper = (name: string, payload: any = {}) => {
         if (!config.helpers || !config.helpers[name]) return null;
         try {
             const fn = new Function('state', 'params', 'helpers', config.helpers[name]);
-            return fn(state, payload, {});
+            return fn(stateRef.current, payload, {});
         } catch (e) {
             console.error('Helper failed:', e);
             return null;
@@ -325,8 +379,6 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
     const executeAction = (name: string, params: any = {}) => {
         if (!config.actions || !config.actions[name]) return;
         try {
-            const fn = new Function('state', 'params', 'helpers', config.actions[name]);
-
             const helpersProxy: any = {};
             if (config.helpers) {
                 Object.keys(config.helpers).forEach(hName => {
@@ -334,97 +386,244 @@ const UniversalSparkletEngine: React.FC<{ definitionJson: string }> = ({ definit
                 });
             }
 
-            const result = fn(state, params, helpersProxy);
+            // Built-in helpers
+            helpersProxy.scheduleAction = (actionName: string, actionParams: any, delay: number) => {
+                if (timers.current[actionName]) clearTimeout(timers.current[actionName]);
+                timers.current[actionName] = setTimeout(() => {
+                    executeAction(actionName, actionParams);
+                }, delay);
+            };
+
+            helpersProxy.cancelAction = (actionName: string) => {
+                if (timers.current[actionName]) {
+                    clearTimeout(timers.current[actionName]);
+                    delete timers.current[actionName];
+                }
+            };
+
+            const fn = new Function('state', 'params', 'helpers', config.actions[name]);
+            const result = fn(stateRef.current, params, helpersProxy);
             if (result && typeof result === 'object') {
-                setState({ ...result });
+                const newState = { ...stateRef.current, ...result };
+                stateRef.current = newState;
+                setState(newState);
             }
         } catch (e) {
             console.error('Action execution failed:', e);
         }
     };
 
-    // Value Interpolator (e.g. {{state.status}})
-    const interpolate = (val: string) => {
+    // Value Interpolator (e.g. {{state.status}} or {{element.label}})
+    const interpolate = (val: any, context: any = {}): any => {
         if (typeof val !== 'string') return val;
-        return val.replace(/{{([^}]+)}}/g, (match, path) => {
-            const keys = path.trim().replace(/^state\./, '').split('.');
-            let current = state;
-            for (const key of keys) {
-                if (current === undefined) return '';
-                current = current[key];
+
+        const expressionRegex = /{{([^}]+)}}/g;
+
+        // Combine state and and other local context (like 'element' in grids)
+        const evalContext = { state: stateRef.current, ...context };
+
+        // Check if the entire string is a single interpolation (to return raw objects)
+        const matchFull = val.match(/^{{([^}]+)}}$/);
+        if (matchFull) {
+            try {
+                const keys = Object.keys(evalContext);
+                const values = Object.values(evalContext);
+                const fn = new Function(...keys, `return ${matchFull[1].trim()}`);
+                return fn(...values);
+            } catch (e) {
+                console.warn('Interpolation failed:', matchFull[1], e);
+                return undefined;
             }
-            return current !== undefined ? String(current) : '';
+        }
+
+        // Otherwise replace matches in the string
+        return val.replace(expressionRegex, (match, expression) => {
+            try {
+                const keys = Object.keys(evalContext);
+                const values = Object.values(evalContext);
+                const fn = new Function(...keys, `return ${expression.trim()}`);
+                const result = fn(...values);
+                return result !== undefined ? String(result) : '';
+            } catch (e) {
+                console.warn('Interpolation failed:', expression, e);
+                return '';
+            }
         });
     };
 
-    const renderElement = (el: any, index: number) => {
-        const customStyle = config.view?.styles?.[el.style] || {};
+    const renderElement = (el: any, index: number, context: any = {}): React.ReactNode => {
+        // Handle conditional visibility
+        if (el.visible !== undefined) {
+            const isVisible = interpolate(el.visible, context);
+            if (!isVisible || isVisible === 'false') return null;
+        }
+        if (el.hidden !== undefined) {
+            const isHidden = interpolate(el.hidden, context);
+            if (isHidden === true || isHidden === 'true') return null;
+        }
+
+        const rawStyle = config.view?.styles?.[el.style] || {};
+        const customStyle: any = {};
+        Object.keys(rawStyle).forEach(key => {
+            let val = interpolate(rawStyle[key], context);
+
+            // Basic web-to-native mapping
+            if (typeof val === 'string') {
+                // Remove px
+                if (val.endsWith('px')) {
+                    val = parseFloat(val);
+                } else if (val.endsWith('em')) {
+                    // Rough em to px approximation
+                    val = parseFloat(val) * 16;
+                } else if (/^-?\d+(\.\d+)?$/.test(val)) {
+                    // If it's just a number string, convert to Number
+                    val = parseFloat(val);
+                }
+            }
+
+            // Specific property mappings
+            if (key === 'display' && val === 'none') {
+                customStyle.height = 0;
+                customStyle.opacity = 0;
+                customStyle.overflow = 'hidden';
+            } else if (key === 'transform' && typeof val === 'string') {
+                // Parser for "translate(-50%, -50%)"
+                const match = val.match(/translate\(([^,]+),\s*([^)]+)\)/);
+                if (match) {
+                    customStyle.transform = [
+                        { translateX: match[1].includes('%') ? match[1] : parseFloat(match[1]) },
+                        { translateY: match[2].includes('%') ? match[2] : parseFloat(match[2]) }
+                    ];
+                }
+            } else if (key === 'boxShadow' && typeof val === 'string') {
+                // Parser for "0px 4px 8px rgba(0,0,0,0.2)"
+                const parts = val.split(' ');
+                if (parts.length >= 4) {
+                    customStyle.shadowOffset = { width: parseFloat(parts[0]), height: parseFloat(parts[1]) };
+                    customStyle.shadowRadius = parseFloat(parts[2]);
+                    const colorPart = val.substring(val.indexOf('rgba'));
+                    customStyle.shadowColor = colorPart || '#000';
+                    customStyle.shadowOpacity = 0.3; // Default
+                    customStyle.elevation = 5;
+                }
+            } else if (key === 'cursor') {
+                // Ignore web-only cursor
+            } else {
+                customStyle[key] = val;
+            }
+        });
 
         switch (el.type) {
             case 'text':
                 return (
                     <Text key={index} style={[styles.engineText, { color: colors.text }, customStyle]}>
-                        {interpolate(el.value)}
+                        {interpolate(el.value, context)}
                     </Text>
                 );
             case 'button':
+                const buttonStyle: any = {};
+                const textStyle: any = {};
+                const textProps = ['color', 'fontSize', 'fontWeight', 'textAlign', 'fontFamily', 'lineHeight'];
+
+                Object.keys(customStyle).forEach(key => {
+                    if (textProps.includes(key)) {
+                        textStyle[key] = customStyle[key];
+                    } else {
+                        buttonStyle[key] = customStyle[key];
+                    }
+                });
+
                 return (
                     <TouchableOpacity
                         key={index}
-                        style={[styles.engineButton, { backgroundColor: colors.primary }, customStyle]}
+                        style={[styles.engineButton, { backgroundColor: colors.primary }, buttonStyle]}
                         onPress={() => {
                             HapticFeedback.light();
-                            executeAction(el.onPress);
+                            // Interpolate individual params
+                            const finalParams: any = {};
+                            if (el.params) {
+                                Object.keys(el.params).forEach(k => {
+                                    finalParams[k] = interpolate(el.params[k], context);
+                                });
+                            }
+                            executeAction(el.onPress, finalParams);
                         }}
                     >
-                        <Text style={styles.engineButtonText}>{interpolate(el.label)}</Text>
+                        <Text style={[styles.engineButtonText, textStyle]}>{interpolate(el.label || el.value, context)}</Text>
                     </TouchableOpacity>
                 );
-            case 'grid':
-                const fieldName = el.dataSource.replace(/^state\./, '');
-                const items = state[fieldName] || [];
+            case 'grid': {
+                if (el.dataSource) {
+                    const fieldName = el.dataSource.replace(/^state\./, '');
+                    const items = state[fieldName] || [];
+                    return (
+                        <View key={index} style={[styles.engineGrid, customStyle]}>
+                            {items.map((item: any, i: number) => {
+                                if (el.elements && el.elements.length > 0) {
+                                    // Render custom template for each grid item
+                                    return el.elements.map((template: any, subIndex: number) =>
+                                        renderElement(template, i * 100 + subIndex, { element: item })
+                                    );
+                                }
+                                // Fallback to simple cell if no template provided
+                                return (
+                                    <TouchableOpacity
+                                        key={i}
+                                        style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                                        onPress={() => executeAction(el.onPress, { index: i })}
+                                    >
+                                        <Text style={[styles.engineCellText, { color: item === 'X' ? colors.primary : '#ef4444' }]}>
+                                            {String(item)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    );
+                }
+            }
+            case 'view':
+            case 'container':
                 return (
-                    <View key={index} style={[styles.engineGrid, customStyle]}>
-                        {items.map((item: any, i: number) => (
-                            <TouchableOpacity
-                                key={i}
-                                style={[styles.engineCell, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                                onPress={() => executeAction(el.onPress, { index: i })}
-                            >
-                                <Text style={[styles.engineCellText, { color: item === 'X' ? colors.primary : '#ef4444' }]}>
-                                    {String(item)}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                    <View key={index} style={[customStyle]}>
+                        {el.elements?.map((child: any, i: number) => renderElement(child, i, context))}
+                        {el.children?.map((child: any, i: number) => renderElement(child, i, context))}
                     </View>
                 );
-            case 'input':
+            case 'input': {
+                if (!el.binding) {
+                    console.warn('Input element missing binding');
+                    return null;
+                }
                 const bindingField = el.binding.replace(/^state\./, '');
                 return (
                     <TextInput
                         key={index}
-                        style={[styles.engineInput, { color: colors.text, borderColor: colors.border }]}
+                        style={[styles.engineInput, { color: colors.text, borderColor: colors.border, height: 50 }, customStyle]}
                         placeholder={el.placeholder}
                         placeholderTextColor={colors.textSecondary}
                         value={String(state[bindingField] || '')}
                         onChangeText={(txt) => {
                             setState((prev: any) => ({ ...prev, [bindingField]: txt }));
                         }}
+                        secureTextEntry={el.secureTextEntry}
+                        autoCapitalize={el.autoCapitalize || 'none'}
                     />
                 );
+            }
             default:
                 return null;
         }
     };
 
     if (!config?.view?.elements) {
-        return <Text style={{ color: colors.textSecondary }}>Empty or invalid definition.</Text>;
+        return <View style={{ padding: 20 }}><Text style={{ color: colors.textSecondary }}>Empty or invalid definition.</Text></View>;
     }
 
     return (
-        <View style={styles.engineContainer}>
+        <ScrollView contentContainerStyle={styles.engineContainer}>
             {config.view.elements.map((el: any, i: number) => renderElement(el, i))}
-        </View>
+        </ScrollView>
     );
 };
 
@@ -466,6 +665,15 @@ const styles = StyleSheet.create({
     discoverSubtitle: {
         fontSize: 16,
     },
+    section: {
+        marginBottom: 24,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 12,
+        marginLeft: 4,
+    },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -500,6 +708,16 @@ const styles = StyleSheet.create({
     betaBadge: {
         fontSize: 10,
         color: '#ff9500',
+        fontWeight: 'bold',
+    },
+    statusBadge: {
+        marginTop: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    statusText: {
+        fontSize: 9,
         fontWeight: 'bold',
     },
     infoBox: {
